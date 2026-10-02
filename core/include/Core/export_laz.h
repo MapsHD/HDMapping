@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 // TODO(mwlasiuk) : do this at the end (print -> spdlog) as it is .h and not cpp + hpp and that breaks some subprojects ...
 
@@ -399,6 +399,61 @@ inline void points_to_vector(
                 }
             }
         }
+    }
+}
+
+//! Writes the points of `session` that fall inside the active xz/yz/xy intersection slab(s) (within
+//! `intersection_width` of the respective plane) to one laz file. Shared by step 2 (one session,
+//! picked via a file dialog) and step 3 (one call per session, auto-named -- see
+//! export_intersection_all_sessions() in multi_session_registration.cpp).
+inline void save_intersection(
+    const Session& session,
+    const std::string& output_las_name,
+    bool xz_intersection,
+    bool yz_intersection,
+    bool xy_intersection,
+    double intersection_width)
+{
+    std::vector<Eigen::Vector3d> pointcloud;
+    std::vector<unsigned short> intensity;
+    std::vector<double> timestamps;
+
+    for (auto& p : session.point_clouds_container.point_clouds)
+    {
+        if (!p.visible)
+            continue;
+
+        for (size_t i = 0; i < p.points_local.size(); i++)
+        {
+            Eigen::Vector3d vp = p.m_pose * p.points_local[i];
+
+            bool is_inside = false;
+            if (xz_intersection && fabs(vp.y()) < intersection_width)
+                is_inside = true;
+            if (yz_intersection && fabs(vp.x()) < intersection_width)
+                is_inside = true;
+            if (xy_intersection && fabs(vp.z()) < intersection_width)
+                is_inside = true;
+
+            if (is_inside)
+            {
+                pointcloud.push_back(vp);
+                intensity.push_back(i < p.intensities.size() ? p.intensities[i] : 0);
+                timestamps.push_back(i < p.timestamps.size() ? p.timestamps[i] : 0.0);
+            }
+        }
+    }
+
+    if (!exportLaz(
+            output_las_name,
+            pointcloud,
+            intensity,
+            timestamps,
+            session.point_clouds_container.offset.x(),
+            session.point_clouds_container.offset.y(),
+            session.point_clouds_container.offset.z()))
+    {
+        std::cerr << "problem with saving file: " << output_las_name << std::endl;
     }
 }
 

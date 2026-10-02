@@ -1,5 +1,6 @@
 #include <cmath>
 #include <filesystem>
+#include <map>
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -10,6 +11,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <nlohmann/json.hpp>
+#include <spdlog/spdlog.h>
 
 #include <Eigen/Eigen>
 
@@ -34,6 +36,7 @@
 #endif
 
 #include <HDMapping/Version.hpp>
+#include <HDMapping/Assert.h>
 
 #ifdef _WIN32
 #include "resource.h"
@@ -151,8 +154,11 @@ double search_radius = 0.3;
 bool loaded_sessions = false;
 bool optimized = false;
 bool gizmo_all_sessions = false;
+//!< Stashed Gizmo update when ImGuizmo::IsUsing(). index is sessionId
+std::map<size_t, std::vector<Eigen::Affine3d>> session_drag_preview_poses;
 bool is_ndt_gui = false;
 bool is_loop_closure_gui = false;
+bool prev_is_loop_closure_gui = false;
 bool remove_gui = false;
 NDT ndt;
 
@@ -161,6 +167,7 @@ bool update_rotation_center = false;
 bool is_settings_gui = true;
 
 int number_visible_sessions = 0;
+std::set<int> visible_sessions;
 int index_gt = -1;
 int old_index_gt = -1;
 int index_gizmo = -1;
@@ -190,7 +197,22 @@ namespace fs = std::filesystem;
 int num_edge_extended_before = 0;
 int num_edge_extended_after = 0;
 
-int gui_point_size = 2;
+// Cross-section slicing, ported from step 2's per-session "Intersections" menu. Step 3 has no
+// single active session, so -- same pattern as View > Points size above -- these are pushed to
+// every session's point_clouds_container when changed, instead of being one session's fields.
+bool gui_xz_intersection = false;
+bool gui_yz_intersection = false;
+bool gui_xy_intersection = false;
+double gui_intersection_width = 0.1;
+bool gui_xz_grid_10x10 = false;
+bool gui_xz_grid_1x1 = false;
+bool gui_xz_grid_01x01 = false;
+bool gui_yz_grid_10x10 = false;
+bool gui_yz_grid_1x1 = false;
+bool gui_yz_grid_01x01 = false;
+bool gui_xy_grid_10x10 = false;
+bool gui_xy_grid_1x1 = false;
+bool gui_xy_grid_01x01 = false;
 
 TaitBryanPose motion_model_weights = { 0.01, 0.01, 0.01, 0.1, 0.1, 0.1 };
 ///////////////////////////////////////////////////////////////////////////////////
@@ -376,33 +398,178 @@ void ndt_gui()
 // Places the edge gizmo at the active edge's target pose.
 void setGizmoFromActiveEdge()
 {
+    HDMAPPING_ASSERT(index_active_edge < edges.size(), "requested edge outside edges");
     const Edge& e = edges[index_active_edge];
+
+    HDMAPPING_ASSERT(e.index_session_from  < sessions.size(), "requested session from outside session vector");
+    HDMAPPING_ASSERT(e.index_from < sessions[e.index_session_from].point_clouds_container.point_clouds.size(), "scan index outside session");
     const Eigen::Affine3d m_to = sessions[e.index_session_from].point_clouds_container.point_clouds[e.index_from].m_pose *
         affine_matrix_from_pose_tait_bryan(e.relative_pose_tb);
     Eigen::Map<Eigen::Matrix4f> gizmo(m_gizmo);
     gizmo = m_to.matrix().cast<float>();
 }
 
+bool canEdgeBeActivated(const int i)
+{
+    if (i < 0 || i >= (int)edges.size())
+    {
+        return false;
+    }
+    const auto &e = edges[i];
+    return visible_sessions.contains(e.index_session_from) && visible_sessions.contains(e.index_session_to);
+}
+
 // Makes edge `i` active. The manipulate-edge view draws the scans picked by first/second_session_index and
 // index_loop_closure_source/target, so these follow the edge; a gizmo that is on is moved to the new edge,
 // otherwise it would write the previous edge's pose into this one.
-void setActiveEdge(int i)
+void setActiveEdge(const int i)
 {
+    HDMAPPING_ASSERT(i >= 0 && i < (int)edges.size(), "Edge outside bounds" );
+
     if (i < 0 || i >= (int)edges.size())
         return;
 
-    index_active_edge = i;
     const Edge& e = edges[i];
+
+    HDMAPPING_ASSERT(e.index_session_from < (int)sessions.size(), "First session outside");
+    HDMAPPING_ASSERT(e.index_session_to < (int)sessions.size(), "Second session outside");
+
+    HDMAPPING_ASSERT(visible_sessions.contains(e.index_session_from), "Cannot edit edge in hidden session");
+    HDMAPPING_ASSERT(visible_sessions.contains(e.index_session_to), "Cannot edit edge in hidden session");
+
+    index_active_edge = i;
     first_session_index = e.index_session_from;
     second_session_index = e.index_session_to;
     index_loop_closure_source = e.index_from;
     index_loop_closure_target = e.index_to;
 
+    HDMAPPING_ASSERT(
+        e.index_from < (int)sessions[e.index_session_from].point_clouds_container.point_clouds.size(),
+        "Edge index_from outside its session's point clouds");
+    HDMAPPING_ASSERT(
+        e.index_to < (int)sessions[e.index_session_to].point_clouds_container.point_clouds.size(),
+        "Edge index_to outside its session's point clouds");
+
     if (edge_gizmo)
         setGizmoFromActiveEdge();
 }
 
-void loop_closure_gui()
+// Shared by icp_active_edge() and loop_closure_gui()'s plain "ICP" button: when either
+// endpoint session of the active edge is ground truth, fills source_out/target_out with the
+// other scan's points and the ground-truth scan's points trimmed to that scan's bounding box
+// (so a large ground-truth cloud doesn't drag in unrelated overlapping geometry), and returns
+// true. Returns false if neither/both sessions are ground truth -- caller handles that case.
+bool ground_truth_icp_source_target(std::vector<Eigen::Vector3d>& source_out, std::vector<Eigen::Vector3d>& target_out)
+{
+    bool is_with_ground_truth = sessions[edges[index_active_edge].index_session_from].is_ground_truth ||
+        sessions[edges[index_active_edge].index_session_to].is_ground_truth;
+
+    if (!is_with_ground_truth)
+        return false;
+
+    int index_session_from = -1;
+    int index_session_to = -1;
+    int index_from = -1;
+    int index_to = -1;
+
+    if (sessions[edges[index_active_edge].index_session_from].is_ground_truth)
+    {
+        index_session_from = edges[index_active_edge].index_session_from;
+        index_session_to = edges[index_active_edge].index_session_to;
+        index_from = edges[index_active_edge].index_from;
+        index_to = edges[index_active_edge].index_to;
+    }
+    else
+    {
+        index_session_from = edges[index_active_edge].index_session_to;
+        index_session_to = edges[index_active_edge].index_session_from;
+        index_from = edges[index_active_edge].index_to;
+        index_to = edges[index_active_edge].index_from;
+    }
+
+    double x_min = 1000000000000.0;
+    double y_min = 1000000000000.0;
+    double z_min = 1000000000000.0;
+    double x_max = -1000000000000.0;
+    double y_max = -1000000000000.0;
+    double z_max = -1000000000000.0;
+
+    auto& points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
+
+    for (const auto& p : points_to.points_local)
+    {
+        auto pg = points_to.m_pose * p;
+        if (pg.x() < x_min)
+            x_min = pg.x();
+        if (pg.y() < y_min)
+            y_min = pg.y();
+        if (pg.z() < z_min)
+            z_min = pg.z();
+
+        if (pg.x() > x_max)
+            x_max = pg.x();
+        if (pg.y() > y_max)
+            y_max = pg.y();
+        if (pg.z() > z_max)
+            z_max = pg.z();
+    }
+    auto& points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
+    std::vector<Eigen::Vector3d> ground_truth;
+    for (const auto& p : points_from.points_local)
+    {
+        auto pg = points_from.m_pose * p;
+        if (pg.x() > x_min && pg.x() < x_max)
+        {
+            if (pg.y() > y_min && pg.y() < y_max)
+            {
+                if (pg.z() > z_min && pg.z() < z_max)
+                    ground_truth.push_back(p);
+            }
+        }
+    }
+
+    // index_session_to/index_to here (not edges[index_active_edge]'s raw fields): those
+    // get swapped above when the *target* (not source) side of the edge is the ground
+    // truth session, and source must track that swap too, or it silently ends up
+    // aligning the ground-truth scan against a filtered copy of itself.
+    source_out = sessions[index_session_to].point_clouds_container.point_clouds[index_to].points_local;
+    target_out = std::move(ground_truth);
+    return true;
+}
+
+// Shared body of the fixed-search-radius ICP buttons in loop_closure_gui(): registers the
+// active edge's two scans, via ground_truth_icp_source_target() when applicable.
+void icp_active_edge(float search_radius, int number_of_iterations = 30)
+{
+    std::cout << "Iterative Closest Point" << std::endl;
+    if (sessions[edges[index_active_edge].index_session_from].is_ground_truth &&
+        sessions[edges[index_active_edge].index_session_to].is_ground_truth)
+    {
+        std::cout << "Two sessions are ground truth!!! ICP is disabled" << std::endl;
+        return;
+    }
+
+    PairWiseICP icp;
+    auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+    std::vector<Eigen::Vector3d> source;
+    std::vector<Eigen::Vector3d> target;
+
+    if (!ground_truth_icp_source_target(source, target))
+    {
+        source = sessions[edges[index_active_edge].index_session_to]
+                     .point_clouds_container.point_clouds[edges[index_active_edge].index_to]
+                     .points_local;
+        target = sessions[edges[index_active_edge].index_session_from]
+                     .point_clouds_container.point_clouds[edges[index_active_edge].index_from]
+                     .points_local;
+    }
+
+    if (icp.compute(source, target, search_radius, number_of_iterations, m_pose))
+        edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+}
+
+void on_loop_closure_gui_open()
 {
     // Session gizmos are not drawn in this mode and would block the edge gizmo, so drop the selection.
     if (index_gizmo != -1)
@@ -412,9 +579,28 @@ void loop_closure_gui()
         for (auto& s : sessions)
             s.is_gizmo = false;
     }
+    manipulate_active_edge = false;
 
+}
+void on_loop_closure_gui_close()
+{
+    // reset
+    manipulate_active_edge = false;
+    index_loop_closure_target = 0;
+    index_loop_closure_source = 0;
+}
+
+void loop_closure_gui()
+{
     if (ImGui::Begin("Manual Pose Graph Loop Closure Mode", &is_loop_closure_gui, ImGuiWindowFlags_AlwaysAutoResize))
     {
+        std::stringstream ss;
+        for (auto& s : visible_sessions)
+        {
+            ss << s << " ";
+        }
+        ImGui::Text("Visible sessions %s", ss.str().c_str());
+
         if (ImGui::Button("Optimize GRAPH"))
         {
             for (int i = 0; i < 100; i++)
@@ -427,56 +613,83 @@ void loop_closure_gui()
 
         ImGui::Checkbox("update_rotation_center", &update_rotation_center);
 
-        //
-        auto point_cloud_upper = sessions[first_session_index].point_clouds_container.point_clouds.size() - 1;
+        // visible session
+        const auto& firstSessionRef = sessions[first_session_index];
+        const auto& secondSessionRef = sessions[second_session_index];
+        HDMAPPING_ASSERT(firstSessionRef.point_clouds_container.point_clouds.size() > 1, "First session should have at least one cloud");
+        HDMAPPING_ASSERT(secondSessionRef.point_clouds_container.point_clouds.size() > 1, "Second session should have at least one cloud");
 
-        ImGui::InputInt("gui_point_size", &gui_point_size);
-        if (gui_point_size < 1)
-            gui_point_size = 1;
+        const int firstSessionUpper = firstSessionRef.point_clouds_container.point_clouds.size();
+        const int secondSessionUpper = secondSessionRef.point_clouds_container.point_clouds.size();
 
+        {
+            // Same control and the same push-to-every-session behavior as View > Points
+            // size -- was a separate "gui_point_size" that unconditionally overwrote every
+            // session's point_size every frame, permanently fighting View > Points size.
+            int tmp_point_size = point_size;
+            ImGui::InputInt("Points size", &point_size);
+            if (point_size < 1)
+                point_size = 1;
+            if (tmp_point_size != point_size)
+                for (auto& session : sessions)
+                    for (auto& point_cloud : session.point_clouds_container.point_clouds)
+                        point_cloud.point_size = point_size;
+        }
+
+        ImGui::Text("Manualy adding edges from session %d to %d", first_session_index, second_session_index);
         ImGui::Text("Num edge extended:");
 
         ImGui::Text("before: ");
         ImGui::SameLine();
         ImGui::PushItemWidth(ImGuiNumberWidth);
-        ImGui::SliderInt("##fs", &num_edge_extended_before, 0, point_cloud_upper);
+        ImGui::SliderInt("##fs", &num_edge_extended_before, 0, firstSessionUpper);
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("min 0; max %zu", point_cloud_upper);
+            ImGui::SetTooltip("min 0; max %zu", firstSessionUpper);
         ImGui::SameLine();
         ImGui::InputInt("##fi", &num_edge_extended_before, 1, 5);
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("min 0; max %zu", point_cloud_upper);
+            ImGui::SetTooltip("min 0; max %zu", firstSessionUpper);
         if (num_edge_extended_before < 0)
             num_edge_extended_before = 0;
-        if (num_edge_extended_before >= point_cloud_upper)
-            num_edge_extended_before = point_cloud_upper;
-
-        point_cloud_upper = sessions[second_session_index].point_clouds_container.point_clouds.size() - 1;
+        if (num_edge_extended_before >= firstSessionUpper)
+            num_edge_extended_before = firstSessionUpper;
 
         ImGui::Text(" after: ");
         ImGui::SameLine();
 
-        ImGui::SliderInt("##ts", &num_edge_extended_after, index_loop_closure_target, static_cast<int>(point_cloud_upper));
+        ImGui::SliderInt("##ts", &num_edge_extended_after, index_loop_closure_target, static_cast<int>(secondSessionUpper));
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("min 0; max %zu", point_cloud_upper);
+            ImGui::SetTooltip("min 0; max %zu", secondSessionUpper);
         ImGui::SameLine();
         ImGui::InputInt("##ti", &num_edge_extended_after, 1, 5);
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("min 0; max %zu", point_cloud_upper);
+            ImGui::SetTooltip("min 0; max %zu", secondSessionUpper);
         if (num_edge_extended_after < 0)
             num_edge_extended_after = 0;
-        if (num_edge_extended_after >= point_cloud_upper)
-            num_edge_extended_after = point_cloud_upper;
+        if (num_edge_extended_after >= secondSessionUpper)
+            num_edge_extended_after = secondSessionUpper;
         ImGui::PopItemWidth();
         //
 
         if (!manipulate_active_edge)
         {
+            ImGui::SliderInt(
+                "##index_loop_closure_source_slider",
+                &index_loop_closure_source,
+                0,
+                static_cast<int>(sessions[first_session_index].point_clouds_container.point_clouds.size() - 1));
+            ImGui::SameLine();
             ImGui::InputInt("index_loop_closure_source", &index_loop_closure_source);
             if (index_loop_closure_source < 0)
                 index_loop_closure_source = 0;
             if (index_loop_closure_source >= sessions[first_session_index].point_clouds_container.point_clouds.size() - 1)
                 index_loop_closure_source = sessions[first_session_index].point_clouds_container.point_clouds.size() - 1;
+            ImGui::SliderInt(
+                "##index_loop_closure_target_slider",
+                &index_loop_closure_target,
+                0,
+                static_cast<int>(sessions[second_session_index].point_clouds_container.point_clouds.size() - 1));
+            ImGui::SameLine();
             ImGui::InputInt("index_loop_closure_target", &index_loop_closure_target);
             if (index_loop_closure_target < 0)
                 index_loop_closure_target = 0;
@@ -532,11 +745,14 @@ void loop_closure_gui()
             ImGui::SameLine();
             char buttonLabel[128];
             snprintf(buttonLabel, sizeof(buttonLabel), "Set Active##%d", i);
+
+            ImGui::BeginDisabled(!canEdgeBeActivated(i));
             if (ImGui::Button(buttonLabel))
             {
                 setActiveEdge(i);
                 manipulate_active_edge = true;
             }
+            ImGui::EndDisabled();
             ImGui::SameLine();
             snprintf(buttonLabel, sizeof(buttonLabel), "Delete##%d", i);
             if (ImGui::Button(buttonLabel))
@@ -563,6 +779,8 @@ void loop_closure_gui()
         }
         if (edges.size() > 0)
         {
+            const bool isEdgeOk = canEdgeBeActivated(index_active_edge);
+            ImGui::BeginDisabled(!isEdgeOk);
             if (ImGui::Checkbox("manipulate_active_edge", &manipulate_active_edge) && manipulate_active_edge)
                 setActiveEdge(std::clamp(index_active_edge, 0, (int)edges.size() - 1));
             if (manipulate_active_edge)
@@ -581,6 +799,8 @@ void loop_closure_gui()
 
                     if (!is_gizmo)
                     {
+                        ImGui::SliderInt("##index_active_edge_slider", &index_active_edge, 0, (int)edges.size() - 1);
+                        ImGui::SameLine();
                         ImGui::InputInt("index_active_edge", &index_active_edge);
 
                         if (index_active_edge < 0)
@@ -618,86 +838,14 @@ void loop_closure_gui()
                         }
                         else
                         {
-                            bool is_with_ground_truth = false;
-                            if (sessions[edges[index_active_edge].index_session_from].is_ground_truth ||
-                                sessions[edges[index_active_edge].index_session_to].is_ground_truth)
+                            std::vector<Eigen::Vector3d> source;
+                            std::vector<Eigen::Vector3d> target;
+
+                            if (ground_truth_icp_source_target(source, target))
                             {
-                                is_with_ground_truth = true;
-                            }
-
-                            if (is_with_ground_truth)
-                            {
-                                int index_session_from = -1;
-                                int index_session_to = -1;
-                                int index_from = -1;
-                                int index_to = -1;
-
-                                if (sessions[edges[index_active_edge].index_session_from].is_ground_truth)
-                                {
-                                    index_session_from = edges[index_active_edge].index_session_from;
-                                    index_session_to = edges[index_active_edge].index_session_to;
-                                    index_from = edges[index_active_edge].index_from;
-                                    index_to = edges[index_active_edge].index_to;
-                                }
-                                else
-                                {
-                                    index_session_from = edges[index_active_edge].index_session_to;
-                                    index_session_to = edges[index_active_edge].index_session_from;
-                                    index_from = edges[index_active_edge].index_to;
-                                    index_to = edges[index_active_edge].index_from;
-                                }
-
-                                double x_min = 1000000000000.0;
-                                double y_min = 1000000000000.0;
-                                double z_min = 1000000000000.0;
-                                double x_max = -1000000000000.0;
-                                double y_max = -1000000000000.0;
-                                double z_max = -1000000000000.0;
-
-                                auto& points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
-
-                                for (const auto& p : points_to.points_local)
-                                {
-                                    auto pg = points_to.m_pose * p;
-                                    if (pg.x() < x_min)
-                                        x_min = pg.x();
-                                    if (pg.y() < y_min)
-                                        y_min = pg.y();
-                                    if (pg.z() < z_min)
-                                        z_min = pg.z();
-
-                                    if (pg.x() > x_max)
-                                        x_max = pg.x();
-                                    if (pg.y() > y_max)
-                                        y_max = pg.y();
-                                    if (pg.z() > z_max)
-                                        z_max = pg.z();
-                                }
-                                auto& points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
-                                std::vector<Eigen::Vector3d> ground_truth;
-                                for (const auto& p : points_from.points_local)
-                                {
-                                    auto pg = points_from.m_pose * p;
-                                    if (pg.x() > x_min && pg.x() < x_max)
-                                    {
-                                        if (pg.y() > y_min && pg.y() < y_max)
-                                        {
-                                            if (pg.z() > z_min && pg.z() < z_max)
-                                                ground_truth.push_back(p);
-                                        }
-                                    }
-                                }
-
                                 int number_of_iterations = 10;
                                 PairWiseICP icp;
                                 auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-
-                                std::vector<Eigen::Vector3d> source =
-                                    sessions[edges[index_active_edge].index_session_to]
-                                        .point_clouds_container.point_clouds[edges[index_active_edge].index_to]
-                                        .points_local;
-                                std::vector<Eigen::Vector3d> target =
-                                    ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
 
                                 if (icp.compute(source, target, search_radius, number_of_iterations, m_pose))
                                     edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
@@ -791,597 +939,20 @@ void loop_closure_gui()
 
                     /////////////////////////////////
                     if (ImGui::Button("ICP [search radius 2m]"))
-                    {
-                        float sr = 2.0;
-                        std::cout << "Iterative Closest Point" << std::endl;
-                        if (sessions[edges[index_active_edge].index_session_from].is_ground_truth &&
-                            sessions[edges[index_active_edge].index_session_to].is_ground_truth)
-                        {
-                            std::cout << "Two sessions are ground truth!!! ICP is disabled" << std::endl;
-                        }
-                        else
-                        {
-                            bool is_with_ground_truth = false;
-                            if (sessions[edges[index_active_edge].index_session_from].is_ground_truth ||
-                                sessions[edges[index_active_edge].index_session_to].is_ground_truth)
-                            {
-                                is_with_ground_truth = true;
-                            }
-
-                            if (is_with_ground_truth)
-                            {
-                                int index_session_from = -1;
-                                int index_session_to = -1;
-                                int index_from = -1;
-                                int index_to = -1;
-
-                                if (sessions[edges[index_active_edge].index_session_from].is_ground_truth)
-                                {
-                                    index_session_from = edges[index_active_edge].index_session_from;
-                                    index_session_to = edges[index_active_edge].index_session_to;
-                                    index_from = edges[index_active_edge].index_from;
-                                    index_to = edges[index_active_edge].index_to;
-                                }
-                                else
-                                {
-                                    index_session_from = edges[index_active_edge].index_session_to;
-                                    index_session_to = edges[index_active_edge].index_session_from;
-                                    index_from = edges[index_active_edge].index_to;
-                                    index_to = edges[index_active_edge].index_from;
-                                }
-
-                                double x_min = 1000000000000.0;
-                                double y_min = 1000000000000.0;
-                                double z_min = 1000000000000.0;
-                                double x_max = -1000000000000.0;
-                                double y_max = -1000000000000.0;
-                                double z_max = -1000000000000.0;
-
-                                auto& points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
-
-                                for (const auto& p : points_to.points_local)
-                                {
-                                    auto pg = points_to.m_pose * p;
-                                    if (pg.x() < x_min)
-                                        x_min = pg.x();
-                                    if (pg.y() < y_min)
-                                        y_min = pg.y();
-                                    if (pg.z() < z_min)
-                                        z_min = pg.z();
-
-                                    if (pg.x() > x_max)
-                                        x_max = pg.x();
-                                    if (pg.y() > y_max)
-                                        y_max = pg.y();
-                                    if (pg.z() > z_max)
-                                        z_max = pg.z();
-                                }
-                                auto& points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
-                                std::vector<Eigen::Vector3d> ground_truth;
-                                for (const auto& p : points_from.points_local)
-                                {
-                                    auto pg = points_from.m_pose * p;
-                                    if (pg.x() > x_min && pg.x() < x_max)
-                                    {
-                                        if (pg.y() > y_min && pg.y() < y_max)
-                                        {
-                                            if (pg.z() > z_min && pg.z() < z_max)
-                                                ground_truth.push_back(p);
-                                        }
-                                    }
-                                }
-
-                                int number_of_iterations = 30;
-                                PairWiseICP icp;
-                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-
-                                const std::vector<Eigen::Vector3d>& source =
-                                    sessions[edges[index_active_edge].index_session_to]
-                                        .point_clouds_container.point_clouds[edges[index_active_edge].index_to]
-                                        .points_local;
-                                const std::vector<Eigen::Vector3d>& target =
-                                    ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
-
-                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
-                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
-                            }
-                            else
-                            {
-                                int number_of_iterations = 30;
-                                PairWiseICP icp;
-                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-
-                                const std::vector<Eigen::Vector3d>& source =
-                                    sessions[edges[index_active_edge].index_session_to]
-                                        .point_clouds_container.point_clouds[edges[index_active_edge].index_to]
-                                        .points_local;
-                                const std::vector<Eigen::Vector3d>& target =
-                                    sessions[edges[index_active_edge].index_session_from]
-                                        .point_clouds_container.point_clouds[edges[index_active_edge].index_from]
-                                        .points_local;
-
-                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
-                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
-                            }
-                        }
-                    }
+                        icp_active_edge(2.0f);
 
                     ImGui::SameLine();
                     if (ImGui::Button("ICP [search radius 1m]"))
-                    {
-                        float sr = 1.0;
-                        std::cout << "Iterative Closest Point" << std::endl;
-                        if (sessions[edges[index_active_edge].index_session_from].is_ground_truth &&
-                            sessions[edges[index_active_edge].index_session_to].is_ground_truth)
-                        {
-                            std::cout << "Two sessions are ground truth!!! ICP is disabled" << std::endl;
-                        }
-                        else
-                        {
-                            bool is_with_ground_truth = false;
-                            if (sessions[edges[index_active_edge].index_session_from].is_ground_truth ||
-                                sessions[edges[index_active_edge].index_session_to].is_ground_truth)
-                            {
-                                is_with_ground_truth = true;
-                            }
-
-                            if (is_with_ground_truth)
-                            {
-                                int index_session_from = -1;
-                                int index_session_to = -1;
-                                int index_from = -1;
-                                int index_to = -1;
-
-                                if (sessions[edges[index_active_edge].index_session_from].is_ground_truth)
-                                {
-                                    index_session_from = edges[index_active_edge].index_session_from;
-                                    index_session_to = edges[index_active_edge].index_session_to;
-                                    index_from = edges[index_active_edge].index_from;
-                                    index_to = edges[index_active_edge].index_to;
-                                }
-                                else
-                                {
-                                    index_session_from = edges[index_active_edge].index_session_to;
-                                    index_session_to = edges[index_active_edge].index_session_from;
-                                    index_from = edges[index_active_edge].index_to;
-                                    index_to = edges[index_active_edge].index_from;
-                                }
-
-                                double x_min = 1000000000000.0;
-                                double y_min = 1000000000000.0;
-                                double z_min = 1000000000000.0;
-                                double x_max = -1000000000000.0;
-                                double y_max = -1000000000000.0;
-                                double z_max = -1000000000000.0;
-
-                                auto& points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
-
-                                for (const auto& p : points_to.points_local)
-                                {
-                                    auto pg = points_to.m_pose * p;
-                                    if (pg.x() < x_min)
-                                        x_min = pg.x();
-                                    if (pg.y() < y_min)
-                                        y_min = pg.y();
-                                    if (pg.z() < z_min)
-                                        z_min = pg.z();
-
-                                    if (pg.x() > x_max)
-                                        x_max = pg.x();
-                                    if (pg.y() > y_max)
-                                        y_max = pg.y();
-                                    if (pg.z() > z_max)
-                                        z_max = pg.z();
-                                }
-                                auto& points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
-                                std::vector<Eigen::Vector3d> ground_truth;
-                                for (const auto& p : points_from.points_local)
-                                {
-                                    auto pg = points_from.m_pose * p;
-                                    if (pg.x() > x_min && pg.x() < x_max)
-                                    {
-                                        if (pg.y() > y_min && pg.y() < y_max)
-                                        {
-                                            if (pg.z() > z_min && pg.z() < z_max)
-                                                ground_truth.push_back(p);
-                                        }
-                                    }
-                                }
-
-                                int number_of_iterations = 30;
-                                PairWiseICP icp;
-                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-
-                                const std::vector<Eigen::Vector3d>& source =
-                                    sessions[edges[index_active_edge].index_session_to]
-                                        .point_clouds_container.point_clouds[edges[index_active_edge].index_to]
-                                        .points_local;
-                                const std::vector<Eigen::Vector3d>& target =
-                                    ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
-
-                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
-                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
-                            }
-                            else
-                            {
-                                int number_of_iterations = 30;
-                                PairWiseICP icp;
-                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-
-                                const std::vector<Eigen::Vector3d>& source =
-                                    sessions[edges[index_active_edge].index_session_to]
-                                        .point_clouds_container.point_clouds[edges[index_active_edge].index_to]
-                                        .points_local;
-                                const std::vector<Eigen::Vector3d>& target =
-                                    sessions[edges[index_active_edge].index_session_from]
-                                        .point_clouds_container.point_clouds[edges[index_active_edge].index_from]
-                                        .points_local;
-
-                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
-                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
-                            }
-                        }
-                    }
+                        icp_active_edge(1.0f);
                     ImGui::SameLine();
                     if (ImGui::Button("ICP [search radius 0.5m]"))
-                    {
-                        float sr = 0.5;
-                        std::cout << "Iterative Closest Point" << std::endl;
-                        if (sessions[edges[index_active_edge].index_session_from].is_ground_truth &&
-                            sessions[edges[index_active_edge].index_session_to].is_ground_truth)
-                        {
-                            std::cout << "Two sessions are ground truth!!! ICP is disabled" << std::endl;
-                        }
-                        else
-                        {
-                            bool is_with_ground_truth = false;
-                            if (sessions[edges[index_active_edge].index_session_from].is_ground_truth ||
-                                sessions[edges[index_active_edge].index_session_to].is_ground_truth)
-                            {
-                                is_with_ground_truth = true;
-                            }
-
-                            if (is_with_ground_truth)
-                            {
-                                int index_session_from = -1;
-                                int index_session_to = -1;
-                                int index_from = -1;
-                                int index_to = -1;
-
-                                if (sessions[edges[index_active_edge].index_session_from].is_ground_truth)
-                                {
-                                    index_session_from = edges[index_active_edge].index_session_from;
-                                    index_session_to = edges[index_active_edge].index_session_to;
-                                    index_from = edges[index_active_edge].index_from;
-                                    index_to = edges[index_active_edge].index_to;
-                                }
-                                else
-                                {
-                                    index_session_from = edges[index_active_edge].index_session_to;
-                                    index_session_to = edges[index_active_edge].index_session_from;
-                                    index_from = edges[index_active_edge].index_to;
-                                    index_to = edges[index_active_edge].index_from;
-                                }
-
-                                double x_min = 1000000000000.0;
-                                double y_min = 1000000000000.0;
-                                double z_min = 1000000000000.0;
-                                double x_max = -1000000000000.0;
-                                double y_max = -1000000000000.0;
-                                double z_max = -1000000000000.0;
-
-                                auto& points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
-
-                                for (const auto& p : points_to.points_local)
-                                {
-                                    auto pg = points_to.m_pose * p;
-                                    if (pg.x() < x_min)
-                                        x_min = pg.x();
-                                    if (pg.y() < y_min)
-                                        y_min = pg.y();
-                                    if (pg.z() < z_min)
-                                        z_min = pg.z();
-
-                                    if (pg.x() > x_max)
-                                        x_max = pg.x();
-                                    if (pg.y() > y_max)
-                                        y_max = pg.y();
-                                    if (pg.z() > z_max)
-                                        z_max = pg.z();
-                                }
-                                auto& points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
-                                std::vector<Eigen::Vector3d> ground_truth;
-                                for (const auto& p : points_from.points_local)
-                                {
-                                    auto pg = points_from.m_pose * p;
-                                    if (pg.x() > x_min && pg.x() < x_max)
-                                    {
-                                        if (pg.y() > y_min && pg.y() < y_max)
-                                        {
-                                            if (pg.z() > z_min && pg.z() < z_max)
-                                                ground_truth.push_back(p);
-                                        }
-                                    }
-                                }
-
-                                int number_of_iterations = 30;
-                                PairWiseICP icp;
-                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-
-                                const std::vector<Eigen::Vector3d>& source =
-                                    sessions[edges[index_active_edge].index_session_to]
-                                        .point_clouds_container.point_clouds[edges[index_active_edge].index_to]
-                                        .points_local;
-                                const std::vector<Eigen::Vector3d>& target =
-                                    ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
-
-                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
-                                {
-                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
-                                }
-                            }
-                            else
-                            {
-                                int number_of_iterations = 30;
-                                PairWiseICP icp;
-                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-
-                                const std::vector<Eigen::Vector3d>& source =
-                                    sessions[edges[index_active_edge].index_session_to]
-                                        .point_clouds_container.point_clouds[edges[index_active_edge].index_to]
-                                        .points_local;
-                                const std::vector<Eigen::Vector3d>& target =
-                                    sessions[edges[index_active_edge].index_session_from]
-                                        .point_clouds_container.point_clouds[edges[index_active_edge].index_from]
-                                        .points_local;
-
-                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
-                                {
-                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
-                                }
-                            }
-                        }
-                    }
+                        icp_active_edge(0.5f);
                     ImGui::SameLine();
                     if (ImGui::Button("ICP [search radius 0.25m]"))
-                    {
-                        float sr = 0.25;
-                        std::cout << "Iterative Closest Point" << std::endl;
-                        if (sessions[edges[index_active_edge].index_session_from].is_ground_truth &&
-                            sessions[edges[index_active_edge].index_session_to].is_ground_truth)
-                        {
-                            std::cout << "Two sessions are ground truth!!! ICP is disabled" << std::endl;
-                        }
-                        else
-                        {
-                            bool is_with_ground_truth = false;
-                            if (sessions[edges[index_active_edge].index_session_from].is_ground_truth ||
-                                sessions[edges[index_active_edge].index_session_to].is_ground_truth)
-                            {
-                                is_with_ground_truth = true;
-                            }
-
-                            if (is_with_ground_truth)
-                            {
-                                int index_session_from = -1;
-                                int index_session_to = -1;
-                                int index_from = -1;
-                                int index_to = -1;
-
-                                if (sessions[edges[index_active_edge].index_session_from].is_ground_truth)
-                                {
-                                    index_session_from = edges[index_active_edge].index_session_from;
-                                    index_session_to = edges[index_active_edge].index_session_to;
-                                    index_from = edges[index_active_edge].index_from;
-                                    index_to = edges[index_active_edge].index_to;
-                                }
-                                else
-                                {
-                                    index_session_from = edges[index_active_edge].index_session_to;
-                                    index_session_to = edges[index_active_edge].index_session_from;
-                                    index_from = edges[index_active_edge].index_to;
-                                    index_to = edges[index_active_edge].index_from;
-                                }
-
-                                double x_min = 1000000000000.0;
-                                double y_min = 1000000000000.0;
-                                double z_min = 1000000000000.0;
-                                double x_max = -1000000000000.0;
-                                double y_max = -1000000000000.0;
-                                double z_max = -1000000000000.0;
-
-                                auto& points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
-
-                                for (const auto& p : points_to.points_local)
-                                {
-                                    auto pg = points_to.m_pose * p;
-                                    if (pg.x() < x_min)
-                                        x_min = pg.x();
-                                    if (pg.y() < y_min)
-                                        y_min = pg.y();
-                                    if (pg.z() < z_min)
-                                        z_min = pg.z();
-
-                                    if (pg.x() > x_max)
-                                        x_max = pg.x();
-                                    if (pg.y() > y_max)
-                                        y_max = pg.y();
-                                    if (pg.z() > z_max)
-                                        z_max = pg.z();
-                                }
-                                auto& points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
-                                std::vector<Eigen::Vector3d> ground_truth;
-                                for (const auto& p : points_from.points_local)
-                                {
-                                    auto pg = points_from.m_pose * p;
-                                    if (pg.x() > x_min && pg.x() < x_max)
-                                    {
-                                        if (pg.y() > y_min && pg.y() < y_max)
-                                        {
-                                            if (pg.z() > z_min && pg.z() < z_max)
-                                                ground_truth.push_back(p);
-                                        }
-                                    }
-                                }
-
-                                int number_of_iterations = 30;
-                                PairWiseICP icp;
-                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-
-                                const std::vector<Eigen::Vector3d>& source =
-                                    sessions[edges[index_active_edge].index_session_to]
-                                        .point_clouds_container.point_clouds[edges[index_active_edge].index_to]
-                                        .points_local;
-                                const std::vector<Eigen::Vector3d>& target =
-                                    ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
-
-                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
-                                {
-                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
-                                }
-                            }
-                            else
-                            {
-                                int number_of_iterations = 30;
-                                PairWiseICP icp;
-                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-
-                                const std::vector<Eigen::Vector3d>& source =
-                                    sessions[edges[index_active_edge].index_session_to]
-                                        .point_clouds_container.point_clouds[edges[index_active_edge].index_to]
-                                        .points_local;
-                                const std::vector<Eigen::Vector3d>& target =
-                                    sessions[edges[index_active_edge].index_session_from]
-                                        .point_clouds_container.point_clouds[edges[index_active_edge].index_from]
-                                        .points_local;
-
-                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
-                                {
-                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
-                                }
-                            }
-                        }
-                    }
+                        icp_active_edge(0.25f);
                     ImGui::SameLine();
                     if (ImGui::Button("ICP [search radius 0.1m]"))
-                    {
-                        float sr = 0.1;
-                        std::cout << "Iterative Closest Point" << std::endl;
-                        if (sessions[edges[index_active_edge].index_session_from].is_ground_truth &&
-                            sessions[edges[index_active_edge].index_session_to].is_ground_truth)
-                        {
-                            std::cout << "Two sessions are ground truth!!! ICP is disabled" << std::endl;
-                        }
-                        else
-                        {
-                            bool is_with_ground_truth = false;
-                            if (sessions[edges[index_active_edge].index_session_from].is_ground_truth ||
-                                sessions[edges[index_active_edge].index_session_to].is_ground_truth)
-                            {
-                                is_with_ground_truth = true;
-                            }
-
-                            if (is_with_ground_truth)
-                            {
-                                int index_session_from = -1;
-                                int index_session_to = -1;
-                                int index_from = -1;
-                                int index_to = -1;
-
-                                if (sessions[edges[index_active_edge].index_session_from].is_ground_truth)
-                                {
-                                    index_session_from = edges[index_active_edge].index_session_from;
-                                    index_session_to = edges[index_active_edge].index_session_to;
-                                    index_from = edges[index_active_edge].index_from;
-                                    index_to = edges[index_active_edge].index_to;
-                                }
-                                else
-                                {
-                                    index_session_from = edges[index_active_edge].index_session_to;
-                                    index_session_to = edges[index_active_edge].index_session_from;
-                                    index_from = edges[index_active_edge].index_to;
-                                    index_to = edges[index_active_edge].index_from;
-                                }
-
-                                double x_min = 1000000000000.0;
-                                double y_min = 1000000000000.0;
-                                double z_min = 1000000000000.0;
-                                double x_max = -1000000000000.0;
-                                double y_max = -1000000000000.0;
-                                double z_max = -1000000000000.0;
-
-                                auto& points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
-
-                                for (const auto& p : points_to.points_local)
-                                {
-                                    auto pg = points_to.m_pose * p;
-                                    if (pg.x() < x_min)
-                                        x_min = pg.x();
-                                    if (pg.y() < y_min)
-                                        y_min = pg.y();
-                                    if (pg.z() < z_min)
-                                        z_min = pg.z();
-
-                                    if (pg.x() > x_max)
-                                        x_max = pg.x();
-                                    if (pg.y() > y_max)
-                                        y_max = pg.y();
-                                    if (pg.z() > z_max)
-                                        z_max = pg.z();
-                                }
-                                auto& points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
-                                std::vector<Eigen::Vector3d> ground_truth;
-                                for (const auto& p : points_from.points_local)
-                                {
-                                    auto pg = points_from.m_pose * p;
-                                    if (pg.x() > x_min && pg.x() < x_max)
-                                    {
-                                        if (pg.y() > y_min && pg.y() < y_max)
-                                        {
-                                            if (pg.z() > z_min && pg.z() < z_max)
-                                                ground_truth.push_back(p);
-                                        }
-                                    }
-                                }
-
-                                int number_of_iterations = 30;
-                                PairWiseICP icp;
-                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-
-                                const std::vector<Eigen::Vector3d>& source =
-                                    sessions[edges[index_active_edge].index_session_to]
-                                        .point_clouds_container.point_clouds[edges[index_active_edge].index_to]
-                                        .points_local;
-                                const std::vector<Eigen::Vector3d>& target =
-                                    ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
-
-                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
-                                {
-                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
-                                }
-                            }
-                            else
-                            {
-                                int number_of_iterations = 30;
-                                PairWiseICP icp;
-                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-
-                                const std::vector<Eigen::Vector3d>& source =
-                                    sessions[edges[index_active_edge].index_session_to]
-                                        .point_clouds_container.point_clouds[edges[index_active_edge].index_to]
-                                        .points_local;
-                                const std::vector<Eigen::Vector3d>& target =
-                                    sessions[edges[index_active_edge].index_session_from]
-                                        .point_clouds_container.point_clouds[edges[index_active_edge].index_from]
-                                        .points_local;
-
-                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
-                                {
-                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
-                                }
-                            }
-                        }
-                    }
+                        icp_active_edge(0.1f);
 #if 0
                     if (ImGui::Button("Save src"))
                     {
@@ -1430,6 +1001,7 @@ void loop_closure_gui()
                     //////////////////////////////////
                 }
             }
+            ImGui::EndDisabled();
         }
 
         ImGui::End();
@@ -1523,6 +1095,33 @@ void save_trajectories_to_laz(
     {
         std::cout << "problem with saving file: " << output_file_name << std::endl;
     }
+}
+
+// Step 3 has no single active session (unlike step 2's "Export xz/yz/xy intersection", which
+// picks one output file for the one session via a save dialog), so this calls the shared
+// save_intersection() (Core/export_laz.h) once per session, auto-named -- same pattern as
+// "Save all marked trajectories" above.
+void export_intersection_all_sessions(bool xz_intersection, bool yz_intersection, bool xy_intersection, const std::string& suffix)
+{
+    for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
+    {
+        const auto& session_path = project_settings.session_file_names[i];
+
+        if (i >= sessions.size())
+        {
+            std::cerr << "No loaded session for: " << session_path << std::endl;
+            continue;
+        }
+
+        std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
+        std::string folder_name = dir.filename().string();
+        std::string laz_path = (dir / (folder_name + suffix)).string();
+
+        std::cout << "Saving intersection to LAZ: " << laz_path << std::endl;
+        save_intersection(sessions[i], laz_path, xz_intersection, yz_intersection, xy_intersection, gui_intersection_width);
+    }
+
+    std::cout << "Finished saving all intersections to .laz files." << std::endl;
 }
 
 void createDXFPolyline(const std::string& filename, const std::vector<Eigen::Vector3d>& points)
@@ -2019,6 +1618,9 @@ void appendSession(const std::string& ps)
         session.point_clouds_container.xy_grid_1x1 = false;
         session.point_clouds_container.xy_grid_01x01 = false;
 
+        for (auto& pc : session.point_clouds_container.point_clouds)
+            pc.point_size = point_size;
+
         sessions.push_back(session);
         if (session.is_ground_truth)
             index_gt = sessions.size() - 1;
@@ -2091,6 +1693,7 @@ void finishLoadingSessions()
 void loadSessions()
 {
     sessions.clear();
+    session_drag_preview_poses.clear();
     for (const auto& ps : project_settings.session_file_names)
         appendSession(ps);
     loaded_sessions = true;
@@ -2575,29 +2178,31 @@ void settings_gui()
                         sessions[i].is_gizmo = (i == index_gizmo);
                     }
 
+                    // set rotation center to gizmo
+                    const auto& session = sessions[index_gizmo];
+                    if (session.point_clouds_container.point_clouds.size() > 0)
+                    {
+
+                        setNewRotationCenter(sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose.translation());
+                    }
                     old_index_gt = index_gt;
                     old_index_gizmo = index_gizmo;
                 }
 
-                if (index_gizmo != -1 && index_gizmo < sessions.size())
+                // Skipped while index_gizmo's gizmo is mid-drag: that session's m_pose is
+                // deliberately left untouched until the drag ends (see session_drag_preview_poses),
+                // so resetting m_gizmo from it here every frame would feed ImGuizmo::Manipulate()
+                // the frozen pre-drag pose instead of its own last output, breaking the drag.
+                if (index_gizmo != -1 && index_gizmo < sessions.size() &&
+                    session_drag_preview_poses.find(static_cast<size_t>(index_gizmo)) == session_drag_preview_poses.end())
                 {
+                    HDMAPPING_ASSERT(index_gizmo < sessions.size());
+                    HDMAPPING_ASSERT(!sessions[index_gizmo].point_clouds_container.point_clouds.empty());
                     // sessions[index_gizmo].is_gizmo = true;
-                    m_gizmo[0] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(0, 0);
-                    m_gizmo[1] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(1, 0);
-                    m_gizmo[2] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(2, 0);
-                    m_gizmo[3] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(3, 0);
-                    m_gizmo[4] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(0, 1);
-                    m_gizmo[5] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(1, 1);
-                    m_gizmo[6] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(2, 1);
-                    m_gizmo[7] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(3, 1);
-                    m_gizmo[8] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(0, 2);
-                    m_gizmo[9] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(1, 2);
-                    m_gizmo[10] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(2, 2);
-                    m_gizmo[11] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(3, 2);
-                    m_gizmo[12] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(0, 3);
-                    m_gizmo[13] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(1, 3);
-                    m_gizmo[14] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(2, 3);
-                    m_gizmo[15] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(3, 3);
+                    // Column-major 4x4, matching the Eigen::Map<const Eigen::Matrix4f>(m_gizmo)
+                    // reads elsewhere in this file -- this is just that assignment reversed.
+                    Eigen::Map<Eigen::Matrix4f> gizmo_map(m_gizmo);
+                    gizmo_map = sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose.matrix().cast<float>();
                 }
             }
 
@@ -2618,10 +2223,12 @@ void settings_gui()
                 number_visible_sessions = 0;
 
                 bool first_session_index_found = false;
+                visible_sessions = {};
                 for (size_t index = 0; index < sessions.size(); index++)
                 {
                     if (sessions[index].visible)
                     {
+                        visible_sessions.emplace(static_cast<int>(index));
                         number_visible_sessions++;
                         if (!first_session_index_found)
                         {
@@ -2694,10 +2301,6 @@ void settings_gui()
                         search_radius = 0.01;
                 }
 
-                // if (!is_loop_closure_gui && prev_is_loop_closure_gui)
-                //{
-                //     exit(1);
-                // }
             }
         }
     }
@@ -2723,19 +2326,10 @@ void display()
 
     viewLocal = Eigen::Affine3f::Identity();
 
-    for (auto& s : sessions)
-    {
-        for (auto& pc : s.point_clouds_container.point_clouds)
-        {
-            pc.point_size = gui_point_size;
-        }
-    }
-
     if (!is_ortho)
     {
         reshape((int)io.DisplaySize.x, (int)io.DisplaySize.y);
 
-        // janusz
         if (is_loop_closure_gui)
         {
             // sessions[first_session_index].point_clouds_container.point_clouds.at(index_loop_closure_source).render(false,
@@ -2745,7 +2339,8 @@ void display()
             // observation_picking, viewer_decmiate_point_cloud, false, false, false, false, false, false, false, false, false, false,
             // false, false, 100000);
 
-            if (first_session_index < sessions[first_session_index].point_clouds_container.point_clouds.size())
+            if (index_loop_closure_source >= 0 &&
+                index_loop_closure_source < (int)sessions[first_session_index].point_clouds_container.point_clouds.size())
             {
                 if (update_rotation_center)
                 {
@@ -2817,6 +2412,7 @@ void display()
     captureFrameMatrices();
 
     showAxes();
+    drawIntersectionGrids(sessions);
 
     if (is_loop_closure_gui)
     {
@@ -2845,62 +2441,76 @@ void display()
                 int index_src = edges[index_active_edge].index_from;
                 int index_trg = edges[index_active_edge].index_to;
 
+                // The active edge's own sessions, not the first/second_session_index globals: those
+                // are re-synced every frame by settings_gui()'s visibility loop for the "pick two
+                // sessions for a new edge" UI, independent of which edge is active here, so they can
+                // (and do) drift from this edge's actual sessions and index into the wrong one.
+                const int active_session_from = edges[index_active_edge].index_session_from;
+                const int active_session_to = edges[index_active_edge].index_session_to;
+
                 Eigen::Affine3d _m_src =
-                    sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds.at(index_src).m_pose;
+                    sessions[active_session_from].point_clouds_container.point_clouds.at(index_src).m_pose;
                 Eigen::Affine3d _m_trg = _m_src * affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
 
                 Eigen::Affine3d m_src_0 =
-                    sessions[first_session_index].point_clouds_container.point_clouds.at(index_loop_closure_source).m_pose; // Todo
+                    sessions[active_session_from].point_clouds_container.point_clouds.at(index_loop_closure_source).m_pose;
 
                 for (int i = index_loop_closure_source - num_edge_extended_before; i <= index_loop_closure_source + num_edge_extended_after;
                      i++)
                 {
-                    if (i >= 0 && i < sessions[first_session_index].point_clouds_container.point_clouds.size() &&
-                        sessions[first_session_index].point_clouds_container.point_clouds.size() > 0)
+                    if (i >= 0 && i < sessions[active_session_from].point_clouds_container.point_clouds.size() &&
+                        sessions[active_session_from].point_clouds_container.point_clouds.size() > 0)
                     {
                         // ObservationPicking observation_picking;
                         // point_clouds_container.point_clouds.at(i).render(false, observation_picking, 1, 1, false, false, false, 10000,
                         // false);
 
-                        Eigen::Affine3d m_src_curr = sessions[first_session_index].point_clouds_container.point_clouds.at(i).m_pose; // Todo
+                        Eigen::Affine3d m_src_curr = sessions[active_session_from].point_clouds_container.point_clouds.at(i).m_pose;
                         Eigen::Affine3d m_src = _m_src * (m_src_0.inverse() * m_src_curr);
 
-                        // sessions[first_session_index].point_clouds_container.point_clouds.at(i).point_size = gui_point_size;
-
                         renderScanAtPose(
-                            first_session_index,
+                            active_session_from,
                             i,
                             m_src,
                             viewer_decimate_point_cloud,
                             viewer_reduce_rendered_trajectory,
-                            sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds.at(i).render_color);
+                            sessions[active_session_from].point_clouds_container.point_clouds.at(i).render_color,
+                            /*useSceneColorMode=*/false,
+                            sessions[active_session_from].point_clouds_container.xz_intersection,
+                            sessions[active_session_from].point_clouds_container.yz_intersection,
+                            sessions[active_session_from].point_clouds_container.xy_intersection,
+                            sessions[active_session_from].point_clouds_container.intersection_width);
                     }
                 }
 
                 Eigen::Affine3d m_trg_0 =
-                    sessions[second_session_index].point_clouds_container.point_clouds.at(index_loop_closure_target).m_pose; // Todo
+                    sessions[active_session_to].point_clouds_container.point_clouds.at(index_loop_closure_target).m_pose;
 
                 for (int i = index_loop_closure_target - num_edge_extended_before; i <= index_loop_closure_target + num_edge_extended_after;
                      i++)
                 {
-                    if (i >= 0 && i < sessions[second_session_index].point_clouds_container.point_clouds.size() &&
-                        sessions[second_session_index].point_clouds_container.point_clouds.size() > 0)
+                    if (i >= 0 && i < sessions[active_session_to].point_clouds_container.point_clouds.size() &&
+                        sessions[active_session_to].point_clouds_container.point_clouds.size() > 0)
                     {
                         // ObservationPicking observation_picking;
                         // point_clouds_container.point_clouds.at(i).render(false, observation_picking, 1, 1, false, false, false, 10000,
                         // false);
                         Eigen::Affine3d m_trg_curr =
-                            sessions[second_session_index].point_clouds_container.point_clouds.at(i).m_pose; // Todo
+                            sessions[active_session_to].point_clouds_container.point_clouds.at(i).m_pose;
                         Eigen::Affine3d m_trg = _m_trg * (m_trg_0.inverse() * m_trg_curr);
 
-                        // sessions[second_session_index].point_clouds_container.point_clouds.at(i).point_size = gui_point_size;
                         renderScanAtPose(
-                            second_session_index,
+                            active_session_to,
                             i,
                             m_trg,
                             viewer_decimate_point_cloud,
                             viewer_reduce_rendered_trajectory,
-                            sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds.at(i).render_color);
+                            sessions[active_session_to].point_clouds_container.point_clouds.at(i).render_color,
+                            /*useSceneColorMode=*/false,
+                            sessions[active_session_to].point_clouds_container.xz_intersection,
+                            sessions[active_session_to].point_clouds_container.yz_intersection,
+                            sessions[active_session_to].point_clouds_container.xy_intersection,
+                            sessions[active_session_to].point_clouds_container.intersection_width);
                     }
                 }
             }
@@ -2940,10 +2550,10 @@ void display()
                         observation_picking,
                         viewer_decimate_point_cloud,
                         viewer_reduce_rendered_trajectory,
-                        false,
-                        false,
-                        false,
-                        100000,
+                        sessions[first_session_index].point_clouds_container.xz_intersection,
+                        sessions[first_session_index].point_clouds_container.yz_intersection,
+                        sessions[first_session_index].point_clouds_container.xy_intersection,
+                        sessions[first_session_index].point_clouds_container.intersection_width,
                         false);
                 }
             }
@@ -2979,10 +2589,10 @@ void display()
                         observation_picking,
                         viewer_decimate_point_cloud,
                         viewer_reduce_rendered_trajectory,
-                        false,
-                        false,
-                        false,
-                        100000,
+                        sessions[second_session_index].point_clouds_container.xz_intersection,
+                        sessions[second_session_index].point_clouds_container.yz_intersection,
+                        sessions[second_session_index].point_clouds_container.xy_intersection,
+                        sessions[second_session_index].point_clouds_container.intersection_width,
                         false);
                 }
             }
@@ -3080,7 +2690,33 @@ void display()
         {
             if (session.visible)
             {
-                renderSession(session, observation_picking, viewer_decimate_point_cloud, viewer_reduce_rendered_trajectory);
+                const size_t session_idx = static_cast<size_t>(&session - sessions.data());
+                const auto preview_it = session_drag_preview_poses.find(session_idx);
+                if (preview_it != session_drag_preview_poses.end())
+                {
+                    // This session's gizmo is actively being dragged this frame: draw straight
+                    // from its cached GPU buffers with the in-progress pose, no re-upload.
+                    const auto& preview_poses = preview_it->second;
+                    for (size_t j = 0; j < session.point_clouds_container.point_clouds.size() && j < preview_poses.size(); j++)
+                    {
+                        renderScanAtPose(
+                            static_cast<int>(session_idx),
+                            static_cast<int>(j),
+                            preview_poses[j],
+                            viewer_decimate_point_cloud,
+                            viewer_reduce_rendered_trajectory,
+                            session.point_clouds_container.point_clouds[j].render_color,
+                            /*useSceneColorMode=*/true,
+                            session.point_clouds_container.xz_intersection,
+                            session.point_clouds_container.yz_intersection,
+                            session.point_clouds_container.xy_intersection,
+                            session.point_clouds_container.intersection_width);
+                    }
+                }
+                else
+                {
+                    renderSession(session, observation_picking, viewer_decimate_point_cloud, viewer_reduce_rendered_trajectory);
+                }
                 renderGroundControlPoints(session.ground_control_points, session.point_clouds_container);
                 renderControlPoints(session.control_points, session.point_clouds_container);
 
@@ -3137,69 +2773,6 @@ void display()
         }
     }
 
-    /*if (is_loop_closure_gui)
-    {
-        session.manual_pose_graph_loop_closure.Render(session.point_clouds_container, index_loop_closure_source, index_loop_closure_target);
-    }
-    else
-    {
-        for (const auto &g : available_geo_points)
-        {
-            glBegin(GL_LINES);
-            glColor3f(1.0f, 0.0f, 0.0f);
-            auto c = g.coordinates - session.point_clouds_container.offset;
-            glVertex3f(c.x() - 0.5, c.y(), c.z());
-            glVertex3f(c.x() + 0.5, c.y(), c.z());
-
-            glVertex3f(c.x(), c.y() - 0.5, c.z());
-            glVertex3f(c.x(), c.y() + 0.5, c.z());
-
-            glVertex3f(c.x(), c.y(), c.z() - 0.5);
-            glVertex3f(c.x(), c.y(), c.z() + 0.5);
-            glEnd();
-        }
-
-        //
-        for (const auto &pc : session.point_clouds_container.point_clouds)
-        {
-            for (const auto &gp : pc.available_geo_points)
-            {
-                if (gp.choosen)
-                {
-                    auto c = pc.m_pose * gp.coordinates;
-                    glBegin(GL_LINES);
-                    glColor3f(1.0f, 0.0f, 0.0f);
-                    glVertex3f(c.x() - 0.5, c.y(), c.z());
-                    glVertex3f(c.x() + 0.5, c.y(), c.z());
-
-                    glVertex3f(c.x(), c.y() - 0.5, c.z());
-                    glVertex3f(c.x(), c.y() + 0.5, c.z());
-
-                    glVertex3f(c.x(), c.y(), c.z() - 0.5);
-                    glVertex3f(c.x(), c.y(), c.z() + 0.5);
-                    glEnd();
-
-                    glBegin(GL_LINES);
-                    glColor3f(0.0f, 1.0f, 0.0f);
-                    glVertex3f(c.x(), c.y(), c.z());
-                    glVertex3f(gp.coordinates.x(), gp.coordinates.y(), gp.coordinates.z());
-                    glEnd();
-
-                    glColor3f(0.0f, 0.0f, 0.0f);
-                    glBegin(GL_LINES);
-                    glVertex3f(c.x(), c.y(), c.z());
-                    glVertex3f(c.x() + 10, c.y(), c.z());
-                    glEnd();
-
-                    glRasterPos3f(c.x() + 10, c.y(), c.z());
-                    glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, (const unsigned char *)gp.name.c_str());
-                }
-            }
-        }
-    }*/
-
-    // gnss.render(session.point_clouds_container);
-
     rlImGuiBegin();
 
     ShowMainDockSpace();
@@ -3208,6 +2781,27 @@ void display()
     {
         Eigen::Affine3d prev_pose_manipulated = Eigen::Affine3d::Identity();
         Eigen::Affine3d prev_pose_after_gismo = Eigen::Affine3d::Identity();
+        bool gizmo_dragging_this_frame = false;
+
+        // Commits `candidate_poses` into session i's point clouds for real: writes m_pose,
+        // pose and the gui_translation/gui_rotation mirrors. This is the only place that
+        // mutates the session data model, so it's the only frame syncSessionRenderers()
+        // sees a pose change and rebuilds that session's GPU buffers.
+        auto commit_session_poses = [](size_t i, const std::vector<Eigen::Affine3d>& candidate_poses)
+        {
+            for (size_t j = 0; j < candidate_poses.size(); j++)
+            {
+                auto& pc = sessions[i].point_clouds_container.point_clouds[j];
+                pc.m_pose = candidate_poses[j];
+                pc.pose = pose_tait_bryan_from_affine_matrix(pc.m_pose);
+                pc.gui_translation[0] = (float)pc.pose.px;
+                pc.gui_translation[1] = (float)pc.pose.py;
+                pc.gui_translation[2] = (float)pc.pose.pz;
+                pc.gui_rotation[0] = (float)(pc.pose.om * RAD_TO_DEG);
+                pc.gui_rotation[1] = (float)(pc.pose.fi * RAD_TO_DEG);
+                pc.gui_rotation[2] = (float)(pc.pose.ka * RAD_TO_DEG);
+            }
+        };
 
         for (size_t i = 0; i < sessions.size(); i++)
         {
@@ -3252,48 +2846,44 @@ void display()
                             m_gizmo,
                             NULL);
 
-                    sessions[i].point_clouds_container.point_clouds[0].m_pose = Eigen::Map<const Eigen::Matrix4f>(m_gizmo).cast<double>();
-                    prev_pose_after_gismo = sessions[i].point_clouds_container.point_clouds[0].m_pose;
-                    sessions[i].point_clouds_container.point_clouds[0].pose =
-                        pose_tait_bryan_from_affine_matrix(sessions[i].point_clouds_container.point_clouds[0].m_pose);
+                    gizmo_dragging_this_frame = ImGuizmo::IsUsing();
 
-                    sessions[i].point_clouds_container.point_clouds[0].gui_translation[0] =
-                        (float)sessions[i].point_clouds_container.point_clouds[0].pose.px;
-                    sessions[i].point_clouds_container.point_clouds[0].gui_translation[1] =
-                        (float)sessions[i].point_clouds_container.point_clouds[0].pose.py;
-                    sessions[i].point_clouds_container.point_clouds[0].gui_translation[2] =
-                        (float)sessions[i].point_clouds_container.point_clouds[0].pose.pz;
+                    // Candidate pose chain from this frame's gizmo value. Computed either way
+                    // (cheap, CPU-only) but only ever written into the session data model --
+                    // which is what triggers ScanRenderer's GPU re-upload -- once the drag ends.
+                    const Eigen::Affine3d new_pose0(Eigen::Map<const Eigen::Matrix4f>(m_gizmo).cast<double>());
+                    prev_pose_after_gismo = new_pose0;
 
-                    sessions[i].point_clouds_container.point_clouds[0].gui_rotation[0] =
-                        (float)(sessions[i].point_clouds_container.point_clouds[0].pose.om * RAD_TO_DEG);
-                    sessions[i].point_clouds_container.point_clouds[0].gui_rotation[1] =
-                        (float)(sessions[i].point_clouds_container.point_clouds[0].pose.fi * RAD_TO_DEG);
-                    sessions[i].point_clouds_container.point_clouds[0].gui_rotation[2] =
-                        (float)(sessions[i].point_clouds_container.point_clouds[0].pose.ka * RAD_TO_DEG);
-
-                    Eigen::Affine3d curr_m_pose = sessions[i].point_clouds_container.point_clouds[0].m_pose;
-                    for (size_t j = 1; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
+                    std::vector<Eigen::Affine3d> candidate_poses(sessions[i].point_clouds_container.point_clouds.size());
+                    candidate_poses[0] = new_pose0;
+                    Eigen::Affine3d curr_m_pose = new_pose0;
+                    for (size_t j = 1; j < all_m_poses.size(); j++)
                     {
                         curr_m_pose = curr_m_pose * (all_m_poses[j - 1].inverse() * all_m_poses[j]);
-                        sessions[i].point_clouds_container.point_clouds[j].m_pose = curr_m_pose;
-                        sessions[i].point_clouds_container.point_clouds[j].pose =
-                            pose_tait_bryan_from_affine_matrix(sessions[i].point_clouds_container.point_clouds[j].m_pose);
-
-                        sessions[i].point_clouds_container.point_clouds[j].gui_translation[0] =
-                            (float)sessions[i].point_clouds_container.point_clouds[j].pose.px;
-                        sessions[i].point_clouds_container.point_clouds[j].gui_translation[1] =
-                            (float)sessions[i].point_clouds_container.point_clouds[j].pose.py;
-                        sessions[i].point_clouds_container.point_clouds[j].gui_translation[2] =
-                            (float)sessions[i].point_clouds_container.point_clouds[j].pose.pz;
-
-                        sessions[i].point_clouds_container.point_clouds[j].gui_rotation[0] =
-                            (float)(sessions[i].point_clouds_container.point_clouds[j].pose.om * RAD_TO_DEG);
-                        sessions[i].point_clouds_container.point_clouds[j].gui_rotation[1] =
-                            (float)(sessions[i].point_clouds_container.point_clouds[j].pose.fi * RAD_TO_DEG);
-                        sessions[i].point_clouds_container.point_clouds[j].gui_rotation[2] =
-                            (float)(sessions[i].point_clouds_container.point_clouds[j].pose.ka * RAD_TO_DEG);
+                        candidate_poses[j] = curr_m_pose;
                     }
-                    //}
+
+                    if (gizmo_dragging_this_frame)
+                    {
+                        // Actively being dragged this frame: don't touch the session's pose --
+                        // that's what used to force ScanRenderer::syncPoses() to tear down and
+                        // re-upload every scan's full GPU buffer every single frame. The render
+                        // loop draws this session's preview from this entry instead.
+                        session_drag_preview_poses[i] = std::move(candidate_poses);
+                    }
+                    else
+                    {
+                        const bool was_dragging = session_drag_preview_poses.erase(i) > 0;
+                        if (was_dragging)
+                        {
+                            // Drag just ended: commit the final pose for real, exactly once --
+                            // the only frame this session's GPU buffers actually get rebuilt.
+                            commit_session_poses(i, candidate_poses);
+                        }
+                        // else: gizmo is merely selected, not being dragged -- leave the
+                        // session's pose untouched, so selecting a gizmo doesn't by itself
+                        // cause any per-frame GPU churn.
+                    }
                 }
             }
         }
@@ -3302,61 +2892,40 @@ void display()
             for (size_t i = 0; i < sessions.size(); i++)
             {
                 // guizmo_all_sessions;
-                if (!sessions[i].is_gizmo && !sessions[i].is_ground_truth)
+                if (!sessions[i].is_gizmo && !sessions[i].is_ground_truth &&
+                    !sessions[i].point_clouds_container.point_clouds.empty())
                 {
                     std::vector<Eigen::Affine3d> all_m_poses;
                     for (size_t j = 0; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
                         all_m_poses.push_back(sessions[i].point_clouds_container.point_clouds[j].m_pose);
 
-                    Eigen::Affine3d m_rel_org = prev_pose_manipulated.inverse() * sessions[i].point_clouds_container.point_clouds[0].m_pose;
-
+                    Eigen::Affine3d m_rel_org = prev_pose_manipulated.inverse() * all_m_poses[0];
                     Eigen::Affine3d m_new = prev_pose_after_gismo * m_rel_org;
 
-                    sessions[i].point_clouds_container.point_clouds[0].m_pose = m_new;
-                    sessions[i].point_clouds_container.point_clouds[0].pose =
-                        pose_tait_bryan_from_affine_matrix(sessions[i].point_clouds_container.point_clouds[0].m_pose);
-
-                    sessions[i].point_clouds_container.point_clouds[i].gui_translation[0] =
-                        (float)sessions[i].point_clouds_container.point_clouds[0].pose.px;
-                    sessions[i].point_clouds_container.point_clouds[i].gui_translation[1] =
-                        (float)sessions[i].point_clouds_container.point_clouds[0].pose.py;
-                    sessions[i].point_clouds_container.point_clouds[i].gui_translation[2] =
-                        (float)sessions[i].point_clouds_container.point_clouds[0].pose.pz;
-
-                    sessions[i].point_clouds_container.point_clouds[i].gui_rotation[0] =
-                        (float)(sessions[i].point_clouds_container.point_clouds[0].pose.om * RAD_TO_DEG);
-                    sessions[i].point_clouds_container.point_clouds[i].gui_rotation[1] =
-                        (float)(sessions[i].point_clouds_container.point_clouds[0].pose.fi * RAD_TO_DEG);
-                    sessions[i].point_clouds_container.point_clouds[i].gui_rotation[2] =
-                        (float)(sessions[i].point_clouds_container.point_clouds[0].pose.ka * RAD_TO_DEG);
-
-                    Eigen::Affine3d curr_m_pose = sessions[i].point_clouds_container.point_clouds[0].m_pose;
-                    for (size_t j = 1; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
+                    std::vector<Eigen::Affine3d> candidate_poses(all_m_poses.size());
+                    candidate_poses[0] = m_new;
+                    Eigen::Affine3d curr_m_pose = m_new;
+                    for (size_t j = 1; j < all_m_poses.size(); j++)
                     {
                         curr_m_pose = curr_m_pose * (all_m_poses[j - 1].inverse() * all_m_poses[j]);
-                        sessions[i].point_clouds_container.point_clouds[j].m_pose = curr_m_pose;
-                        sessions[i].point_clouds_container.point_clouds[j].pose =
-                            pose_tait_bryan_from_affine_matrix(sessions[i].point_clouds_container.point_clouds[j].m_pose);
+                        candidate_poses[j] = curr_m_pose;
+                    }
 
-                        sessions[i].point_clouds_container.point_clouds[j].gui_translation[0] =
-                            (float)sessions[i].point_clouds_container.point_clouds[j].pose.px;
-                        sessions[i].point_clouds_container.point_clouds[j].gui_translation[1] =
-                            (float)sessions[i].point_clouds_container.point_clouds[j].pose.py;
-                        sessions[i].point_clouds_container.point_clouds[j].gui_translation[2] =
-                            (float)sessions[i].point_clouds_container.point_clouds[j].pose.pz;
-
-                        sessions[i].point_clouds_container.point_clouds[j].gui_rotation[0] =
-                            (float)(sessions[i].point_clouds_container.point_clouds[j].pose.om * RAD_TO_DEG);
-                        sessions[i].point_clouds_container.point_clouds[j].gui_rotation[1] =
-                            (float)(sessions[i].point_clouds_container.point_clouds[j].pose.fi * RAD_TO_DEG);
-                        sessions[i].point_clouds_container.point_clouds[j].gui_rotation[2] =
-                            (float)(sessions[i].point_clouds_container.point_clouds[j].pose.ka * RAD_TO_DEG);
+                    if (gizmo_dragging_this_frame)
+                    {
+                        session_drag_preview_poses[i] = std::move(candidate_poses);
+                    }
+                    else
+                    {
+                        const bool was_dragging = session_drag_preview_poses.erase(i) > 0;
+                        if (was_dragging)
+                            commit_session_poses(i, candidate_poses);
                     }
                 }
             }
         }
     }
-    else
+    else //if (is_loop_closure_gui)
     {
         // ImGuizmo -----------------------------------------------
         if (edge_gizmo && edges.size() > 0)
@@ -3401,215 +2970,6 @@ void display()
             edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
         }
     }
-
-    /*if (!is_loop_closure_gui)
-{
-    for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
-    {
-        if (session.point_clouds_container.point_clouds[i].gizmo)
-        {
-            std::vector<Eigen::Affine3d> all_m_poses;
-            for (size_t j = 0; j < session.point_clouds_container.point_clouds.size(); j++)
-                all_m_poses.push_back(session.point_clouds_container.point_clouds[j].m_pose);
-
-            ImGuiIO &io = ImGui::GetIO();
-            // ImGuizmo -----------------------------------------------
-            ImGuizmo::BeginFrame();
-            ImGuizmo::Enable(true);
-            ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
-
-            if (!is_ortho)
-            {
-                GLfloat projection[16];
-                glGetFloatv(GL_PROJECTION_MATRIX, projection);
-
-                GLfloat modelview[16];
-                glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
-
-                ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X |
-ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
-            }
-            else
-                ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y |
-ImGuizmo::ROTATE_Z, ImGuizmo::WORLD, m_gizmo, NULL);
-
-            session.point_clouds_container.point_clouds[i].m_pose(0, 0) = m_gizmo[0];
-            session.point_clouds_container.point_clouds[i].m_pose(1, 0) = m_gizmo[1];
-            session.point_clouds_container.point_clouds[i].m_pose(2, 0) = m_gizmo[2];
-            session.point_clouds_container.point_clouds[i].m_pose(3, 0) = m_gizmo[3];
-            session.point_clouds_container.point_clouds[i].m_pose(0, 1) = m_gizmo[4];
-            session.point_clouds_container.point_clouds[i].m_pose(1, 1) = m_gizmo[5];
-            session.point_clouds_container.point_clouds[i].m_pose(2, 1) = m_gizmo[6];
-            session.point_clouds_container.point_clouds[i].m_pose(3, 1) = m_gizmo[7];
-            session.point_clouds_container.point_clouds[i].m_pose(0, 2) = m_gizmo[8];
-            session.point_clouds_container.point_clouds[i].m_pose(1, 2) = m_gizmo[9];
-            session.point_clouds_container.point_clouds[i].m_pose(2, 2) = m_gizmo[10];
-            session.point_clouds_container.point_clouds[i].m_pose(3, 2) = m_gizmo[11];
-            session.point_clouds_container.point_clouds[i].m_pose(0, 3) = m_gizmo[12];
-            session.point_clouds_container.point_clouds[i].m_pose(1, 3) = m_gizmo[13];
-            session.point_clouds_container.point_clouds[i].m_pose(2, 3) = m_gizmo[14];
-            session.point_clouds_container.point_clouds[i].m_pose(3, 3) = m_gizmo[15];
-            session.point_clouds_container.point_clouds[i].pose =
-pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[i].m_pose);
-
-            session.point_clouds_container.point_clouds[i].gui_translation[0] =
-(float)session.point_clouds_container.point_clouds[i].pose.px; session.point_clouds_container.point_clouds[i].gui_translation[1] =
-(float)session.point_clouds_container.point_clouds[i].pose.py; session.point_clouds_container.point_clouds[i].gui_translation[2] =
-(float)session.point_clouds_container.point_clouds[i].pose.pz;
-
-            session.point_clouds_container.point_clouds[i].gui_rotation[0] = (float)(session.point_clouds_container.point_clouds[i].pose.om
-* RAD_TO_DEG); session.point_clouds_container.point_clouds[i].gui_rotation[1] =
-(float)(session.point_clouds_container.point_clouds[i].pose.fi * RAD_TO_DEG); session.point_clouds_container.point_clouds[i].gui_rotation[2]
-= (float)(session.point_clouds_container.point_clouds[i].pose.ka * RAD_TO_DEG);
-
-            if (!manipulate_only_marked_gizmo)
-            {
-                Eigen::Affine3d curr_m_pose = session.point_clouds_container.point_clouds[i].m_pose;
-                for (size_t j = i + 1; j < session.point_clouds_container.point_clouds.size(); j++)
-                {
-                    curr_m_pose = curr_m_pose * (all_m_poses[j - 1].inverse() * all_m_poses[j]);
-                    session.point_clouds_container.point_clouds[j].m_pose = curr_m_pose;
-                    session.point_clouds_container.point_clouds[j].pose =
-pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[j].m_pose);
-
-                    session.point_clouds_container.point_clouds[j].gui_translation[0] =
-(float)session.point_clouds_container.point_clouds[j].pose.px; session.point_clouds_container.point_clouds[j].gui_translation[1] =
-(float)session.point_clouds_container.point_clouds[j].pose.py; session.point_clouds_container.point_clouds[j].gui_translation[2] =
-(float)session.point_clouds_container.point_clouds[j].pose.pz;
-
-                    session.point_clouds_container.point_clouds[j].gui_rotation[0] =
-(float)(session.point_clouds_container.point_clouds[j].pose.om * RAD_TO_DEG); session.point_clouds_container.point_clouds[j].gui_rotation[1]
-= (float)(session.point_clouds_container.point_clouds[j].pose.fi * RAD_TO_DEG);
-                    session.point_clouds_container.point_clouds[j].gui_rotation[2] =
-(float)(session.point_clouds_container.point_clouds[j].pose.ka * RAD_TO_DEG);
-                }
-            }
-        }
-    }
-
-    session.point_clouds_container.render(observation_picking, viewer_decmiate_point_cloud);
-    observation_picking.render();
-
-    glPushAttrib(GL_ALL_ATTRIB_BITS);
-    glPointSize(5);
-    for (const auto &obs : observation_picking.observations)
-    {
-        for (const auto &[key1, value1] : obs)
-        {
-            for (const auto &[key2, value2] : obs)
-            {
-                if (key1 != key2)
-                {
-                    Eigen::Vector3d p1, p2;
-                    if (session.point_clouds_container.show_with_initial_pose)
-                    {
-                        p1 = session.point_clouds_container.point_clouds[key1].m_initial_pose * value1;
-                        p2 = session.point_clouds_container.point_clouds[key2].m_initial_pose * value2;
-                    }
-                    else
-                    {
-                        p1 = session.point_clouds_container.point_clouds[key1].m_pose * value1;
-                        p2 = session.point_clouds_container.point_clouds[key2].m_pose * value2;
-                    }
-                    glColor3f(0, 1, 0);
-                    glBegin(GL_POINTS);
-                    glVertex3f(p1.x(), p1.y(), p1.z());
-                    glVertex3f(p2.x(), p2.y(), p2.z());
-                    glEnd();
-                    glColor3f(1, 0, 0);
-                    glBegin(GL_LINES);
-                    glVertex3f(p1.x(), p1.y(), p1.z());
-                    glVertex3f(p2.x(), p2.y(), p2.z());
-                    glEnd();
-                }
-            }
-        }
-    }
-    glPopAttrib();
-
-    for (const auto &obs : observation_picking.observations)
-    {
-        Eigen::Vector3d mean(0, 0, 0);
-        int counter = 0;
-        for (const auto &[key1, value1] : obs)
-        {
-            mean += session.point_clouds_container.point_clouds[key1].m_initial_pose * value1;
-            counter++;
-        }
-        if (counter > 0)
-        {
-            mean /= counter;
-
-            glColor3f(1, 0, 0);
-            glBegin(GL_LINE_STRIP);
-            glVertex3f(mean.x() - 1, mean.y() - 1, mean.z());
-            glVertex3f(mean.x() + 1, mean.y() - 1, mean.z());
-            glVertex3f(mean.x() + 1, mean.y() + 1, mean.z());
-            glVertex3f(mean.x() - 1, mean.y() + 1, mean.z());
-            glVertex3f(mean.x() - 1, mean.y() - 1, mean.z());
-            glEnd();F
-        }
-    }
-
-    glColor3f(1, 0, 1);
-    glBegin(GL_POINTS);
-    for (auto p : picked_points)
-    {
-        glVertex3f(p.x(), p.y(), p.z());
-    }
-    glEnd();
-}
-else
-{
-    // ImGuizmo -----------------------------------------------
-    if (session.manual_pose_graph_loop_closure.gizmo && session.manual_pose_graph_loop_closure.edges.size() > 0)
-    {
-        ImGuizmo::BeginFrame();
-        ImGuizmo::Enable(true);
-        ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
-
-        if (!is_ortho)
-        {
-            GLfloat projection[16];
-            glGetFloatv(GL_PROJECTION_MATRIX, projection);
-
-            GLfloat modelview[16];
-            glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
-
-            ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X |
-ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
-        }
-        else
-            ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z,
-ImGuizmo::WORLD, m_gizmo, NULL);
-
-        Eigen::Affine3d m_g = Eigen::Affine3d::Identity();
-
-        m_g(0, 0) = m_gizmo[0];
-        m_g(1, 0) = m_gizmo[1];
-        m_g(2, 0) = m_gizmo[2];
-        m_g(3, 0) = m_gizmo[3];
-        m_g(0, 1) = m_gizmo[4];
-        m_g(1, 1) = m_gizmo[5];
-        m_g(2, 1) = m_gizmo[6];
-        m_g(3, 1) = m_gizmo[7];
-        m_g(0, 2) = m_gizmo[8];
-        m_g(1, 2) = m_gizmo[9];
-        m_g(2, 2) = m_gizmo[10];
-        m_g(3, 2) = m_gizmo[11];
-        m_g(0, 3) = m_gizmo[12];
-        m_g(1, 3) = m_gizmo[13];
-        m_g(2, 3) = m_gizmo[14];
-        m_g(3, 3) = m_gizmo[15];
-
-        const int &index_src =
-session.manual_pose_graph_loop_closure.edges[session.manual_pose_graph_loop_closure.index_active_edge].index_from;
-
-        const Eigen::Affine3d &m_src = session.point_clouds_container.point_clouds.at(index_src).m_pose;
-        session.manual_pose_graph_loop_closure.edges[session.manual_pose_graph_loop_closure.index_active_edge].relative_pose_tb =
-pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
-    }
-}*/
 
     view_kbd_shortcuts();
 
@@ -4230,6 +3590,65 @@ pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
             ImGui::EndMenu();
         }
 
+        if (ImGui::BeginMenu("Intersections"))
+        {
+            bool changed = false;
+
+            ImGui::SetNextItemWidth(ImGuiNumberWidth);
+            changed |= ImGui::InputDouble("Intersection width [m]", &gui_intersection_width, 0.0, 0.0, "%.2f");
+            if (gui_intersection_width < 0.001)
+                gui_intersection_width = 0.001;
+
+            ImGui::Separator();
+            changed |= ImGui::MenuItem("xz_intersection", nullptr, &gui_xz_intersection);
+            changed |= ImGui::MenuItem("10m grid##xz", nullptr, &gui_xz_grid_10x10);
+            changed |= ImGui::MenuItem("1m grid##xz", nullptr, &gui_xz_grid_1x1);
+            changed |= ImGui::MenuItem("0.1m grid##xz", nullptr, &gui_xz_grid_01x01);
+            if (ImGui::MenuItem("Export xz intersection", nullptr, false, gui_xz_intersection))
+                export_intersection_all_sessions(gui_xz_intersection, gui_yz_intersection, gui_xy_intersection, "_xz_intersection.laz");
+
+            ImGui::Separator();
+            changed |= ImGui::MenuItem("yz_intersection", nullptr, &gui_yz_intersection);
+            changed |= ImGui::MenuItem("10m grid##yz", nullptr, &gui_yz_grid_10x10);
+            changed |= ImGui::MenuItem("1m grid##yz", nullptr, &gui_yz_grid_1x1);
+            changed |= ImGui::MenuItem("0.1m grid##yz", nullptr, &gui_yz_grid_01x01);
+            if (ImGui::MenuItem("Export yz intersection", nullptr, false, gui_yz_intersection))
+                export_intersection_all_sessions(gui_xz_intersection, gui_yz_intersection, gui_xy_intersection, "_yz_intersection.laz");
+
+            ImGui::Separator();
+            changed |= ImGui::MenuItem("xy_intersection", nullptr, &gui_xy_intersection);
+            changed |= ImGui::MenuItem("10m grid##xy", nullptr, &gui_xy_grid_10x10);
+            changed |= ImGui::MenuItem("1m grid##xy", nullptr, &gui_xy_grid_1x1);
+            changed |= ImGui::MenuItem("0.1m grid##xy", nullptr, &gui_xy_grid_01x01);
+            if (ImGui::MenuItem("Export xy intersection", nullptr, false, gui_xy_intersection))
+                export_intersection_all_sessions(gui_xz_intersection, gui_yz_intersection, gui_xy_intersection, "_xy_intersection.laz");
+
+            if (changed)
+            {
+                for (auto& session : sessions)
+                {
+                    session.point_clouds_container.xz_intersection = gui_xz_intersection;
+                    session.point_clouds_container.yz_intersection = gui_yz_intersection;
+                    session.point_clouds_container.xy_intersection = gui_xy_intersection;
+                    session.point_clouds_container.intersection_width = gui_intersection_width;
+
+                    session.point_clouds_container.xz_grid_10x10 = gui_xz_grid_10x10;
+                    session.point_clouds_container.xz_grid_1x1 = gui_xz_grid_1x1;
+                    session.point_clouds_container.xz_grid_01x01 = gui_xz_grid_01x01;
+                    session.point_clouds_container.yz_grid_10x10 = gui_yz_grid_10x10;
+                    session.point_clouds_container.yz_grid_1x1 = gui_yz_grid_1x1;
+                    session.point_clouds_container.yz_grid_01x01 = gui_yz_grid_01x01;
+                    session.point_clouds_container.xy_grid_10x10 = gui_xy_grid_10x10;
+                    session.point_clouds_container.xy_grid_1x1 = gui_xy_grid_1x1;
+                    session.point_clouds_container.xy_grid_01x01 = gui_xy_grid_01x01;
+                }
+            }
+
+            ImGui::EndMenu();
+        }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Intersection menu");
+
         if (ImGui::BeginMenu("View"))
         {
             ImGui::BeginDisabled(!(sessions.size() > 0));
@@ -4386,7 +3805,10 @@ pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
                     project_settings.session_file_names.erase(project_settings.session_file_names.begin() + idx);
 
                     if (idx < sessions.size())
+                    {
                         sessions.erase(sessions.begin() + idx);
+                        session_drag_preview_poses.clear();
+                    }
                 }
             }
             session_marked_for_removal.clear();
@@ -4415,8 +3837,24 @@ pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
     if (is_ndt_gui)
         ndt_gui();
 
+    if (!prev_is_loop_closure_gui  && is_loop_closure_gui)
+    {
+        spdlog::debug("Closed loop open gui");
+        on_loop_closure_gui_open();
+    }
     if (is_loop_closure_gui)
+    {
+        // loop_closure_gui() passes &is_loop_closure_gui as the window's p_open, so clicking
+        // its own close (X) button flips is_loop_closure_gui to false inside this call -- the
+        // close check below has to run after, or that transition is never observed.
         loop_closure_gui();
+    }
+    if (prev_is_loop_closure_gui  && !is_loop_closure_gui)
+    {
+        spdlog::debug("Closed loop closure gui");
+        on_loop_closure_gui_close();
+    }
+    prev_is_loop_closure_gui = is_loop_closure_gui;
 
     cor_window();
 
@@ -4585,12 +4023,6 @@ int main(int argc, char* argv[])
     {
         std::cerr << "System is out of memory : " << e.what() << std::endl;
         mandeye::fd::OutOfMemMessage();
-    } catch (const std::exception& e)
-    {
-        std::cout << e.what();
-    } catch (...)
-    {
-        std::cerr << "Unknown fatal error occurred." << std::endl;
     }
 
     return 0;

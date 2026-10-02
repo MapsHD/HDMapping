@@ -717,12 +717,13 @@ void loop_closure_gui()
                                 PairWiseICP icp;
                                 auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
 
+                                // index_session_to/index_to here (not edges[index_active_edge]'s raw fields): those
+                                // get swapped above when the *target* (not source) side of the edge is the ground
+                                // truth session, and source must track that swap too, or it silently ends up
+                                // aligning the ground-truth scan against a filtered copy of itself.
                                 std::vector<Eigen::Vector3d> source =
-                                    sessions[edges[index_active_edge].index_session_to]
-                                        .point_clouds_container.point_clouds[edges[index_active_edge].index_to]
-                                        .points_local;
-                                std::vector<Eigen::Vector3d> target =
-                                    ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+                                    sessions[index_session_to].point_clouds_container.point_clouds[index_to].points_local;
+                                std::vector<Eigen::Vector3d> target = ground_truth;
 
                                 if (icp.compute(source, target, search_radius, number_of_iterations, m_pose))
                                     edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
@@ -900,12 +901,13 @@ void loop_closure_gui()
                                 PairWiseICP icp;
                                 auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
 
+                                // index_session_to/index_to here (not edges[index_active_edge]'s raw fields): those
+                                // get swapped above when the *target* (not source) side of the edge is the ground
+                                // truth session, and source must track that swap too, or it silently ends up
+                                // aligning the ground-truth scan against a filtered copy of itself.
                                 const std::vector<Eigen::Vector3d>& source =
-                                    sessions[edges[index_active_edge].index_session_to]
-                                        .point_clouds_container.point_clouds[edges[index_active_edge].index_to]
-                                        .points_local;
-                                const std::vector<Eigen::Vector3d>& target =
-                                    ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+                                    sessions[index_session_to].point_clouds_container.point_clouds[index_to].points_local;
+                                const std::vector<Eigen::Vector3d>& target = ground_truth;
 
                                 if (icp.compute(source, target, sr, number_of_iterations, m_pose))
                                     edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
@@ -1017,12 +1019,13 @@ void loop_closure_gui()
                                 PairWiseICP icp;
                                 auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
 
+                                // index_session_to/index_to here (not edges[index_active_edge]'s raw fields): those
+                                // get swapped above when the *target* (not source) side of the edge is the ground
+                                // truth session, and source must track that swap too, or it silently ends up
+                                // aligning the ground-truth scan against a filtered copy of itself.
                                 const std::vector<Eigen::Vector3d>& source =
-                                    sessions[edges[index_active_edge].index_session_to]
-                                        .point_clouds_container.point_clouds[edges[index_active_edge].index_to]
-                                        .points_local;
-                                const std::vector<Eigen::Vector3d>& target =
-                                    ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+                                    sessions[index_session_to].point_clouds_container.point_clouds[index_to].points_local;
+                                const std::vector<Eigen::Vector3d>& target = ground_truth;
 
                                 if (icp.compute(source, target, sr, number_of_iterations, m_pose))
                                     edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
@@ -1133,12 +1136,13 @@ void loop_closure_gui()
                                 PairWiseICP icp;
                                 auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
 
+                                // index_session_to/index_to here (not edges[index_active_edge]'s raw fields): those
+                                // get swapped above when the *target* (not source) side of the edge is the ground
+                                // truth session, and source must track that swap too, or it silently ends up
+                                // aligning the ground-truth scan against a filtered copy of itself.
                                 const std::vector<Eigen::Vector3d>& source =
-                                    sessions[edges[index_active_edge].index_session_to]
-                                        .point_clouds_container.point_clouds[edges[index_active_edge].index_to]
-                                        .points_local;
-                                const std::vector<Eigen::Vector3d>& target =
-                                    ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+                                    sessions[index_session_to].point_clouds_container.point_clouds[index_to].points_local;
+                                const std::vector<Eigen::Vector3d>& target = ground_truth;
 
                                 if (icp.compute(source, target, sr, number_of_iterations, m_pose))
                                 {
@@ -1253,12 +1257,13 @@ void loop_closure_gui()
                                 PairWiseICP icp;
                                 auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
 
+                                // index_session_to/index_to here (not edges[index_active_edge]'s raw fields): those
+                                // get swapped above when the *target* (not source) side of the edge is the ground
+                                // truth session, and source must track that swap too, or it silently ends up
+                                // aligning the ground-truth scan against a filtered copy of itself.
                                 const std::vector<Eigen::Vector3d>& source =
-                                    sessions[edges[index_active_edge].index_session_to]
-                                        .point_clouds_container.point_clouds[edges[index_active_edge].index_to]
-                                        .points_local;
-                                const std::vector<Eigen::Vector3d>& target =
-                                    ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+                                    sessions[index_session_to].point_clouds_container.point_clouds[index_to].points_local;
+                                const std::vector<Eigen::Vector3d>& target = ground_truth;
 
                                 if (icp.compute(source, target, sr, number_of_iterations, m_pose))
                                 {
@@ -1373,12 +1378,13 @@ void loop_closure_gui()
                                 PairWiseICP icp;
                                 auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
 
+                                // index_session_to/index_to here (not edges[index_active_edge]'s raw fields): those
+                                // get swapped above when the *target* (not source) side of the edge is the ground
+                                // truth session, and source must track that swap too, or it silently ends up
+                                // aligning the ground-truth scan against a filtered copy of itself.
                                 const std::vector<Eigen::Vector3d>& source =
-                                    sessions[edges[index_active_edge].index_session_to]
-                                        .point_clouds_container.point_clouds[edges[index_active_edge].index_to]
-                                        .points_local;
-                                const std::vector<Eigen::Vector3d>& target =
-                                    ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+                                    sessions[index_session_to].point_clouds_container.point_clouds[index_to].points_local;
+                                const std::vector<Eigen::Vector3d>& target = ground_truth;
 
                                 if (icp.compute(source, target, sr, number_of_iterations, m_pose))
                                 {

@@ -193,8 +193,6 @@ namespace fs = std::filesystem;
 int num_edge_extended_before = 0;
 int num_edge_extended_after = 0;
 
-int gui_point_size = 2;
-
 // Cross-section slicing, ported from step 2's per-session "Intersections" menu. Step 3 has no
 // single active session, so -- same pattern as View > Points size above -- these are pushed to
 // every session's point_clouds_container when changed, instead of being one session's fields.
@@ -202,6 +200,15 @@ bool gui_xz_intersection = false;
 bool gui_yz_intersection = false;
 bool gui_xy_intersection = false;
 double gui_intersection_width = 0.1;
+bool gui_xz_grid_10x10 = false;
+bool gui_xz_grid_1x1 = false;
+bool gui_xz_grid_01x01 = false;
+bool gui_yz_grid_10x10 = false;
+bool gui_yz_grid_1x1 = false;
+bool gui_yz_grid_01x01 = false;
+bool gui_xy_grid_10x10 = false;
+bool gui_xy_grid_1x1 = false;
+bool gui_xy_grid_01x01 = false;
 
 TaitBryanPose motion_model_weights = { 0.01, 0.01, 0.01, 0.1, 0.1, 0.1 };
 ///////////////////////////////////////////////////////////////////////////////////
@@ -441,10 +448,21 @@ void loop_closure_gui()
         //
         auto point_cloud_upper = sessions[first_session_index].point_clouds_container.point_clouds.size() - 1;
 
-        ImGui::InputInt("gui_point_size", &gui_point_size);
-        if (gui_point_size < 1)
-            gui_point_size = 1;
+        {
+            // Same control and the same push-to-every-session behavior as View > Points
+            // size -- was a separate "gui_point_size" that unconditionally overwrote every
+            // session's point_size every frame, permanently fighting View > Points size.
+            int tmp_point_size = point_size;
+            ImGui::InputInt("Points size", &point_size);
+            if (point_size < 1)
+                point_size = 1;
+            if (tmp_point_size != point_size)
+                for (auto& session : sessions)
+                    for (auto& point_cloud : session.point_clouds_container.point_clouds)
+                        point_cloud.point_size = point_size;
+        }
 
+        ImGui::Text("Manualy adding edges from session %d to %d", first_session_index, second_session_index);
         ImGui::Text("Num edge extended:");
 
         ImGui::Text("before: ");
@@ -1556,6 +1574,33 @@ void save_trajectories_to_laz(
     }
 }
 
+// Step 3 has no single active session (unlike step 2's "Export xz/yz/xy intersection", which
+// picks one output file for the one session via a save dialog), so this calls the shared
+// save_intersection() (Core/export_laz.h) once per session, auto-named -- same pattern as
+// "Save all marked trajectories" above.
+void export_intersection_all_sessions(bool xz_intersection, bool yz_intersection, bool xy_intersection, const std::string& suffix)
+{
+    for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
+    {
+        const auto& session_path = project_settings.session_file_names[i];
+
+        if (i >= sessions.size())
+        {
+            std::cerr << "No loaded session for: " << session_path << std::endl;
+            continue;
+        }
+
+        std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
+        std::string folder_name = dir.filename().string();
+        std::string laz_path = (dir / (folder_name + suffix)).string();
+
+        std::cout << "Saving intersection to LAZ: " << laz_path << std::endl;
+        save_intersection(sessions[i], laz_path, xz_intersection, yz_intersection, xy_intersection, gui_intersection_width);
+    }
+
+    std::cout << "Finished saving all intersections to .laz files." << std::endl;
+}
+
 void createDXFPolyline(const std::string& filename, const std::vector<Eigen::Vector3d>& points)
 {
     std::ofstream dxfFile(filename);
@@ -2049,6 +2094,9 @@ void appendSession(const std::string& ps)
         session.point_clouds_container.xy_grid_10x10 = false;
         session.point_clouds_container.xy_grid_1x1 = false;
         session.point_clouds_container.xy_grid_01x01 = false;
+
+        for (auto& pc : session.point_clouds_container.point_clouds)
+            pc.point_size = point_size;
 
         sessions.push_back(session);
         if (session.is_ground_truth)
@@ -2748,14 +2796,6 @@ void display()
 
     viewLocal = Eigen::Affine3f::Identity();
 
-    for (auto& s : sessions)
-    {
-        for (auto& pc : s.point_clouds_container.point_clouds)
-        {
-            pc.point_size = gui_point_size;
-        }
-    }
-
     if (!is_ortho)
     {
         reshape((int)io.DisplaySize.x, (int)io.DisplaySize.y);
@@ -2842,6 +2882,7 @@ void display()
     captureFrameMatrices();
 
     showAxes();
+    drawIntersectionGrids(sessions);
 
     if (is_loop_closure_gui)
     {
@@ -2890,15 +2931,18 @@ void display()
                         Eigen::Affine3d m_src_curr = sessions[first_session_index].point_clouds_container.point_clouds.at(i).m_pose; // Todo
                         Eigen::Affine3d m_src = _m_src * (m_src_0.inverse() * m_src_curr);
 
-                        // sessions[first_session_index].point_clouds_container.point_clouds.at(i).point_size = gui_point_size;
-
                         renderScanAtPose(
                             first_session_index,
                             i,
                             m_src,
                             viewer_decimate_point_cloud,
                             viewer_reduce_rendered_trajectory,
-                            sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds.at(i).render_color);
+                            sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds.at(i).render_color,
+                            /*useSceneColorMode=*/false,
+                            sessions[first_session_index].point_clouds_container.xz_intersection,
+                            sessions[first_session_index].point_clouds_container.yz_intersection,
+                            sessions[first_session_index].point_clouds_container.xy_intersection,
+                            sessions[first_session_index].point_clouds_container.intersection_width);
                     }
                 }
 
@@ -2918,14 +2962,18 @@ void display()
                             sessions[second_session_index].point_clouds_container.point_clouds.at(i).m_pose; // Todo
                         Eigen::Affine3d m_trg = _m_trg * (m_trg_0.inverse() * m_trg_curr);
 
-                        // sessions[second_session_index].point_clouds_container.point_clouds.at(i).point_size = gui_point_size;
                         renderScanAtPose(
                             second_session_index,
                             i,
                             m_trg,
                             viewer_decimate_point_cloud,
                             viewer_reduce_rendered_trajectory,
-                            sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds.at(i).render_color);
+                            sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds.at(i).render_color,
+                            /*useSceneColorMode=*/false,
+                            sessions[second_session_index].point_clouds_container.xz_intersection,
+                            sessions[second_session_index].point_clouds_container.yz_intersection,
+                            sessions[second_session_index].point_clouds_container.xy_intersection,
+                            sessions[second_session_index].point_clouds_container.intersection_width);
                     }
                 }
             }
@@ -2965,10 +3013,10 @@ void display()
                         observation_picking,
                         viewer_decimate_point_cloud,
                         viewer_reduce_rendered_trajectory,
-                        false,
-                        false,
-                        false,
-                        100000,
+                        sessions[first_session_index].point_clouds_container.xz_intersection,
+                        sessions[first_session_index].point_clouds_container.yz_intersection,
+                        sessions[first_session_index].point_clouds_container.xy_intersection,
+                        sessions[first_session_index].point_clouds_container.intersection_width,
                         false);
                 }
             }
@@ -3004,10 +3052,10 @@ void display()
                         observation_picking,
                         viewer_decimate_point_cloud,
                         viewer_reduce_rendered_trajectory,
-                        false,
-                        false,
-                        false,
-                        100000,
+                        sessions[second_session_index].point_clouds_container.xz_intersection,
+                        sessions[second_session_index].point_clouds_container.yz_intersection,
+                        sessions[second_session_index].point_clouds_container.xy_intersection,
+                        sessions[second_session_index].point_clouds_container.intersection_width,
                         false);
                 }
             }
@@ -3121,7 +3169,11 @@ void display()
                             viewer_decimate_point_cloud,
                             viewer_reduce_rendered_trajectory,
                             session.point_clouds_container.point_clouds[j].render_color,
-                            /*useSceneColorMode=*/true);
+                            /*useSceneColorMode=*/true,
+                            session.point_clouds_container.xz_intersection,
+                            session.point_clouds_container.yz_intersection,
+                            session.point_clouds_container.xy_intersection,
+                            session.point_clouds_container.intersection_width);
                     }
                 }
                 else
@@ -4064,6 +4116,65 @@ void display()
             ImGui::EndMenu();
         }
 
+        if (ImGui::BeginMenu("Intersections"))
+        {
+            bool changed = false;
+
+            ImGui::SetNextItemWidth(ImGuiNumberWidth);
+            changed |= ImGui::InputDouble("Intersection width [m]", &gui_intersection_width, 0.0, 0.0, "%.2f");
+            if (gui_intersection_width < 0.001)
+                gui_intersection_width = 0.001;
+
+            ImGui::Separator();
+            changed |= ImGui::MenuItem("xz_intersection", nullptr, &gui_xz_intersection);
+            changed |= ImGui::MenuItem("10m grid##xz", nullptr, &gui_xz_grid_10x10);
+            changed |= ImGui::MenuItem("1m grid##xz", nullptr, &gui_xz_grid_1x1);
+            changed |= ImGui::MenuItem("0.1m grid##xz", nullptr, &gui_xz_grid_01x01);
+            if (ImGui::MenuItem("Export xz intersection", nullptr, false, gui_xz_intersection))
+                export_intersection_all_sessions(gui_xz_intersection, gui_yz_intersection, gui_xy_intersection, "_xz_intersection.laz");
+
+            ImGui::Separator();
+            changed |= ImGui::MenuItem("yz_intersection", nullptr, &gui_yz_intersection);
+            changed |= ImGui::MenuItem("10m grid##yz", nullptr, &gui_yz_grid_10x10);
+            changed |= ImGui::MenuItem("1m grid##yz", nullptr, &gui_yz_grid_1x1);
+            changed |= ImGui::MenuItem("0.1m grid##yz", nullptr, &gui_yz_grid_01x01);
+            if (ImGui::MenuItem("Export yz intersection", nullptr, false, gui_yz_intersection))
+                export_intersection_all_sessions(gui_xz_intersection, gui_yz_intersection, gui_xy_intersection, "_yz_intersection.laz");
+
+            ImGui::Separator();
+            changed |= ImGui::MenuItem("xy_intersection", nullptr, &gui_xy_intersection);
+            changed |= ImGui::MenuItem("10m grid##xy", nullptr, &gui_xy_grid_10x10);
+            changed |= ImGui::MenuItem("1m grid##xy", nullptr, &gui_xy_grid_1x1);
+            changed |= ImGui::MenuItem("0.1m grid##xy", nullptr, &gui_xy_grid_01x01);
+            if (ImGui::MenuItem("Export xy intersection", nullptr, false, gui_xy_intersection))
+                export_intersection_all_sessions(gui_xz_intersection, gui_yz_intersection, gui_xy_intersection, "_xy_intersection.laz");
+
+            if (changed)
+            {
+                for (auto& session : sessions)
+                {
+                    session.point_clouds_container.xz_intersection = gui_xz_intersection;
+                    session.point_clouds_container.yz_intersection = gui_yz_intersection;
+                    session.point_clouds_container.xy_intersection = gui_xy_intersection;
+                    session.point_clouds_container.intersection_width = gui_intersection_width;
+
+                    session.point_clouds_container.xz_grid_10x10 = gui_xz_grid_10x10;
+                    session.point_clouds_container.xz_grid_1x1 = gui_xz_grid_1x1;
+                    session.point_clouds_container.xz_grid_01x01 = gui_xz_grid_01x01;
+                    session.point_clouds_container.yz_grid_10x10 = gui_yz_grid_10x10;
+                    session.point_clouds_container.yz_grid_1x1 = gui_yz_grid_1x1;
+                    session.point_clouds_container.yz_grid_01x01 = gui_yz_grid_01x01;
+                    session.point_clouds_container.xy_grid_10x10 = gui_xy_grid_10x10;
+                    session.point_clouds_container.xy_grid_1x1 = gui_xy_grid_1x1;
+                    session.point_clouds_container.xy_grid_01x01 = gui_xy_grid_01x01;
+                }
+            }
+
+            ImGui::EndMenu();
+        }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Intersection menu");
+
         if (ImGui::BeginMenu("View"))
         {
             ImGui::BeginDisabled(!(sessions.size() > 0));
@@ -4086,36 +4197,6 @@ void display()
                 ImGui::Separator();
             }
             ImGui::EndDisabled();
-
-            if (ImGui::BeginMenu("Intersections"))
-            {
-                bool changed = false;
-
-                ImGui::SetNextItemWidth(ImGuiNumberWidth);
-                changed |= ImGui::InputDouble("Intersection width [m]", &gui_intersection_width, 0.0, 0.0, "%.2f");
-                if (gui_intersection_width < 0.001)
-                    gui_intersection_width = 0.001;
-
-                ImGui::Separator();
-                changed |= ImGui::MenuItem("xz_intersection", nullptr, &gui_xz_intersection);
-                changed |= ImGui::MenuItem("yz_intersection", nullptr, &gui_yz_intersection);
-                changed |= ImGui::MenuItem("xy_intersection", nullptr, &gui_xy_intersection);
-
-                if (changed)
-                {
-                    for (auto& session : sessions)
-                    {
-                        session.point_clouds_container.xz_intersection = gui_xz_intersection;
-                        session.point_clouds_container.yz_intersection = gui_yz_intersection;
-                        session.point_clouds_container.xy_intersection = gui_xy_intersection;
-                        session.point_clouds_container.intersection_width = gui_intersection_width;
-                    }
-                }
-
-                ImGui::EndMenu();
-            }
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Slice the view to a thin slab around the X, Y or Z = 0 plane");
 
             if (ImGui::MenuItem("Orthographic", "key O", &is_ortho))
             {

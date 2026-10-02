@@ -205,6 +205,9 @@ public:
     // `color` with no gradient, matching this function's behavior before these
     // four trailing parameters existed (color.a is used as alpha either way).
     // Does nothing if index is out of range or the scan has no cached buffer yet.
+    // xzIntersection/yzIntersection/xyIntersection/intersectionWidth: same cross-section slab
+    // filter draw() applies (see its own doc comment); off by default, so a caller that doesn't
+    // pass these draws every point regardless of the current global setting.
     void drawCachedWithTransform(
         size_t index,
         const Eigen::Affine3d& extraTransform,
@@ -214,7 +217,11 @@ public:
         float elevationMin = 0.f,
         float elevationMax = 1.f,
         const Eigen::Vector3d& distanceCenter = Eigen::Vector3d::Zero(),
-        float distanceMax = 1.f) const;
+        float distanceMax = 1.f,
+        bool xzIntersection = false,
+        bool yzIntersection = false,
+        bool xyIntersection = false,
+        float intersectionWidth = 0.1f) const;
 
     // A caller-owned GPU buffer for an arbitrary world-space point set drawn
     // via drawPoints() below -- for overlays that aren't part of any

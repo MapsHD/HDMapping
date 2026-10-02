@@ -396,7 +396,15 @@ namespace
 } // namespace
 
 void ScanRenderer::drawCachedWithTransform(
-    size_t index, const Eigen::Affine3d& extraTransform, Color color, float pointSize, bool useIntensityColor) const
+    size_t index,
+    const Eigen::Affine3d& extraTransform,
+    Color color,
+    float pointSize,
+    ScanColorMode colorMode,
+    float elevationMin,
+    float elevationMax,
+    const Eigen::Vector3d& distanceCenter,
+    float distanceMax) const
 {
     if (!shaderValid_ || index >= clouds_.size())
     {
@@ -418,13 +426,20 @@ void ScanRenderer::drawCachedWithTransform(
     Matrix mvp = MatrixMultiply(toRaylibMatrix(extraTransform), mvpBase);
 
     float colorF[4] = { color.r / 255.f, color.g / 255.f, color.b / 255.f, color.a / 255.f };
-    int colorMode = useIntensityColor ? 1 : 0;
+    int colorModeInt = static_cast<int>(colorMode);
 
     rlEnableShader(shader_.id);
     rlSetUniformMatrix(locMVP_, mvp);
     rlSetUniform(locPointSize_, &pointSize, RL_SHADER_UNIFORM_FLOAT, 1);
     rlSetUniform(locColor_, colorF, RL_SHADER_UNIFORM_VEC4, 1);
-    rlSetUniform(locColorMode_, &colorMode, RL_SHADER_UNIFORM_INT, 1);
+    rlSetUniform(locColorMode_, &colorModeInt, RL_SHADER_UNIFORM_INT, 1);
+    rlSetUniform(locElevMin_, &elevationMin, RL_SHADER_UNIFORM_FLOAT, 1);
+    rlSetUniform(locElevMax_, &elevationMax, RL_SHADER_UNIFORM_FLOAT, 1);
+    float distCenterF[3] = { static_cast<float>(distanceCenter.x()),
+                             static_cast<float>(distanceCenter.y()),
+                             static_cast<float>(distanceCenter.z()) };
+    rlSetUniform(locDistCenter_, distCenterF, RL_SHADER_UNIFORM_VEC3, 1);
+    rlSetUniform(locDistMax_, &distanceMax, RL_SHADER_UNIFORM_FLOAT, 1);
     // Explicitly off: uniform program state persists across draw calls
     // sharing this shader, and this preview draw should never be
     // slab-filtered regardless of what draw() last set these to.

@@ -633,7 +633,8 @@ void renderScan(
         session_index, index, show_with_initial_pose ? pc.m_initial_pose : pc.m_pose, decimate, reduce_trajectory, pc.render_color);
 }
 
-void renderScanAtPose(int session_index, int index, const Eigen::Affine3d& pose, int, int reduce_trajectory, const float color[3])
+void renderScanAtPose(
+    int session_index, int index, const Eigen::Affine3d& pose, int, int reduce_trajectory, const float color[3], bool useSceneColorMode)
 {
     ScanRenderer* r = rendererOf(session_index);
     if (!r || index < 0 || index >= static_cast<int>(renderers_base[session_index].point_clouds_container.point_clouds.size()))
@@ -642,12 +643,17 @@ void renderScanAtPose(int session_index, int index, const Eigen::Affine3d& pose,
     if (!pc.visible)
         return;
 
+    const Vector3 rc = camera.euler.rotationCenter;
     r->drawCachedWithTransform(
         static_cast<size_t>(index),
         pose * pc.m_pose.inverse(),
         ColorFromNormalized(Vector4{ color[0], color[1], color[2], 1.f }),
         static_cast<float>(pc.point_size),
-        false);
+        useSceneColorMode ? color_mode : ScanColorMode::Flat,
+        static_cast<float>(scene_dims.z_min),
+        static_cast<float>(scene_dims.z_max),
+        Eigen::Vector3d(rc.x, rc.y, rc.z),
+        static_cast<float>(std::max({ scene_dims.length, scene_dims.width, scene_dims.height, 1.0 })));
 
     const size_t stride = std::max(1, reduce_trajectory);
     rlBegin(RL_LINES);

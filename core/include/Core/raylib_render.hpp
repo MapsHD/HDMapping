@@ -198,13 +198,23 @@ public:
     // it's folded into the MVP matrix for this draw call rather than applied
     // to the points themselves. For overlays that need to preview a scan at
     // a pose other than its stored one without paying for a CPU retransform
-    // every frame (e.g. a loop-closure edge's in-progress relative pose). If
-    // useIntensityColor is set, points use the same jet colormap draw()'s
-    // colorByIntensity uses; otherwise every point draws flat in color
-    // (color.a is used as alpha either way). Does nothing if index is out
-    // of range or the scan has no cached buffer yet.
+    // every frame (e.g. a loop-closure edge's in-progress relative pose, or a
+    // gizmo-drag preview). colorMode selects the shader's gradient exactly as
+    // draw()'s own colorMode does (elevationMin/Max and distanceCenter/Max only
+    // matter for Elevation/Distance); the default, Flat, draws every point in
+    // `color` with no gradient, matching this function's behavior before these
+    // four trailing parameters existed (color.a is used as alpha either way).
+    // Does nothing if index is out of range or the scan has no cached buffer yet.
     void drawCachedWithTransform(
-        size_t index, const Eigen::Affine3d& extraTransform, Color color, float pointSize, bool useIntensityColor) const;
+        size_t index,
+        const Eigen::Affine3d& extraTransform,
+        Color color,
+        float pointSize,
+        ScanColorMode colorMode = ScanColorMode::Flat,
+        float elevationMin = 0.f,
+        float elevationMax = 1.f,
+        const Eigen::Vector3d& distanceCenter = Eigen::Vector3d::Zero(),
+        float distanceMax = 1.f) const;
 
     // A caller-owned GPU buffer for an arbitrary world-space point set drawn
     // via drawPoints() below -- for overlays that aren't part of any

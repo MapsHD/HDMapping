@@ -1,5 +1,6 @@
 #include <cmath>
 #include <filesystem>
+#include <map>
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -151,6 +152,8 @@ double search_radius = 0.3;
 bool loaded_sessions = false;
 bool optimized = false;
 bool gizmo_all_sessions = false;
+//!< Stashed Gizmo update when ImGuizmo::IsUsing(). index is sessionId
+std::map<size_t, std::vector<Eigen::Affine3d>> session_drag_preview_poses;
 bool is_ndt_gui = false;
 bool is_loop_closure_gui = false;
 bool remove_gui = false;
@@ -2579,25 +2582,18 @@ void settings_gui()
                     old_index_gizmo = index_gizmo;
                 }
 
-                if (index_gizmo != -1 && index_gizmo < sessions.size())
+                // Skipped while index_gizmo's gizmo is mid-drag: that session's m_pose is
+                // deliberately left untouched until the drag ends (see session_drag_preview_poses),
+                // so resetting m_gizmo from it here every frame would feed ImGuizmo::Manipulate()
+                // the frozen pre-drag pose instead of its own last output, breaking the drag.
+                if (index_gizmo != -1 && index_gizmo < sessions.size() &&
+                    session_drag_preview_poses.find(static_cast<size_t>(index_gizmo)) == session_drag_preview_poses.end())
                 {
                     // sessions[index_gizmo].is_gizmo = true;
-                    m_gizmo[0] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(0, 0);
-                    m_gizmo[1] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(1, 0);
-                    m_gizmo[2] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(2, 0);
-                    m_gizmo[3] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(3, 0);
-                    m_gizmo[4] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(0, 1);
-                    m_gizmo[5] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(1, 1);
-                    m_gizmo[6] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(2, 1);
-                    m_gizmo[7] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(3, 1);
-                    m_gizmo[8] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(0, 2);
-                    m_gizmo[9] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(1, 2);
-                    m_gizmo[10] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(2, 2);
-                    m_gizmo[11] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(3, 2);
-                    m_gizmo[12] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(0, 3);
-                    m_gizmo[13] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(1, 3);
-                    m_gizmo[14] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(2, 3);
-                    m_gizmo[15] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(3, 3);
+                    // Column-major 4x4, matching the Eigen::Map<const Eigen::Matrix4f>(m_gizmo)
+                    // reads elsewhere in this file -- this is just that assignment reversed.
+                    Eigen::Map<Eigen::Matrix4f> gizmo_map(m_gizmo);
+                    gizmo_map = sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose.matrix().cast<float>();
                 }
             }
 
@@ -3080,7 +3076,29 @@ void display()
         {
             if (session.visible)
             {
-                renderSession(session, observation_picking, viewer_decimate_point_cloud, viewer_reduce_rendered_trajectory);
+                const size_t session_idx = static_cast<size_t>(&session - sessions.data());
+                const auto preview_it = session_drag_preview_poses.find(session_idx);
+                if (preview_it != session_drag_preview_poses.end())
+                {
+                    // This session's gizmo is actively being dragged this frame: draw straight
+                    // from its cached GPU buffers with the in-progress pose, no re-upload.
+                    const auto& preview_poses = preview_it->second;
+                    for (size_t j = 0; j < session.point_clouds_container.point_clouds.size() && j < preview_poses.size(); j++)
+                    {
+                        renderScanAtPose(
+                            static_cast<int>(session_idx),
+                            static_cast<int>(j),
+                            preview_poses[j],
+                            viewer_decimate_point_cloud,
+                            viewer_reduce_rendered_trajectory,
+                            session.point_clouds_container.point_clouds[j].render_color,
+                            /*useSceneColorMode=*/true);
+                    }
+                }
+                else
+                {
+                    renderSession(session, observation_picking, viewer_decimate_point_cloud, viewer_reduce_rendered_trajectory);
+                }
                 renderGroundControlPoints(session.ground_control_points, session.point_clouds_container);
                 renderControlPoints(session.control_points, session.point_clouds_container);
 
@@ -3208,6 +3226,27 @@ void display()
     {
         Eigen::Affine3d prev_pose_manipulated = Eigen::Affine3d::Identity();
         Eigen::Affine3d prev_pose_after_gismo = Eigen::Affine3d::Identity();
+        bool gizmo_dragging_this_frame = false;
+
+        // Commits `candidate_poses` into session i's point clouds for real: writes m_pose,
+        // pose and the gui_translation/gui_rotation mirrors. This is the only place that
+        // mutates the session data model, so it's the only frame syncSessionRenderers()
+        // sees a pose change and rebuilds that session's GPU buffers.
+        auto commit_session_poses = [](size_t i, const std::vector<Eigen::Affine3d>& candidate_poses)
+        {
+            for (size_t j = 0; j < candidate_poses.size(); j++)
+            {
+                auto& pc = sessions[i].point_clouds_container.point_clouds[j];
+                pc.m_pose = candidate_poses[j];
+                pc.pose = pose_tait_bryan_from_affine_matrix(pc.m_pose);
+                pc.gui_translation[0] = (float)pc.pose.px;
+                pc.gui_translation[1] = (float)pc.pose.py;
+                pc.gui_translation[2] = (float)pc.pose.pz;
+                pc.gui_rotation[0] = (float)(pc.pose.om * RAD_TO_DEG);
+                pc.gui_rotation[1] = (float)(pc.pose.fi * RAD_TO_DEG);
+                pc.gui_rotation[2] = (float)(pc.pose.ka * RAD_TO_DEG);
+            }
+        };
 
         for (size_t i = 0; i < sessions.size(); i++)
         {
@@ -3252,48 +3291,44 @@ void display()
                             m_gizmo,
                             NULL);
 
-                    sessions[i].point_clouds_container.point_clouds[0].m_pose = Eigen::Map<const Eigen::Matrix4f>(m_gizmo).cast<double>();
-                    prev_pose_after_gismo = sessions[i].point_clouds_container.point_clouds[0].m_pose;
-                    sessions[i].point_clouds_container.point_clouds[0].pose =
-                        pose_tait_bryan_from_affine_matrix(sessions[i].point_clouds_container.point_clouds[0].m_pose);
+                    gizmo_dragging_this_frame = ImGuizmo::IsUsing();
 
-                    sessions[i].point_clouds_container.point_clouds[0].gui_translation[0] =
-                        (float)sessions[i].point_clouds_container.point_clouds[0].pose.px;
-                    sessions[i].point_clouds_container.point_clouds[0].gui_translation[1] =
-                        (float)sessions[i].point_clouds_container.point_clouds[0].pose.py;
-                    sessions[i].point_clouds_container.point_clouds[0].gui_translation[2] =
-                        (float)sessions[i].point_clouds_container.point_clouds[0].pose.pz;
+                    // Candidate pose chain from this frame's gizmo value. Computed either way
+                    // (cheap, CPU-only) but only ever written into the session data model --
+                    // which is what triggers ScanRenderer's GPU re-upload -- once the drag ends.
+                    const Eigen::Affine3d new_pose0(Eigen::Map<const Eigen::Matrix4f>(m_gizmo).cast<double>());
+                    prev_pose_after_gismo = new_pose0;
 
-                    sessions[i].point_clouds_container.point_clouds[0].gui_rotation[0] =
-                        (float)(sessions[i].point_clouds_container.point_clouds[0].pose.om * RAD_TO_DEG);
-                    sessions[i].point_clouds_container.point_clouds[0].gui_rotation[1] =
-                        (float)(sessions[i].point_clouds_container.point_clouds[0].pose.fi * RAD_TO_DEG);
-                    sessions[i].point_clouds_container.point_clouds[0].gui_rotation[2] =
-                        (float)(sessions[i].point_clouds_container.point_clouds[0].pose.ka * RAD_TO_DEG);
-
-                    Eigen::Affine3d curr_m_pose = sessions[i].point_clouds_container.point_clouds[0].m_pose;
-                    for (size_t j = 1; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
+                    std::vector<Eigen::Affine3d> candidate_poses(sessions[i].point_clouds_container.point_clouds.size());
+                    candidate_poses[0] = new_pose0;
+                    Eigen::Affine3d curr_m_pose = new_pose0;
+                    for (size_t j = 1; j < all_m_poses.size(); j++)
                     {
                         curr_m_pose = curr_m_pose * (all_m_poses[j - 1].inverse() * all_m_poses[j]);
-                        sessions[i].point_clouds_container.point_clouds[j].m_pose = curr_m_pose;
-                        sessions[i].point_clouds_container.point_clouds[j].pose =
-                            pose_tait_bryan_from_affine_matrix(sessions[i].point_clouds_container.point_clouds[j].m_pose);
-
-                        sessions[i].point_clouds_container.point_clouds[j].gui_translation[0] =
-                            (float)sessions[i].point_clouds_container.point_clouds[j].pose.px;
-                        sessions[i].point_clouds_container.point_clouds[j].gui_translation[1] =
-                            (float)sessions[i].point_clouds_container.point_clouds[j].pose.py;
-                        sessions[i].point_clouds_container.point_clouds[j].gui_translation[2] =
-                            (float)sessions[i].point_clouds_container.point_clouds[j].pose.pz;
-
-                        sessions[i].point_clouds_container.point_clouds[j].gui_rotation[0] =
-                            (float)(sessions[i].point_clouds_container.point_clouds[j].pose.om * RAD_TO_DEG);
-                        sessions[i].point_clouds_container.point_clouds[j].gui_rotation[1] =
-                            (float)(sessions[i].point_clouds_container.point_clouds[j].pose.fi * RAD_TO_DEG);
-                        sessions[i].point_clouds_container.point_clouds[j].gui_rotation[2] =
-                            (float)(sessions[i].point_clouds_container.point_clouds[j].pose.ka * RAD_TO_DEG);
+                        candidate_poses[j] = curr_m_pose;
                     }
-                    //}
+
+                    if (gizmo_dragging_this_frame)
+                    {
+                        // Actively being dragged this frame: don't touch the session's pose --
+                        // that's what used to force ScanRenderer::syncPoses() to tear down and
+                        // re-upload every scan's full GPU buffer every single frame. The render
+                        // loop draws this session's preview from this entry instead.
+                        session_drag_preview_poses[i] = std::move(candidate_poses);
+                    }
+                    else
+                    {
+                        const bool was_dragging = session_drag_preview_poses.erase(i) > 0;
+                        if (was_dragging)
+                        {
+                            // Drag just ended: commit the final pose for real, exactly once --
+                            // the only frame this session's GPU buffers actually get rebuilt.
+                            commit_session_poses(i, candidate_poses);
+                        }
+                        // else: gizmo is merely selected, not being dragged -- leave the
+                        // session's pose untouched, so selecting a gizmo doesn't by itself
+                        // cause any per-frame GPU churn.
+                    }
                 }
             }
         }
@@ -3302,55 +3337,34 @@ void display()
             for (size_t i = 0; i < sessions.size(); i++)
             {
                 // guizmo_all_sessions;
-                if (!sessions[i].is_gizmo && !sessions[i].is_ground_truth)
+                if (!sessions[i].is_gizmo && !sessions[i].is_ground_truth &&
+                    !sessions[i].point_clouds_container.point_clouds.empty())
                 {
                     std::vector<Eigen::Affine3d> all_m_poses;
                     for (size_t j = 0; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
                         all_m_poses.push_back(sessions[i].point_clouds_container.point_clouds[j].m_pose);
 
-                    Eigen::Affine3d m_rel_org = prev_pose_manipulated.inverse() * sessions[i].point_clouds_container.point_clouds[0].m_pose;
-
+                    Eigen::Affine3d m_rel_org = prev_pose_manipulated.inverse() * all_m_poses[0];
                     Eigen::Affine3d m_new = prev_pose_after_gismo * m_rel_org;
 
-                    sessions[i].point_clouds_container.point_clouds[0].m_pose = m_new;
-                    sessions[i].point_clouds_container.point_clouds[0].pose =
-                        pose_tait_bryan_from_affine_matrix(sessions[i].point_clouds_container.point_clouds[0].m_pose);
-
-                    sessions[i].point_clouds_container.point_clouds[i].gui_translation[0] =
-                        (float)sessions[i].point_clouds_container.point_clouds[0].pose.px;
-                    sessions[i].point_clouds_container.point_clouds[i].gui_translation[1] =
-                        (float)sessions[i].point_clouds_container.point_clouds[0].pose.py;
-                    sessions[i].point_clouds_container.point_clouds[i].gui_translation[2] =
-                        (float)sessions[i].point_clouds_container.point_clouds[0].pose.pz;
-
-                    sessions[i].point_clouds_container.point_clouds[i].gui_rotation[0] =
-                        (float)(sessions[i].point_clouds_container.point_clouds[0].pose.om * RAD_TO_DEG);
-                    sessions[i].point_clouds_container.point_clouds[i].gui_rotation[1] =
-                        (float)(sessions[i].point_clouds_container.point_clouds[0].pose.fi * RAD_TO_DEG);
-                    sessions[i].point_clouds_container.point_clouds[i].gui_rotation[2] =
-                        (float)(sessions[i].point_clouds_container.point_clouds[0].pose.ka * RAD_TO_DEG);
-
-                    Eigen::Affine3d curr_m_pose = sessions[i].point_clouds_container.point_clouds[0].m_pose;
-                    for (size_t j = 1; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
+                    std::vector<Eigen::Affine3d> candidate_poses(all_m_poses.size());
+                    candidate_poses[0] = m_new;
+                    Eigen::Affine3d curr_m_pose = m_new;
+                    for (size_t j = 1; j < all_m_poses.size(); j++)
                     {
                         curr_m_pose = curr_m_pose * (all_m_poses[j - 1].inverse() * all_m_poses[j]);
-                        sessions[i].point_clouds_container.point_clouds[j].m_pose = curr_m_pose;
-                        sessions[i].point_clouds_container.point_clouds[j].pose =
-                            pose_tait_bryan_from_affine_matrix(sessions[i].point_clouds_container.point_clouds[j].m_pose);
+                        candidate_poses[j] = curr_m_pose;
+                    }
 
-                        sessions[i].point_clouds_container.point_clouds[j].gui_translation[0] =
-                            (float)sessions[i].point_clouds_container.point_clouds[j].pose.px;
-                        sessions[i].point_clouds_container.point_clouds[j].gui_translation[1] =
-                            (float)sessions[i].point_clouds_container.point_clouds[j].pose.py;
-                        sessions[i].point_clouds_container.point_clouds[j].gui_translation[2] =
-                            (float)sessions[i].point_clouds_container.point_clouds[j].pose.pz;
-
-                        sessions[i].point_clouds_container.point_clouds[j].gui_rotation[0] =
-                            (float)(sessions[i].point_clouds_container.point_clouds[j].pose.om * RAD_TO_DEG);
-                        sessions[i].point_clouds_container.point_clouds[j].gui_rotation[1] =
-                            (float)(sessions[i].point_clouds_container.point_clouds[j].pose.fi * RAD_TO_DEG);
-                        sessions[i].point_clouds_container.point_clouds[j].gui_rotation[2] =
-                            (float)(sessions[i].point_clouds_container.point_clouds[j].pose.ka * RAD_TO_DEG);
+                    if (gizmo_dragging_this_frame)
+                    {
+                        session_drag_preview_poses[i] = std::move(candidate_poses);
+                    }
+                    else
+                    {
+                        const bool was_dragging = session_drag_preview_poses.erase(i) > 0;
+                        if (was_dragging)
+                            commit_session_poses(i, candidate_poses);
                     }
                 }
             }
@@ -3401,215 +3415,6 @@ void display()
             edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
         }
     }
-
-    /*if (!is_loop_closure_gui)
-{
-    for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
-    {
-        if (session.point_clouds_container.point_clouds[i].gizmo)
-        {
-            std::vector<Eigen::Affine3d> all_m_poses;
-            for (size_t j = 0; j < session.point_clouds_container.point_clouds.size(); j++)
-                all_m_poses.push_back(session.point_clouds_container.point_clouds[j].m_pose);
-
-            ImGuiIO &io = ImGui::GetIO();
-            // ImGuizmo -----------------------------------------------
-            ImGuizmo::BeginFrame();
-            ImGuizmo::Enable(true);
-            ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
-
-            if (!is_ortho)
-            {
-                GLfloat projection[16];
-                glGetFloatv(GL_PROJECTION_MATRIX, projection);
-
-                GLfloat modelview[16];
-                glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
-
-                ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X |
-ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
-            }
-            else
-                ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y |
-ImGuizmo::ROTATE_Z, ImGuizmo::WORLD, m_gizmo, NULL);
-
-            session.point_clouds_container.point_clouds[i].m_pose(0, 0) = m_gizmo[0];
-            session.point_clouds_container.point_clouds[i].m_pose(1, 0) = m_gizmo[1];
-            session.point_clouds_container.point_clouds[i].m_pose(2, 0) = m_gizmo[2];
-            session.point_clouds_container.point_clouds[i].m_pose(3, 0) = m_gizmo[3];
-            session.point_clouds_container.point_clouds[i].m_pose(0, 1) = m_gizmo[4];
-            session.point_clouds_container.point_clouds[i].m_pose(1, 1) = m_gizmo[5];
-            session.point_clouds_container.point_clouds[i].m_pose(2, 1) = m_gizmo[6];
-            session.point_clouds_container.point_clouds[i].m_pose(3, 1) = m_gizmo[7];
-            session.point_clouds_container.point_clouds[i].m_pose(0, 2) = m_gizmo[8];
-            session.point_clouds_container.point_clouds[i].m_pose(1, 2) = m_gizmo[9];
-            session.point_clouds_container.point_clouds[i].m_pose(2, 2) = m_gizmo[10];
-            session.point_clouds_container.point_clouds[i].m_pose(3, 2) = m_gizmo[11];
-            session.point_clouds_container.point_clouds[i].m_pose(0, 3) = m_gizmo[12];
-            session.point_clouds_container.point_clouds[i].m_pose(1, 3) = m_gizmo[13];
-            session.point_clouds_container.point_clouds[i].m_pose(2, 3) = m_gizmo[14];
-            session.point_clouds_container.point_clouds[i].m_pose(3, 3) = m_gizmo[15];
-            session.point_clouds_container.point_clouds[i].pose =
-pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[i].m_pose);
-
-            session.point_clouds_container.point_clouds[i].gui_translation[0] =
-(float)session.point_clouds_container.point_clouds[i].pose.px; session.point_clouds_container.point_clouds[i].gui_translation[1] =
-(float)session.point_clouds_container.point_clouds[i].pose.py; session.point_clouds_container.point_clouds[i].gui_translation[2] =
-(float)session.point_clouds_container.point_clouds[i].pose.pz;
-
-            session.point_clouds_container.point_clouds[i].gui_rotation[0] = (float)(session.point_clouds_container.point_clouds[i].pose.om
-* RAD_TO_DEG); session.point_clouds_container.point_clouds[i].gui_rotation[1] =
-(float)(session.point_clouds_container.point_clouds[i].pose.fi * RAD_TO_DEG); session.point_clouds_container.point_clouds[i].gui_rotation[2]
-= (float)(session.point_clouds_container.point_clouds[i].pose.ka * RAD_TO_DEG);
-
-            if (!manipulate_only_marked_gizmo)
-            {
-                Eigen::Affine3d curr_m_pose = session.point_clouds_container.point_clouds[i].m_pose;
-                for (size_t j = i + 1; j < session.point_clouds_container.point_clouds.size(); j++)
-                {
-                    curr_m_pose = curr_m_pose * (all_m_poses[j - 1].inverse() * all_m_poses[j]);
-                    session.point_clouds_container.point_clouds[j].m_pose = curr_m_pose;
-                    session.point_clouds_container.point_clouds[j].pose =
-pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[j].m_pose);
-
-                    session.point_clouds_container.point_clouds[j].gui_translation[0] =
-(float)session.point_clouds_container.point_clouds[j].pose.px; session.point_clouds_container.point_clouds[j].gui_translation[1] =
-(float)session.point_clouds_container.point_clouds[j].pose.py; session.point_clouds_container.point_clouds[j].gui_translation[2] =
-(float)session.point_clouds_container.point_clouds[j].pose.pz;
-
-                    session.point_clouds_container.point_clouds[j].gui_rotation[0] =
-(float)(session.point_clouds_container.point_clouds[j].pose.om * RAD_TO_DEG); session.point_clouds_container.point_clouds[j].gui_rotation[1]
-= (float)(session.point_clouds_container.point_clouds[j].pose.fi * RAD_TO_DEG);
-                    session.point_clouds_container.point_clouds[j].gui_rotation[2] =
-(float)(session.point_clouds_container.point_clouds[j].pose.ka * RAD_TO_DEG);
-                }
-            }
-        }
-    }
-
-    session.point_clouds_container.render(observation_picking, viewer_decmiate_point_cloud);
-    observation_picking.render();
-
-    glPushAttrib(GL_ALL_ATTRIB_BITS);
-    glPointSize(5);
-    for (const auto &obs : observation_picking.observations)
-    {
-        for (const auto &[key1, value1] : obs)
-        {
-            for (const auto &[key2, value2] : obs)
-            {
-                if (key1 != key2)
-                {
-                    Eigen::Vector3d p1, p2;
-                    if (session.point_clouds_container.show_with_initial_pose)
-                    {
-                        p1 = session.point_clouds_container.point_clouds[key1].m_initial_pose * value1;
-                        p2 = session.point_clouds_container.point_clouds[key2].m_initial_pose * value2;
-                    }
-                    else
-                    {
-                        p1 = session.point_clouds_container.point_clouds[key1].m_pose * value1;
-                        p2 = session.point_clouds_container.point_clouds[key2].m_pose * value2;
-                    }
-                    glColor3f(0, 1, 0);
-                    glBegin(GL_POINTS);
-                    glVertex3f(p1.x(), p1.y(), p1.z());
-                    glVertex3f(p2.x(), p2.y(), p2.z());
-                    glEnd();
-                    glColor3f(1, 0, 0);
-                    glBegin(GL_LINES);
-                    glVertex3f(p1.x(), p1.y(), p1.z());
-                    glVertex3f(p2.x(), p2.y(), p2.z());
-                    glEnd();
-                }
-            }
-        }
-    }
-    glPopAttrib();
-
-    for (const auto &obs : observation_picking.observations)
-    {
-        Eigen::Vector3d mean(0, 0, 0);
-        int counter = 0;
-        for (const auto &[key1, value1] : obs)
-        {
-            mean += session.point_clouds_container.point_clouds[key1].m_initial_pose * value1;
-            counter++;
-        }
-        if (counter > 0)
-        {
-            mean /= counter;
-
-            glColor3f(1, 0, 0);
-            glBegin(GL_LINE_STRIP);
-            glVertex3f(mean.x() - 1, mean.y() - 1, mean.z());
-            glVertex3f(mean.x() + 1, mean.y() - 1, mean.z());
-            glVertex3f(mean.x() + 1, mean.y() + 1, mean.z());
-            glVertex3f(mean.x() - 1, mean.y() + 1, mean.z());
-            glVertex3f(mean.x() - 1, mean.y() - 1, mean.z());
-            glEnd();F
-        }
-    }
-
-    glColor3f(1, 0, 1);
-    glBegin(GL_POINTS);
-    for (auto p : picked_points)
-    {
-        glVertex3f(p.x(), p.y(), p.z());
-    }
-    glEnd();
-}
-else
-{
-    // ImGuizmo -----------------------------------------------
-    if (session.manual_pose_graph_loop_closure.gizmo && session.manual_pose_graph_loop_closure.edges.size() > 0)
-    {
-        ImGuizmo::BeginFrame();
-        ImGuizmo::Enable(true);
-        ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
-
-        if (!is_ortho)
-        {
-            GLfloat projection[16];
-            glGetFloatv(GL_PROJECTION_MATRIX, projection);
-
-            GLfloat modelview[16];
-            glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
-
-            ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X |
-ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
-        }
-        else
-            ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z,
-ImGuizmo::WORLD, m_gizmo, NULL);
-
-        Eigen::Affine3d m_g = Eigen::Affine3d::Identity();
-
-        m_g(0, 0) = m_gizmo[0];
-        m_g(1, 0) = m_gizmo[1];
-        m_g(2, 0) = m_gizmo[2];
-        m_g(3, 0) = m_gizmo[3];
-        m_g(0, 1) = m_gizmo[4];
-        m_g(1, 1) = m_gizmo[5];
-        m_g(2, 1) = m_gizmo[6];
-        m_g(3, 1) = m_gizmo[7];
-        m_g(0, 2) = m_gizmo[8];
-        m_g(1, 2) = m_gizmo[9];
-        m_g(2, 2) = m_gizmo[10];
-        m_g(3, 2) = m_gizmo[11];
-        m_g(0, 3) = m_gizmo[12];
-        m_g(1, 3) = m_gizmo[13];
-        m_g(2, 3) = m_gizmo[14];
-        m_g(3, 3) = m_gizmo[15];
-
-        const int &index_src =
-session.manual_pose_graph_loop_closure.edges[session.manual_pose_graph_loop_closure.index_active_edge].index_from;
-
-        const Eigen::Affine3d &m_src = session.point_clouds_container.point_clouds.at(index_src).m_pose;
-        session.manual_pose_graph_loop_closure.edges[session.manual_pose_graph_loop_closure.index_active_edge].relative_pose_tb =
-pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
-    }
-}*/
 
     view_kbd_shortcuts();
 

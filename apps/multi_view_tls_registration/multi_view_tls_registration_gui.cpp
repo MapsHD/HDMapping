@@ -3704,7 +3704,7 @@ void renderLoopClosure(
                              static_cast<unsigned char>(pointClouds[idx].render_color[2] * 255.f),
                              255 };
                 scan_renderer.drawCachedWithTransform(
-                    static_cast<size_t>(idx), delta, c, static_cast<float>(pointClouds[idx].point_size), false);
+                    static_cast<size_t>(idx), delta, c, static_cast<float>(pointClouds[idx].point_size), ScanColorMode::Flat);
             }
         }
     }

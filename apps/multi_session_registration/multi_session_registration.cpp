@@ -475,11 +475,21 @@ void loop_closure_gui()
 
         if (!manipulate_active_edge)
         {
+            ImGui::SliderInt(
+                "##index_loop_closure_source_slider",
+                &index_loop_closure_source,
+                0,
+                static_cast<int>(sessions[first_session_index].point_clouds_container.point_clouds.size() - 1));
             ImGui::InputInt("index_loop_closure_source", &index_loop_closure_source);
             if (index_loop_closure_source < 0)
                 index_loop_closure_source = 0;
             if (index_loop_closure_source >= sessions[first_session_index].point_clouds_container.point_clouds.size() - 1)
                 index_loop_closure_source = sessions[first_session_index].point_clouds_container.point_clouds.size() - 1;
+            ImGui::SliderInt(
+                "##index_loop_closure_target_slider",
+                &index_loop_closure_target,
+                0,
+                static_cast<int>(sessions[second_session_index].point_clouds_container.point_clouds.size() - 1));
             ImGui::InputInt("index_loop_closure_target", &index_loop_closure_target);
             if (index_loop_closure_target < 0)
                 index_loop_closure_target = 0;

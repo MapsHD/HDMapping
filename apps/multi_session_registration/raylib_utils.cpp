@@ -109,6 +109,78 @@ namespace
     {
         return session_index >= 0 && session_index < static_cast<int>(renderers.size()) ? renderers[session_index].get() : nullptr;
     }
+
+    // Ported from PointClouds::draw_grids() (core/src/point_clouds.cpp, legacy immediate-mode GL,
+    // shared with the GLUT apps so it can't be changed) -- rl*() rename, one helper per cutting
+    // plane instead of one copy-pasted block per grid density. Same port as step 2's
+    // drawGridXZ/YZ/XY (apps/multi_view_tls_registration/multi_view_tls_registration_gui.cpp);
+    // duplicated here rather than shared because this file is itself a from-scratch per-app
+    // raylib port (see the header comment), not a shared library.
+    void drawGridXZ(float step, Color color, const PointClouds::PointCloudDimensions& dims)
+    {
+        float x_min = std::floor(dims.x_min / step) * step;
+        float x_max = std::ceil(dims.x_max / step) * step;
+        float z_min = std::floor(dims.z_min / step) * step;
+        float z_max = std::ceil(dims.z_max / step) * step;
+
+        rlBegin(RL_LINES);
+        rlColor3f(color.r / 255.f, color.g / 255.f, color.b / 255.f);
+        for (float x = x_min; x <= x_max; x += step)
+        {
+            rlVertex3f(x, 0.0f, z_min);
+            rlVertex3f(x, 0.0f, z_max);
+        }
+        for (float z = z_min; z <= z_max; z += step)
+        {
+            rlVertex3f(x_min, 0.0f, z);
+            rlVertex3f(x_max, 0.0f, z);
+        }
+        rlEnd();
+    }
+
+    void drawGridYZ(float step, Color color, const PointClouds::PointCloudDimensions& dims)
+    {
+        float y_min = std::floor(dims.y_min / step) * step;
+        float y_max = std::ceil(dims.y_max / step) * step;
+        float z_min = std::floor(dims.z_min / step) * step;
+        float z_max = std::ceil(dims.z_max / step) * step;
+
+        rlBegin(RL_LINES);
+        rlColor3f(color.r / 255.f, color.g / 255.f, color.b / 255.f);
+        for (float y = y_min; y <= y_max; y += step)
+        {
+            rlVertex3f(0.0f, y, z_min);
+            rlVertex3f(0.0f, y, z_max);
+        }
+        for (float z = z_min; z <= z_max; z += step)
+        {
+            rlVertex3f(0.0f, y_min, z);
+            rlVertex3f(0.0f, y_max, z);
+        }
+        rlEnd();
+    }
+
+    void drawGridXY(float step, Color color, const PointClouds::PointCloudDimensions& dims)
+    {
+        float x_min = std::floor(dims.x_min / step) * step;
+        float x_max = std::ceil(dims.x_max / step) * step;
+        float y_min = std::floor(dims.y_min / step) * step;
+        float y_max = std::ceil(dims.y_max / step) * step;
+
+        rlBegin(RL_LINES);
+        rlColor3f(color.r / 255.f, color.g / 255.f, color.b / 255.f);
+        for (float x = x_min; x <= x_max; x += step)
+        {
+            rlVertex3f(x, y_min, 0.0f);
+            rlVertex3f(x, y_max, 0.0f);
+        }
+        for (float y = y_min; y <= y_max; y += step)
+        {
+            rlVertex3f(x_min, y, 0.0f);
+            rlVertex3f(x_max, y, 0.0f);
+        }
+        rlEnd();
+    }
 } // namespace
 
 std::string truncPath(const std::string& fullPath)
@@ -236,6 +308,41 @@ void showAxes()
     rlVertex3f(0, 0, 0);
     rlVertex3f(0, 0, 100);
     rlEnd();
+}
+
+// Draws whichever of the 9 grid-density/plane checkboxes (Intersections menu) are on, spanning
+// the whole scene's bounding box. Step 3 has no single active session, so -- same pattern as the
+// xz/yz/xy_intersection toggles -- the Intersections menu pushes these flags to every session
+// identically; sessions[0] is read here only as the (representative) place they live.
+void drawIntersectionGrids(const std::vector<Session>& sessions)
+{
+    if (sessions.empty())
+        return;
+
+    const auto& pcc = sessions[0].point_clouds_container;
+    const Color light = ColorFromNormalized(Vector4{ 0.7f, 0.7f, 0.7f, 1.0f });
+    const Color dark = ColorFromNormalized(Vector4{ 0.3f, 0.3f, 0.3f, 1.0f });
+
+    if (pcc.xz_grid_10x10)
+        drawGridXZ(10.0f, light, scene_dims);
+    if (pcc.xz_grid_1x1)
+        drawGridXZ(1.0f, dark, scene_dims);
+    if (pcc.xz_grid_01x01)
+        drawGridXZ(0.1f, dark, scene_dims);
+
+    if (pcc.yz_grid_10x10)
+        drawGridYZ(10.0f, light, scene_dims);
+    if (pcc.yz_grid_1x1)
+        drawGridYZ(1.0f, dark, scene_dims);
+    if (pcc.yz_grid_01x01)
+        drawGridYZ(0.1f, dark, scene_dims);
+
+    if (pcc.xy_grid_10x10)
+        drawGridXY(10.0f, light, scene_dims);
+    if (pcc.xy_grid_1x1)
+        drawGridXY(1.0f, dark, scene_dims);
+    if (pcc.xy_grid_01x01)
+        drawGridXY(0.1f, dark, scene_dims);
 }
 
 void updateCameraTransition()
@@ -619,10 +726,10 @@ void renderScan(
     const ObservationPicking&,
     int decimate,
     int reduce_trajectory,
-    bool,
-    bool,
-    bool,
-    double,
+    bool xz_intersection,
+    bool yz_intersection,
+    bool xy_intersection,
+    double intersection_width,
     bool)
 {
     ScanRenderer* r = rendererOf(session_index);
@@ -630,10 +737,31 @@ void renderScan(
         return;
     const PointCloud& pc = renderers_base[session_index].point_clouds_container.point_clouds[index];
     renderScanAtPose(
-        session_index, index, show_with_initial_pose ? pc.m_initial_pose : pc.m_pose, decimate, reduce_trajectory, pc.render_color);
+        session_index,
+        index,
+        show_with_initial_pose ? pc.m_initial_pose : pc.m_pose,
+        decimate,
+        reduce_trajectory,
+        pc.render_color,
+        /*useSceneColorMode=*/false,
+        xz_intersection,
+        yz_intersection,
+        xy_intersection,
+        intersection_width);
 }
 
-void renderScanAtPose(int session_index, int index, const Eigen::Affine3d& pose, int, int reduce_trajectory, const float color[3])
+void renderScanAtPose(
+    int session_index,
+    int index,
+    const Eigen::Affine3d& pose,
+    int,
+    int reduce_trajectory,
+    const float color[3],
+    bool useSceneColorMode,
+    bool xzIntersection,
+    bool yzIntersection,
+    bool xyIntersection,
+    double intersectionWidth)
 {
     ScanRenderer* r = rendererOf(session_index);
     if (!r || index < 0 || index >= static_cast<int>(renderers_base[session_index].point_clouds_container.point_clouds.size()))
@@ -642,12 +770,21 @@ void renderScanAtPose(int session_index, int index, const Eigen::Affine3d& pose,
     if (!pc.visible)
         return;
 
+    const Vector3 rc = camera.euler.rotationCenter;
     r->drawCachedWithTransform(
         static_cast<size_t>(index),
         pose * pc.m_pose.inverse(),
         ColorFromNormalized(Vector4{ color[0], color[1], color[2], 1.f }),
         static_cast<float>(pc.point_size),
-        false);
+        useSceneColorMode ? color_mode : ScanColorMode::Flat,
+        static_cast<float>(scene_dims.z_min),
+        static_cast<float>(scene_dims.z_max),
+        Eigen::Vector3d(rc.x, rc.y, rc.z),
+        static_cast<float>(std::max({ scene_dims.length, scene_dims.width, scene_dims.height, 1.0 })),
+        xzIntersection,
+        yzIntersection,
+        xyIntersection,
+        static_cast<float>(intersectionWidth));
 
     const size_t stride = std::max(1, reduce_trajectory);
     rlBegin(RL_LINES);

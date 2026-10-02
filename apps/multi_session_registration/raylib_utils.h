@@ -78,6 +78,8 @@ void motion(int x, int y);
 void reshape(int w, int h);
 bool initGL(int* argc, char** argv, const std::string& winTitle, void (*display)(), void (*mouse)(int, int, int, int));
 void showAxes();
+//! Draws the active Intersections-menu grid overlays (10m/1m/0.1m, per xz/yz/xy plane).
+void drawIntersectionGrids(const std::vector<Session>& sessions);
 void updateCameraTransition();
 void updateOrthoView();
 void camMenu();
@@ -145,7 +147,25 @@ void renderScan(
     double intersection_width,
     bool visible_imu_diff);
 //! Replaces PointCloud::render(pose, ...): points drawn at `pose`, trajectory at the scan's m_pose.
-void renderScanAtPose(int session_index, int index, const Eigen::Affine3d& pose, int decimate, int reduce_trajectory, const float color[3]);
+//! useSceneColorMode: shade points the same way the live render does (View > Points color's
+//! color_mode, with the current scene's elevation/distance bounds) instead of flat `color` -- for
+//! a gizmo-drag preview that should otherwise look identical to the real render. Off (the default)
+//! keeps existing callers' flat highlight color (e.g. the loop-closure edge preview's red/blue).
+//! xzIntersection/yzIntersection/xyIntersection/intersectionWidth: same cross-section slicing
+//! draw() applies (View > Intersections); off (the default) draws every point, for callers that
+//! want an unsliced preview regardless of the current global setting (e.g. the edge highlight).
+void renderScanAtPose(
+    int session_index,
+    int index,
+    const Eigen::Affine3d& pose,
+    int decimate,
+    int reduce_trajectory,
+    const float color[3],
+    bool useSceneColorMode = false,
+    bool xzIntersection = false,
+    bool yzIntersection = false,
+    bool xyIntersection = false,
+    double intersectionWidth = 0.1);
 //! Replace GroundControlPoints::render() / ControlPoints::render(pcs, false), which use legacy GL.
 void renderGroundControlPoints(const GroundControlPoints& ground_control_points, const PointClouds& point_clouds_container);
 void renderControlPoints(const ControlPoints& control_points, const PointClouds& point_clouds_container);

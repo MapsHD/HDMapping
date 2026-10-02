@@ -3418,8 +3418,7 @@ void display()
             for (size_t i = 0; i < sessions.size(); i++)
             {
                 // guizmo_all_sessions;
-                if (!sessions[i].is_gizmo && !sessions[i].is_ground_truth &&
-                    !sessions[i].point_clouds_container.point_clouds.empty())
+                if (!sessions[i].is_gizmo && !sessions[i].is_ground_truth && !sessions[i].point_clouds_container.point_clouds.empty())
                 {
                     std::vector<Eigen::Affine3d> all_m_poses;
                     for (size_t j = 0; j < sessions[i].point_clouds_container.point_clouds.size(); j++)

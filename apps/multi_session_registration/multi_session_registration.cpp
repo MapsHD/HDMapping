@@ -480,6 +480,7 @@ void loop_closure_gui()
                 &index_loop_closure_source,
                 0,
                 static_cast<int>(sessions[first_session_index].point_clouds_container.point_clouds.size() - 1));
+            ImGui::SameLine();
             ImGui::InputInt("index_loop_closure_source", &index_loop_closure_source);
             if (index_loop_closure_source < 0)
                 index_loop_closure_source = 0;
@@ -490,6 +491,7 @@ void loop_closure_gui()
                 &index_loop_closure_target,
                 0,
                 static_cast<int>(sessions[second_session_index].point_clouds_container.point_clouds.size() - 1));
+            ImGui::SameLine();
             ImGui::InputInt("index_loop_closure_target", &index_loop_closure_target);
             if (index_loop_closure_target < 0)
                 index_loop_closure_target = 0;
@@ -594,8 +596,9 @@ void loop_closure_gui()
 
                     if (!is_gizmo)
                     {
-                        ImGui::InputInt("index_active_edge", &index_active_edge);
                         ImGui::SliderInt("##index_active_edge_slider", &index_active_edge, 0, (int)edges.size() - 1);
+                        ImGui::SameLine();
+                        ImGui::InputInt("index_active_edge", &index_active_edge);
 
                         if (index_active_edge < 0)
                             index_active_edge = 0;

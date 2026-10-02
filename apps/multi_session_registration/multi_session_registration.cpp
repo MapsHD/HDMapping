@@ -195,6 +195,14 @@ int num_edge_extended_after = 0;
 
 int gui_point_size = 2;
 
+// Cross-section slicing, ported from step 2's per-session "Intersections" menu. Step 3 has no
+// single active session, so -- same pattern as View > Points size above -- these are pushed to
+// every session's point_clouds_container when changed, instead of being one session's fields.
+bool gui_xz_intersection = false;
+bool gui_yz_intersection = false;
+bool gui_xy_intersection = false;
+double gui_intersection_width = 0.1;
+
 TaitBryanPose motion_model_weights = { 0.01, 0.01, 0.01, 0.1, 0.1, 0.1 };
 ///////////////////////////////////////////////////////////////////////////////////
 
@@ -4072,6 +4080,36 @@ void display()
                 ImGui::Separator();
             }
             ImGui::EndDisabled();
+
+            if (ImGui::BeginMenu("Intersections"))
+            {
+                bool changed = false;
+
+                ImGui::SetNextItemWidth(ImGuiNumberWidth);
+                changed |= ImGui::InputDouble("Intersection width [m]", &gui_intersection_width, 0.0, 0.0, "%.2f");
+                if (gui_intersection_width < 0.001)
+                    gui_intersection_width = 0.001;
+
+                ImGui::Separator();
+                changed |= ImGui::MenuItem("xz_intersection", nullptr, &gui_xz_intersection);
+                changed |= ImGui::MenuItem("yz_intersection", nullptr, &gui_yz_intersection);
+                changed |= ImGui::MenuItem("xy_intersection", nullptr, &gui_xy_intersection);
+
+                if (changed)
+                {
+                    for (auto& session : sessions)
+                    {
+                        session.point_clouds_container.xz_intersection = gui_xz_intersection;
+                        session.point_clouds_container.yz_intersection = gui_yz_intersection;
+                        session.point_clouds_container.xy_intersection = gui_xy_intersection;
+                        session.point_clouds_container.intersection_width = gui_intersection_width;
+                    }
+                }
+
+                ImGui::EndMenu();
+            }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Slice the view to a thin slab around the X, Y or Z = 0 plane");
 
             if (ImGui::MenuItem("Orthographic", "key O", &is_ortho))
             {

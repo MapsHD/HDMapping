@@ -585,6 +585,7 @@ void loop_closure_gui()
                     if (!is_gizmo)
                     {
                         ImGui::InputInt("index_active_edge", &index_active_edge);
+                        ImGui::SliderInt("##index_active_edge_slider", &index_active_edge, 0, (int)edges.size() - 1);
 
                         if (index_active_edge < 0)
                             index_active_edge = 0;
@@ -2094,6 +2095,7 @@ void finishLoadingSessions()
 void loadSessions()
 {
     sessions.clear();
+    session_drag_preview_poses.clear();
     for (const auto& ps : project_settings.session_file_names)
         appendSession(ps);
     loaded_sessions = true;
@@ -4191,7 +4193,10 @@ void display()
                     project_settings.session_file_names.erase(project_settings.session_file_names.begin() + idx);
 
                     if (idx < sessions.size())
+                    {
                         sessions.erase(sessions.begin() + idx);
+                        session_drag_preview_poses.clear();
+                    }
                 }
             }
             session_marked_for_removal.clear();

@@ -10,6 +10,144 @@
 #include <Core/hash_utils.h>
 #include <Core/imu_preintegration.h>
 
+#include <chrono>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <limits>
+#include <random>
+#include <stdexcept>
+// ---- points_global spill (LidarOdometryParams::points_global_spill_directory) -------------------------------------
+// Between sliding-window resets the map buffer `points_global` only grows (every frame's points) and is read only AT a
+// reset: its second half becomes the new buffer and is folded into the buckets point by point, in order. Kept in a
+// file instead of RAM, and streamed back in the same order with the ray-cast decision of its whole size, the buckets
+// and so the trajectory are the ones the in-memory buffer gives; the RAM is one chunk. Empty directory = in memory.
+//
+// One spill file per compute_step_2 call, owned by a PointsGlobalSpill on that call's stack and reached through
+// LidarOdometryParams::points_global_spill: created on entry, its final close checked on success, removed on every exit.
+// A spill I/O failure ends the computation (compute_step_2 returns false); the PointsGlobalSpill that owns the files
+// removes them while the exception unwinds.
+[[noreturn]] static void spill_fail(const std::string& what)
+{
+    throw std::runtime_error("points_global spill: " + what);
+}
+
+static void seek64(std::FILE* f, std::uint64_t offset)
+{
+#if defined(_WIN32)
+    const bool ok = _fseeki64(f, static_cast<__int64>(offset), SEEK_SET) == 0;
+#else
+    // off_t is 32-bit on a 32-bit POSIX build without large-file support: refuse an offset it cannot hold
+    if (offset > static_cast<std::uint64_t>(std::numeric_limits<off_t>::max()))
+        spill_fail("offset beyond this platform's off_t (build with _FILE_OFFSET_BITS=64)");
+    const bool ok = fseeko(f, static_cast<off_t>(offset), SEEK_SET) == 0;
+#endif
+    if (!ok)
+        spill_fail("seek failed");
+}
+
+class PointsGlobalSpill
+{
+public:
+    explicit PointsGlobalSpill(LidarOdometryParams& params)
+        : params_(params)
+    {
+        if (params.points_global_spill_directory.empty())
+            return;
+        dir_ = params.points_global_spill_directory;
+        std::random_device rd;
+        const auto now = std::chrono::steady_clock::now().time_since_epoch().count();
+        tag_ = std::to_string((static_cast<std::uint64_t>(rd()) << 32 ^ rd()) ^ static_cast<std::uint64_t>(now));
+        f_ = std::fopen(path().c_str(), "wb");
+        if (!f_)
+            spill_fail("cannot create '" + path() + "' (points_global_spill_directory)");
+        spdlog::info("points_global spilled to '{}'", path());
+        params_.points_global_spill = this;
+    }
+    ~PointsGlobalSpill()
+    {
+        if (params_.points_global_spill == this)
+            params_.points_global_spill = nullptr;
+        if (in_)
+            std::fclose(in_);
+        if (f_)
+            std::fclose(f_);
+        if (!pending_remove_.empty()) // a reset that did not finish: the previous generation's file too
+            std::remove(pending_remove_.c_str());
+        if (!dir_.empty())
+            std::remove(path().c_str());
+    }
+    PointsGlobalSpill(const PointsGlobalSpill&) = delete;
+    PointsGlobalSpill& operator=(const PointsGlobalSpill&) = delete;
+
+    void append(const Point3Di& p)
+    {
+        if (std::fwrite(&p, sizeof(Point3Di), 1, f_) != 1)
+            spill_fail("write failed on '" + path() + "'");
+        n_++;
+    }
+
+    // The reset, spilled: records [n/2, n) become the new buffer and are folded into the buckets in order.
+    template<typename Update>
+    void reset(Update update)
+    {
+        std::FILE* g = f_;
+        f_ = nullptr; // closed below whatever fclose returns: the destructor must not close it again
+        if (std::fclose(g) != 0)
+            spill_fail("close failed on '" + path() + "'");
+        const std::string old_path = path();
+        pending_remove_ = old_path;
+        in_ = std::fopen(old_path.c_str(), "rb");
+        const std::uint64_t first = n_ / 2, keep = n_ - n_ / 2;
+        gen_++;
+        f_ = std::fopen(path().c_str(), "wb");
+        if (!in_ || !f_)
+            spill_fail("reset could not open '" + old_path + "' / '" + path() + "'");
+        seek64(in_, first * sizeof(Point3Di));
+        const bool ray_cast = keep < 100000;
+        std::vector<Point3Di> chunk;
+        const std::uint64_t CH = std::uint64_t(1) << 21;
+        for (std::uint64_t done = 0; done < keep;)
+        {
+            const size_t m = static_cast<size_t>(std::min(CH, keep - done));
+            chunk.resize(m);
+            if (std::fread(chunk.data(), sizeof(Point3Di), m, in_) != m || std::fwrite(chunk.data(), sizeof(Point3Di), m, f_) != m)
+                spill_fail("reset read/write failed on '" + old_path + "'");
+            update(chunk, ray_cast);
+            done += m;
+        }
+        std::fclose(in_);
+        in_ = nullptr;
+        if (std::remove(old_path.c_str()) != 0)
+            spdlog::warn("points_global spill: could not remove '{}'", old_path);
+        pending_remove_.clear();
+        n_ = keep;
+    }
+
+    // a successful run: the final close is checked, so a failed flush is not hidden behind a reported success
+    void finish()
+    {
+        if (f_ && std::fclose(f_) != 0)
+        {
+            f_ = nullptr;
+            spill_fail("close failed on '" + path() + "'");
+        }
+        f_ = nullptr;
+    }
+
+private:
+    std::string path() const
+    {
+        return dir_ + "/points_global_" + tag_ + "_" + std::to_string(gen_) + ".bin";
+    }
+    LidarOdometryParams& params_;
+    std::string dir_, tag_, pending_remove_;
+    std::FILE* f_ = nullptr;
+    std::FILE* in_ = nullptr;
+    std::uint64_t n_ = 0;
+    int gen_ = 0;
+};
+
 const double DEG_TO_RAD = M_PI / 180.0f;
 const double RAD_TO_DEG = 180.0f / M_PI;
 
@@ -2067,6 +2205,7 @@ bool process_worker_step_lidar_odometry_core(
     constexpr double outdoor_range_squared = 5.0 * 5.0; // 25.0
     const double max_distance_squared = params.max_distance_lidar * params.max_distance_lidar;
 
+    std::vector<int> touched_bins_indoor, touched_bins_outdoor;
     const auto build_normal_vector_histograms = [&]()
     {
         auto process_chunk = [&](size_t chunk)
@@ -2138,14 +2277,27 @@ bool process_worker_step_lidar_odometry_core(
                 process_chunk(c);
         }
 
-        std::fill(table_buckets_nv_indoor.begin(), table_buckets_nv_indoor.end(), 0.0);
-        std::fill(table_buckets_nv_outdoor.begin(), table_buckets_nv_outdoor.end(), 0.0);
+        // Zero only the bins the previous build wrote (the tables are this frame's, zero-initialised) instead of all
+        // 2 x 101^3 doubles every iteration: the same table contents (integer counts summed exactly), ~16 MB of
+        // memory writes per iteration fewer.
+        for (const int b : touched_bins_indoor)
+            table_buckets_nv_indoor[b] = 0.0;
+        for (const int b : touched_bins_outdoor)
+            table_buckets_nv_outdoor[b] = 0.0;
+        touched_bins_indoor.clear();
+        touched_bins_outdoor.clear();
         for (size_t c = 0; c < num_hist_chunks; ++c)
         {
             for (const auto& [bin, count] : chunk_hist_indoor[c])
+            {
                 table_buckets_nv_indoor[bin] += static_cast<double>(count);
+                touched_bins_indoor.push_back(bin);
+            }
             for (const auto& [bin, count] : chunk_hist_outdoor[c])
+            {
                 table_buckets_nv_outdoor[bin] += static_cast<double>(count);
+                touched_bins_outdoor.push_back(bin);
+            }
         }
     };
 
@@ -2239,6 +2391,31 @@ bool process_worker_step_update_rgd_after(
             params.buckets_outdoor.clear();
         }
 
+        if (PointsGlobalSpill* spill = params.points_global_spill)
+        {
+            acc_distance = 0;
+            std::scoped_lock lock(params.mutex_buckets_indoor, params.mutex_buckets_outdoor);
+            // the upstream decimate() below discards its result: the buffer is never decimated, so neither is this
+            const Eigen::Vector3d viewport = worker_data.intermediate_trajectory[0].translation();
+            spill->reset(
+                [&](const std::vector<Point3Di>& chunk, bool ray_cast)
+                {
+                    if (params.ablation_study_use_hierarchical_rgd)
+                        update_rgd_hierarchy_ray(
+                            params.in_out_params_indoor,
+                            params.buckets_indoor,
+                            chunk,
+                            viewport,
+                            params.in_out_params_outdoor,
+                            params.buckets_outdoor,
+                            lookup_stats,
+                            ray_cast);
+                    else
+                        update_rgd_ray(
+                            params.in_out_params_indoor, params.buckets_indoor, chunk, viewport, &lookup_stats.indoor_lookups, ray_cast);
+                });
+            return true;
+        }
         std::vector<Point3Di> points_global_new;
         points_global_new.reserve(points_global.size() / 2 + 1);
         for (int k = points_global.size() / 2; k < points_global.size(); k++)
@@ -2346,7 +2523,33 @@ bool process_worker_step_update_rgd_after(
     return true;
 }
 
+static bool compute_step_2_impl(
+    std::vector<WorkerData>& worker_data,
+    LidarOdometryParams& params,
+    double& ts_failure,
+    std::atomic<float>& loProgress,
+    const std::atomic<bool>& pause,
+    bool debugMsg);
+
 bool compute_step_2(
+    std::vector<WorkerData>& worker_data,
+    LidarOdometryParams& params,
+    double& ts_failure,
+    std::atomic<float>& loProgress,
+    const std::atomic<bool>& pause,
+    bool debugMsg)
+{
+    try
+    {
+        return compute_step_2_impl(worker_data, params, ts_failure, loProgress, pause, debugMsg);
+    } catch (const std::runtime_error& e) // a points_global spill I/O failure; its files are already removed
+    {
+        spdlog::error("{}", e.what());
+        return false;
+    }
+}
+
+static bool compute_step_2_impl(
     std::vector<WorkerData>& worker_data,
     LidarOdometryParams& params,
     double& ts_failure,
@@ -2366,6 +2569,7 @@ bool compute_step_2(
     double total_optimization_time_seconds = 0.0;
     LookupStats lookup_stats;
     std::vector<Point3Di> points_global;
+    PointsGlobalSpill spill(params); // a spill directory set: points_global lives in this call's file, removed at the end
 
     spdlog::stopwatch stopwatch_worker;
     if (initialize_lidar_odometry(worker_data, params, ts_failure, loProgress, pause, debugMsg, lookup_stats))
@@ -2565,7 +2769,10 @@ bool compute_step_2(
             {
                 Point3Di pp = intermediate_points[j];
                 pp.point = worker_data[i].intermediate_trajectory[intermediate_points[j].index_pose] * pp.point;
-                points_global.push_back(pp);
+                if (PointsGlobalSpill* sp = params.points_global_spill)
+                    sp->append(pp);
+                else
+                    points_global.push_back(pp);
             }
             HDMAP_ZONE_END(transform_pts);
 
@@ -2603,6 +2810,7 @@ bool compute_step_2(
         const double avg_iteration_ms = (total_iterations > 0) ? (total_optimization_time_seconds * 1000.0 / total_iterations) : 0.0;
         spdlog::info("avg_iteration_time: {:.3f}ms", avg_iteration_ms);
         spdlog::debug("lookup_stats: indoor={} outdoor_lookups={}", lookup_stats.indoor_lookups, lookup_stats.outdoor_lookups);
+        spill.finish();
         return true;
     }
     else

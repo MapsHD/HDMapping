@@ -1018,6 +1018,7 @@ void loadFiles(std::vector<std::string> input_file_names)
 {
     LidarOdometryParams params; // dummy for load_data function
     params.save_calibration_validation = false;
+    params.lazy_load_raw_clouds = false; // the viewer shows every cloud
     params.filter_threshold_xy_inner = filter_threshold_xy_inner;
     params.filter_threshold_xy_outer = filter_threshold_xy_outer;
 

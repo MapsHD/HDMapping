@@ -427,8 +427,13 @@ void step1(const std::atomic<bool>& loPause, std::string input_folder_name)
         {
             working_directory = fs::path(input_file_names[0]).parent_path().string();
             calculate_trajectory(trajectory, imu_data, params, full_debug_messages);
-            compute_step_1(pointsPerFile, params, trajectory, worker_data, loPause);
-            step_1_done = true;
+            if (compute_step_1(pointsPerFile, params, trajectory, worker_data, loPause))
+            {
+                release_raw_clouds(pointsPerFile, params); // nothing after step 1 reads them
+                step_1_done = true;
+            }
+            else
+                std::cerr << "Lidar odometry step 1 failed (see the messages above)" << std::endl;
         }
         else
         {
@@ -1525,6 +1530,12 @@ void openData()
                 start = std::chrono::system_clock::now();
 
                 step2(loPause);
+                if (!step_2_done)
+                {
+                    loRunning = false;
+                    std::cerr << "Lidar odometry step 2 failed: no results saved" << std::endl;
+                    return;
+                }
 
                 end = std::chrono::system_clock::now();
                 std::chrono::duration<double> elapsed_seconds = end - start;
@@ -1549,7 +1560,7 @@ void openData()
         loRunning = false;
 }
 
-void step1(
+bool step1(
     const std::string& folder,
     LidarOdometryParams& params,
     std::vector<std::vector<Point3Di>>& pointsPerFile,
@@ -1574,16 +1585,20 @@ void step1(
     {
         working_directory = fs::path(input_file_names[0]).parent_path().string();
         calculate_trajectory(trajectory, imu_data, params, full_debug_messages);
-        compute_step_1(pointsPerFile, params, trajectory, worker_data, loPause);
+        if (!compute_step_1(pointsPerFile, params, trajectory, worker_data, loPause))
+            return false;
+        release_raw_clouds(pointsPerFile, params); // nothing after step 1 reads them
         std::cout << "step_1_done" << std::endl;
+        return true;
     }
+    return false;
 }
 
-void step2(std::vector<WorkerData>& worker_data, LidarOdometryParams& params, const std::atomic<bool>& loPause)
+bool step2(std::vector<WorkerData>& worker_data, LidarOdometryParams& params, const std::atomic<bool>& loPause)
 {
     double ts_failure = 0.0;
     std::atomic<float> loProgress;
-    compute_step_2(worker_data, params, ts_failure, loProgress, loPause, full_debug_messages);
+    return compute_step_2(worker_data, params, ts_failure, loProgress, loPause, full_debug_messages);
 }
 
 void save_results(
@@ -2321,6 +2336,12 @@ int main(int argc, char* argv[])
                         start = std::chrono::system_clock::now();
 
                         step2(loPause);
+                        if (!step_2_done)
+                        {
+                            loRunning = false;
+                            std::cerr << "Lidar odometry step 2 failed: no results saved" << std::endl;
+                            return;
+                        }
 
                         end = std::chrono::system_clock::now();
                         std::chrono::duration<double> elapsed_seconds = end - start;

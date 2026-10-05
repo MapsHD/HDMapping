@@ -71,6 +71,19 @@ void update_rgd(
     const Eigen::Vector3d& viewport,
     size_t* lookup_count)
 {
+    update_rgd_ray(rgd_params, buckets, points_global, viewport, lookup_count, points_global.size() < 100000);
+}
+
+// update_rgd with the ray-cast decision made by the caller: a buffer streamed in chunks takes the decision its
+// WHOLE size would have taken, so the buckets are the ones the whole buffer at once would have produced.
+void update_rgd_ray(
+    const NDT::GridParameters& rgd_params,
+    NDTBucketMapType& buckets,
+    const std::vector<Point3Di>& points_global,
+    const Eigen::Vector3d& viewport,
+    size_t* lookup_count,
+    bool ray_cast)
+{
     Eigen::Vector3d b(rgd_params.resolution_X, rgd_params.resolution_Y, rgd_params.resolution_Z);
 
     for (int i = 0; i < points_global.size(); i++)
@@ -187,7 +200,7 @@ void update_rgd(
         // Eigen::Vector3d direction = points_global[i].point - viewport;
         // direction.normalize();
         // double bucket_norm = b.norm();
-        if (points_global.size() < 100000)
+        if (ray_cast)
         {
             Eigen::Vector3d direction = viewport - points_global[i].point;
             double distance = direction.norm();
@@ -233,14 +246,35 @@ void update_rgd_hierarchy(
     NDTBucketMapType& buckets_outdoor,
     LookupStats& stats)
 {
+    update_rgd_hierarchy_ray(
+        rgd_params_indoor,
+        buckets_indoor,
+        points_global,
+        viewport,
+        rgd_params_outdoor,
+        buckets_outdoor,
+        stats,
+        points_global.size() < 100000);
+}
+
+void update_rgd_hierarchy_ray(
+    const NDT::GridParameters& rgd_params_indoor,
+    NDTBucketMapType& buckets_indoor,
+    const std::vector<Point3Di>& points_global,
+    const Eigen::Vector3d& viewport,
+    const NDT::GridParameters& rgd_params_outdoor,
+    NDTBucketMapType& buckets_outdoor,
+    LookupStats& stats,
+    bool ray_cast)
+{
     tbb::parallel_invoke(
         [&]()
         {
-            update_rgd(rgd_params_indoor, buckets_indoor, points_global, viewport, &stats.indoor_lookups);
+            update_rgd_ray(rgd_params_indoor, buckets_indoor, points_global, viewport, &stats.indoor_lookups, ray_cast);
         },
         [&]()
         {
-            update_rgd(rgd_params_outdoor, buckets_outdoor, points_global, viewport, &stats.outdoor_lookups);
+            update_rgd_ray(rgd_params_outdoor, buckets_outdoor, points_global, viewport, &stats.outdoor_lookups, ray_cast);
         });
 }
 

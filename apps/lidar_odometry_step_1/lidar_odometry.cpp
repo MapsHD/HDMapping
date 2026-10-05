@@ -5,8 +5,98 @@
 
 #include <Core/system_info.hpp>
 #include <Fusion.h>
+#if defined(__GLIBC__)
+#include <malloc.h>
+#endif
+
+#include <functional>
 
 namespace fs = std::filesystem;
+
+// ---- raw clouds loaded per file (LidarOdometryParams::lazy_load_raw_clouds) -----------------------------------------
+// Eagerly, load_data holds every file's raw cloud before step 1 (~56 B per point: ~30 GB for 500 M points). Step 1
+// reads them chunk by chunk in time order, each chunk taking [t0, t1) from every file by binary search. Lazily, the
+// first pass loads each file once (one per thread at a time) only to record its time range; step 1 then loads a file
+// when its range overlaps the chunk and frees it once the chunk start has passed its last point. A file is loaded by
+// the same call and sorted by the same comparator as the eager load, so every chunk receives the same points in the
+// same order. The loader lives in LidarOdometryParams::raw_cloud_loader, so each pipeline owns its own.
+struct RawCloudLoader
+{
+    std::function<std::vector<Point3Di>(size_t)> load;
+    std::vector<std::string> files;
+    std::vector<std::uintmax_t> file_size;
+    std::vector<fs::file_time_type> file_time;
+    std::vector<double> t_first, t_last;
+    std::vector<size_t> n;
+    std::vector<char> loaded, done;
+};
+
+static void release_freed_heap()
+{
+#if defined(__GLIBC__)
+    malloc_trim(0); // a freed cloud of ~20 MB sits below glibc's grown mmap threshold and stays in the heap otherwise
+#endif
+}
+
+static void write_calibration_validation(const fs::path& wdp, const std::vector<Point3Di>& data, const LidarOdometryParams& params)
+{
+    if (!fs::exists(wdp))
+    {
+        std::cout << "Creating folder: " << wdp << "\n";
+        fs::create_directory(wdp);
+    }
+
+    fs::path outFile = wdp / "calibrationValidation.asc";
+    std::ofstream testPointcloud(outFile);
+    if (!testPointcloud)
+        std::cerr << "Failed to open file: " << outFile << "\n";
+    else
+        for (size_t j = 0; j < std::min(data.size(), (size_t)params.calibration_validation_points); ++j)
+        {
+            const auto& p = data[j];
+            testPointcloud << p.point.x() << "\t" << p.point.y() << "\t" << p.point.z() << "\t" << p.intensity << "\t" << (int)p.lidarid
+                           << "\n";
+        }
+}
+
+// Load file i if step 1 needs it and it is not in memory. Lazy loading reads every file twice (the range pass in
+// load_data, then here), so a file that changed in between is refused rather than silently processed.
+static bool lazy_ensure(RawCloudLoader* L, std::vector<std::vector<Point3Di>>& ppf, size_t i)
+{
+    if (!L || L->loaded[i] || L->done[i] || L->n[i] == 0)
+        return true;
+    const auto unchanged = [&]()
+    {
+        std::error_code ec;
+        const auto size = fs::file_size(L->files[i], ec);
+        const auto time = fs::last_write_time(L->files[i], ec);
+        return !ec && size == L->file_size[i] && time == L->file_time[i];
+    };
+    if (!unchanged())
+    {
+        std::cerr << "lazy_load_raw_clouds: '" << L->files[i] << "' changed or vanished since it was first read\n";
+        return false;
+    }
+    ppf[i] = L->load(i);
+    // checked again after the read, so a file replaced while it was being opened is refused too
+    if (!unchanged() || ppf[i].size() != L->n[i] || ppf[i].front().timestamp != L->t_first[i] || ppf[i].back().timestamp != L->t_last[i])
+    {
+        std::cerr << "lazy_load_raw_clouds: '" << L->files[i] << "' reads differently than when it was first read\n";
+        std::vector<Point3Di>().swap(ppf[i]);
+        return false;
+    }
+    L->loaded[i] = 1;
+    return true;
+}
+
+static void lazy_release(RawCloudLoader* L, std::vector<std::vector<Point3Di>>& ppf, size_t i)
+{
+    if (!L || !L->loaded[i])
+        return;
+    std::vector<Point3Di>().swap(ppf[i]);
+    L->loaded[i] = 0;
+    L->done[i] = 1;
+}
 
 bool load_data(
     std::vector<std::string>& input_file_names,
@@ -239,6 +329,60 @@ bool load_data(
         fs::path wdp_cache = fs::path(working_directory) / "cache";
         params.working_directory_cache = wdp_cache.string();
 
+        params.raw_cloud_loader.reset();
+        if (params.lazy_load_raw_clouds)
+        {
+            params.raw_cloud_loader = std::make_shared<RawCloudLoader>();
+            auto& L = *params.raw_cloud_loader;
+            // a reload (the GUI opening another folder) must not keep the previous session's clouds
+            std::vector<std::vector<Point3Di>>(minSize).swap(pointsPerFile);
+            const double inner = params.filter_threshold_xy_inner, outer = params.filter_threshold_xy_outer;
+            L.files.assign(laz_files.begin(), laz_files.begin() + minSize);
+            L.file_size.assign(minSize, 0);
+            L.file_time.assign(minSize, fs::file_time_type{});
+            const std::vector<std::string> files = L.files;
+            L.load = [files, inner, outer, combinedCalibration](size_t i)
+            {
+                auto data = load_point_cloud(files[i].c_str(), true, inner, outer, combinedCalibration);
+                std::sort(
+                    data.begin(),
+                    data.end(),
+                    [](const Point3Di& a, const Point3Di& b)
+                    {
+                        return a.timestamp < b.timestamp;
+                    });
+                return data;
+            };
+            L.t_first.assign(minSize, 0.0);
+            L.t_last.assign(minSize, 0.0);
+            L.n.assign(minSize, 0);
+            L.loaded.assign(minSize, 0);
+            L.done.assign(minSize, 0);
+            tbb::parallel_for(
+                size_t(1), // upstream clears the first file's cloud after loading: it is never used
+                minSize,
+                [&](size_t i)
+                {
+                    std::error_code ec;
+                    L.file_size[i] = fs::file_size(L.files[i], ec);
+                    L.file_time[i] = fs::last_write_time(L.files[i], ec);
+                    auto data = L.load(i);
+                    L.n[i] = data.size();
+                    if (!data.empty())
+                    {
+                        L.t_first[i] = data.front().timestamp;
+                        L.t_last[i] = data.back().timestamp;
+                    }
+                });
+            if (params.save_calibration_validation && minSize > 0) // as the eager load: the first file, then dropped
+                write_calibration_validation(wdp, L.load(0), params);
+            size_t totalPoints = 0;
+            for (auto k : L.n)
+                totalPoints += k;
+            std::cout << "TOTAL: " << totalPoints << " (lazy: ranges recorded, clouds loaded on demand)\n..loading finished.\n\n";
+            return true;
+        }
+
         // --- Parallel load of LAZ files
         tbb::parallel_for(
             size_t(0),
@@ -260,25 +404,7 @@ bool load_data(
 
                 // Optional calibration validation (first file only)
                 if ((i == 0) && params.save_calibration_validation)
-                {
-                    if (!fs::exists(wdp))
-                    {
-                        std::cout << "Creating folder: " << wdp << "\n";
-                        fs::create_directory(wdp);
-                    }
-
-                    fs::path outFile = wdp / "calibrationValidation.asc";
-                    std::ofstream testPointcloud(outFile);
-                    if (!testPointcloud)
-                        std::cerr << "Failed to open file: " << outFile << "\n";
-                    else
-                        for (size_t j = 0; j < std::min(data.size(), (size_t)params.calibration_validation_points); ++j)
-                        {
-                            const auto& p = data[j];
-                            testPointcloud << p.point.x() << "\t" << p.point.y() << "\t" << p.point.z() << "\t" << p.intensity << "\t"
-                                           << (int)p.lidarid << "\n";
-                        }
-                }
+                    write_calibration_validation(wdp, data, params);
 
                 // Store results
                 pointsPerFile[i] = std::move(data);
@@ -469,7 +595,7 @@ void calculate_trajectory(Trajectory& trajectory, Imu& imu_data, LidarOdometryPa
 }
 
 bool compute_step_1(
-    const std::vector<std::vector<Point3Di>>& pointsPerFile,
+    std::vector<std::vector<Point3Di>>& pointsPerFile,
     LidarOdometryParams& params,
     Trajectory& trajectory,
     std::vector<WorkerData>& worker_data,
@@ -482,8 +608,27 @@ bool compute_step_1(
     // Step 1: Pre-reserve to avoid vector reallocations
     params.initial_points.reserve(params.threshold_initial_points);
 
-    for (const auto& pp : pointsPerFile)
+    auto& ppf = pointsPerFile;
+    RawCloudLoader* loader = params.raw_cloud_loader.get();
+    if (loader)
     {
+        if (ppf.size() != loader->n.size())
+        {
+            std::cerr << "lazy_load_raw_clouds: the cloud vector does not belong to the last load_data\n";
+            return false;
+        }
+        // the flags describe THIS vector: a re-run reads every file again, and a file counts as loaded only if it is
+        for (size_t i = 0; i < ppf.size(); i++)
+        {
+            loader->loaded[i] = !ppf[i].empty();
+            loader->done[i] = 0;
+        }
+    }
+    for (size_t fi = 0; fi < pointsPerFile.size(); fi++)
+    {
+        if (!lazy_ensure(loader, ppf, fi))
+            return false;
+        const auto& pp = pointsPerFile[fi];
         // number_of_points += pp.size();
         for (const auto& p : pp)
         {
@@ -572,6 +717,25 @@ bool compute_step_1(
         }
 
         std::vector<Point3Di> points;
+
+        if (loader)
+        {
+            auto& L = *loader;
+            const double t0 = wd.intermediate_trajectory_timestamps[0].first;
+            const double t1 = wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1].first;
+            for (size_t index = 0; index < pointsPerFile.size(); index++)
+            {
+                if (L.n[index] == 0)
+                    continue;
+                if (L.t_last[index] < t0) // every later chunk starts later still: never read again
+                    lazy_release(loader, ppf, index);
+                else if (L.t_first[index] < t1) // may hold points in [t0, t1): load; the search below decides
+                {
+                    if (!lazy_ensure(loader, ppf, index))
+                        return false;
+                }
+            }
+        }
 
         for (size_t index = 0; index < pointsPerFile.size(); index++)
         {
@@ -1077,6 +1241,13 @@ std::string save_results_automatic(
     return outwd.string();
 }
 
+void release_raw_clouds(std::vector<std::vector<Point3Di>>& pointsPerFile, LidarOdometryParams& params)
+{
+    std::vector<std::vector<Point3Di>>().swap(pointsPerFile);
+    params.raw_cloud_loader.reset();
+    release_freed_heap();
+}
+
 std::vector<WorkerData> run_lidar_odometry(const std::string& input_dir, LidarOdometryParams& params)
 {
     HDMAP_ZONE_SCOPE("run_lidar_odometry");
@@ -1107,6 +1278,10 @@ std::vector<WorkerData> run_lidar_odometry(const std::string& input_dir, LidarOd
         std::cout << "Calculation failed at step 1 of lidar odometry, exiting." << std::endl;
         return worker_data;
     }
+    // Step 1 has cached every chunk's points to disk (worker_data[*].*_cache_file_name) and nothing after it reads
+    // the raw clouds: release them instead of holding them (~56 B x every raw point; 27 GB on a 480 M-point capture)
+    // through step 2. Output-identical: no later reader exists.
+    release_raw_clouds(pointsPerFile, params);
     double ts_failure = 0.0;
 
     std::atomic<float> loProgress;

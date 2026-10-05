@@ -25,7 +25,7 @@
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
 #include <filesystem>
 
-#include <HDMapping/Version.hpp>
+#include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
 
 #include <mutex>
 
@@ -37,7 +37,7 @@
 
 ///////////////////////////////////////////////////////////////////////////////////
 
-std::string winTitle = std::string("Single session viewer ") + HDMAPPING_VERSION_STRING;
+std::string winTitle = std::string("Single session viewer ") + HDMAPPING_CONFIGURE_PROJECT_VERSION;
 
 std::vector<std::string> infoLines = { "This program is optional step in MANDEYE process",
                                        "",

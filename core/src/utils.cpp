@@ -17,7 +17,7 @@
 
 #include <Core/utils.hpp>
 
-#include <HDMapping/Version.hpp>
+#include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
 
 #ifdef _WIN32
 #include <shellapi.h>
@@ -1127,7 +1127,7 @@ void info_window(const std::vector<std::string>& infoLines, const std::vector<Sh
         ImGui::Text("Author: Janusz Bedkowski & contributors");
         ImGui::NewLine();
         ImGui::Text("Part of HDMapping software suite");
-        ImGui::Text("Version: %s (%s)", HDMAPPING_VERSION_STRING, __DATE__);
+        ImGui::Text("Version: %s (%s)", HDMAPPING_CONFIGURE_PROJECT_VERSION, __DATE__);
         ImGui::Text("Project page: ");
         ImGui::SameLine();
         ImGuiHyperlink("https://github.com/MapsHD/HDMapping");

@@ -19,7 +19,7 @@
 #include <Core/utils.hpp>
 
 #include "toml_io.h"
-#include <HDMapping/Version.hpp>
+#include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
 #include <chrono>
 #include <ctime>
 #include <mutex>
@@ -38,7 +38,7 @@
 // https://github.com/JanuszBedkowski/mandeye_controller The output is a session proving trajekctory and point clouds that can be  further
 // processed by "multi_view_tls_registration" program.
 
-std::string winTitle = std::string("Step 1 (Lidar odometry) ") + HDMAPPING_VERSION_STRING;
+std::string winTitle = std::string("Step 1 (Lidar odometry) ") + HDMAPPING_CONFIGURE_PROJECT_VERSION;
 
 std::vector<std::string> infoLines = {
     "This program is first step in MANDEYE process.",

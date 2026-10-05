@@ -11,7 +11,7 @@
 #include <RaylibWidgets/RayPlaneD.h>
 #include <RaylibWidgets/WindowFit.h>
 
-#include <HDMapping/Version.hpp>
+#include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
 
 #include <algorithm>
 #include <filesystem>
@@ -450,7 +450,7 @@ void cor_window()
 
 void info_window(const std::vector<std::string>& infoLines, const std::vector<ShortcutEntry>& appShortcuts)
 {
-    raylib_widgets::ShowInfoWindow(info_gui, infoLines, appShortcuts, HDMAPPING_VERSION_STRING, __DATE__);
+    raylib_widgets::ShowInfoWindow(info_gui, infoLines, appShortcuts, HDMAPPING_CONFIGURE_PROJECT_VERSION, __DATE__);
 }
 
 void drawMiniCompassWithRuler()

@@ -13,7 +13,7 @@
 #include <Core/e57_utils.h>
 #include <Core/pfd_wrapper.hpp>
 #include <HDMapping/PoseInterpolation.h>
-#include <HDMapping/Version.hpp>
+#include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
 #include <RaylibWidgets/CenterOfRotationWindow.h>
 #include <RaylibWidgets/CompassRuler.h>
 #include <RaylibWidgets/OrbitCamera.h>
@@ -1661,7 +1661,7 @@ static void exportE57(AppState& s)
 
     mandeye::e57io::E57WriteScan scan;
     scan.name = "colored_cloud";
-    scan.description = std::string("HDMapping ") + HDMAPPING_VERSION_STRING + " camera_lidar_trajectory_viewer";
+    scan.description = std::string("HDMapping ") + HDMAPPING_CONFIGURE_PROJECT_VERSION + " camera_lidar_trajectory_viewer";
     scan.points = &pts;
     scan.colors = &cols;
     scan.intensities = &inten;
@@ -1685,7 +1685,7 @@ static void exportE57Session(AppState& s)
         return;
     }
 
-    const std::string description = std::string("HDMapping ") + HDMAPPING_VERSION_STRING + " camera_lidar_trajectory_viewer segment";
+    const std::string description = std::string("HDMapping ") + HDMAPPING_CONFIGURE_PROJECT_VERSION + " camera_lidar_trajectory_viewer segment";
 
     const size_t nSeg = s.exportSegments.size();
     std::vector<std::vector<Eigen::Vector3d>> segPts(nSeg), segCols(nSeg);
@@ -2272,7 +2272,7 @@ int main(int argc, char* argv[])
         strncpy(s.maskBuf, args.get("mask").c_str(), sizeof(s.maskBuf) - 1);
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
-    InitWindow(1400, 900, ("Trajectory Viewer " HDMAPPING_VERSION_STRING));
+    InitWindow(1400, 900, ("Trajectory Viewer " HDMAPPING_CONFIGURE_PROJECT_VERSION));
     // raylib's default exit key (Esc) closes the window outright -- too easy
     // to hit by accident. Disabled; there's no keyboard shortcut for quitting.
     SetExitKey(KEY_NULL);

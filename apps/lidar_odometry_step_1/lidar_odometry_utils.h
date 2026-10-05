@@ -18,7 +18,7 @@
 #include <nlohmann/json.hpp>
 #include <vqf.hpp>
 
-#include <HDMapping/Version.hpp>
+#include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
 
 #include <Core/ndt.h>
 #include <Core/structures.h>
@@ -43,7 +43,7 @@ using NDTBucketMapType2 = ankerl::unordered_dense::map<uint64_t, NDT::Bucket2>;
 // Helper function for getting software version from CMake macros
 inline std::string get_software_version()
 {
-    return HDMAPPING_VERSION_STRING;
+    return HDMAPPING_CONFIGURE_PROJECT_VERSION;
 }
 
 struct RawCloudLoader; // raw_cloud_loader.h: raw point clouds loaded per file during step 1

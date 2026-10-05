@@ -1,5 +1,5 @@
 #include <Core/export_laz.h>
-#include <HDMapping/Version.hpp>
+#include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
 
 #include <filesystem>
 #include <iostream>
@@ -124,7 +124,7 @@ std::unordered_map<int, std::string> GetIdToStringMapping(const std::string& fil
 
 int main(int argc, char* argv[])
 {
-    std::cout << "Version " HDMAPPING_VERSION_STRING << std::endl;
+    std::cout << "Version " HDMAPPING_CONFIGURE_PROJECT_VERSION << std::endl;
     std::vector<std::string> arguments;
     for (int i = 1; i < argc; i++)
     {

@@ -5,7 +5,7 @@
 
 #include "lidar_odometry_utils.h"
 #include "toml_io.h"
-#include <HDMapping/Version.hpp>
+#include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
 #include <laszip/laszip_api.h>
 #include <nlohmann/json.hpp>
 

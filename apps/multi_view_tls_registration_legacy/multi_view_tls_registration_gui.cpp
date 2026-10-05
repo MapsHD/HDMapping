@@ -42,7 +42,7 @@
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
 #include "multi_view_tls_registration.h"
 
-#include <HDMapping/Version.hpp>
+#include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
 
 #include "WGS84toCartesian/WGS84toCartesian.hpp"
 #include "wgs84_do_puwg92/wgs84_do_puwg92.h"
@@ -61,7 +61,7 @@ bool consWin = true;
 #endif
 bool consImGui = false;
 
-std::string winTitle = std::string("Step 2 (Multi view TSL registration) ") + HDMAPPING_VERSION_STRING;
+std::string winTitle = std::string("Step 2 (Multi view TSL registration) ") + HDMAPPING_CONFIGURE_PROJECT_VERSION;
 
 std::vector<std::string> infoLines = {
     "This program is second step in MANDEYE process",

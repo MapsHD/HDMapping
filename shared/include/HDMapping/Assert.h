@@ -19,13 +19,13 @@
 #endif
 
 // message is optional: HDMAPPING_ASSERT(cond) or HDMAPPING_ASSERT(cond, "why")
-#define HDMAPPING_ASSERT(condition, ...)                                                                                           \
-    do                                                                                                                             \
-    {                                                                                                                              \
-        if (!(condition))                                                                                                          \
-        {                                                                                                                          \
-            std::cerr << "HDMAPPING_ASSERT failed: " #condition << " at " << __FILE__ << ":" << __LINE__                          \
-                       __VA_OPT__(<< " -- " << (__VA_ARGS__)) << std::endl;                                                        \
-            HDMAPPING_ASSERT_ABORT();                                                                                              \
-        }                                                                                                                          \
+#define HDMAPPING_ASSERT(condition, ...)                                                                                                   \
+    do                                                                                                                                     \
+    {                                                                                                                                      \
+        if (!(condition))                                                                                                                  \
+        {                                                                                                                                  \
+            std::cerr << "HDMAPPING_ASSERT failed: " #condition << " at " << __FILE__ << ":"                                               \
+                      << __LINE__ __VA_OPT__(<< " -- " << (__VA_ARGS__)) << std::endl;                                                     \
+            HDMAPPING_ASSERT_ABORT();                                                                                                      \
+        }                                                                                                                                  \
     } while (false)

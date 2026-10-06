@@ -35,8 +35,8 @@
 #undef ShowCursor
 #endif
 
-#include <HDMapping/Version.hpp>
 #include <HDMapping/Assert.h>
+#include <HDMapping/Version.hpp>
 
 #ifdef _WIN32
 #include "resource.h"
@@ -401,8 +401,9 @@ void setGizmoFromActiveEdge()
     HDMAPPING_ASSERT(index_active_edge < edges.size(), "requested edge outside edges");
     const Edge& e = edges[index_active_edge];
 
-    HDMAPPING_ASSERT(e.index_session_from  < sessions.size(), "requested session from outside session vector");
-    HDMAPPING_ASSERT(e.index_from < sessions[e.index_session_from].point_clouds_container.point_clouds.size(), "scan index outside session");
+    HDMAPPING_ASSERT(e.index_session_from < sessions.size(), "requested session from outside session vector");
+    HDMAPPING_ASSERT(
+        e.index_from < sessions[e.index_session_from].point_clouds_container.point_clouds.size(), "scan index outside session");
     const Eigen::Affine3d m_to = sessions[e.index_session_from].point_clouds_container.point_clouds[e.index_from].m_pose *
         affine_matrix_from_pose_tait_bryan(e.relative_pose_tb);
     Eigen::Map<Eigen::Matrix4f> gizmo(m_gizmo);
@@ -415,7 +416,7 @@ bool canEdgeBeActivated(const int i)
     {
         return false;
     }
-    const auto &e = edges[i];
+    const auto& e = edges[i];
     return visible_sessions.contains(e.index_session_from) && visible_sessions.contains(e.index_session_to);
 }
 
@@ -424,7 +425,7 @@ bool canEdgeBeActivated(const int i)
 // otherwise it would write the previous edge's pose into this one.
 void setActiveEdge(const int i)
 {
-    HDMAPPING_ASSERT(i >= 0 && i < (int)edges.size(), "Edge outside bounds" );
+    HDMAPPING_ASSERT(i >= 0 && i < (int)edges.size(), "Edge outside bounds");
 
     if (i < 0 || i >= (int)edges.size())
         return;
@@ -580,7 +581,6 @@ void on_loop_closure_gui_open()
             s.is_gizmo = false;
     }
     manipulate_active_edge = false;
-
 }
 void on_loop_closure_gui_close()
 {
@@ -2182,7 +2182,6 @@ void settings_gui()
                     const auto& session = sessions[index_gizmo];
                     if (session.point_clouds_container.point_clouds.size() > 0)
                     {
-
                         setNewRotationCenter(sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose.translation());
                     }
                     old_index_gt = index_gt;
@@ -2300,7 +2299,6 @@ void settings_gui()
                     if (search_radius < 0.01)
                         search_radius = 0.01;
                 }
-
             }
         }
     }
@@ -2448,8 +2446,7 @@ void display()
                 const int active_session_from = edges[index_active_edge].index_session_from;
                 const int active_session_to = edges[index_active_edge].index_session_to;
 
-                Eigen::Affine3d _m_src =
-                    sessions[active_session_from].point_clouds_container.point_clouds.at(index_src).m_pose;
+                Eigen::Affine3d _m_src = sessions[active_session_from].point_clouds_container.point_clouds.at(index_src).m_pose;
                 Eigen::Affine3d _m_trg = _m_src * affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
 
                 Eigen::Affine3d m_src_0 =
@@ -2495,8 +2492,7 @@ void display()
                         // ObservationPicking observation_picking;
                         // point_clouds_container.point_clouds.at(i).render(false, observation_picking, 1, 1, false, false, false, 10000,
                         // false);
-                        Eigen::Affine3d m_trg_curr =
-                            sessions[active_session_to].point_clouds_container.point_clouds.at(i).m_pose;
+                        Eigen::Affine3d m_trg_curr = sessions[active_session_to].point_clouds_container.point_clouds.at(i).m_pose;
                         Eigen::Affine3d m_trg = _m_trg * (m_trg_0.inverse() * m_trg_curr);
 
                         renderScanAtPose(
@@ -2892,8 +2888,7 @@ void display()
             for (size_t i = 0; i < sessions.size(); i++)
             {
                 // guizmo_all_sessions;
-                if (!sessions[i].is_gizmo && !sessions[i].is_ground_truth &&
-                    !sessions[i].point_clouds_container.point_clouds.empty())
+                if (!sessions[i].is_gizmo && !sessions[i].is_ground_truth && !sessions[i].point_clouds_container.point_clouds.empty())
                 {
                     std::vector<Eigen::Affine3d> all_m_poses;
                     for (size_t j = 0; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
@@ -2925,7 +2920,7 @@ void display()
             }
         }
     }
-    else //if (is_loop_closure_gui)
+    else // if (is_loop_closure_gui)
     {
         // ImGuizmo -----------------------------------------------
         if (edge_gizmo && edges.size() > 0)
@@ -3837,7 +3832,7 @@ void display()
     if (is_ndt_gui)
         ndt_gui();
 
-    if (!prev_is_loop_closure_gui  && is_loop_closure_gui)
+    if (!prev_is_loop_closure_gui && is_loop_closure_gui)
     {
         spdlog::debug("Closed loop open gui");
         on_loop_closure_gui_open();
@@ -3849,7 +3844,7 @@ void display()
         // close check below has to run after, or that transition is never observed.
         loop_closure_gui();
     }
-    if (prev_is_loop_closure_gui  && !is_loop_closure_gui)
+    if (prev_is_loop_closure_gui && !is_loop_closure_gui)
     {
         spdlog::debug("Closed loop closure gui");
         on_loop_closure_gui_close();

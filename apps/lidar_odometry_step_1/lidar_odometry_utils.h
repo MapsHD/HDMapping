@@ -46,8 +46,8 @@ inline std::string get_software_version()
     return HDMAPPING_VERSION_STRING;
 }
 
-struct RawCloudLoader; // lidar_odometry.cpp: raw point clouds loaded per file during step 1
-class PointsGlobalSpill; // lidar_odometry_utils_optimizers.cpp: step 2's map buffer kept in a file
+struct RawCloudLoader; // raw_cloud_loader.h: raw point clouds loaded per file during step 1
+class PointsGlobalSpill; // points_global_spill.h: step 2's map buffer kept in a file
 
 struct LidarOdometryParams
 {

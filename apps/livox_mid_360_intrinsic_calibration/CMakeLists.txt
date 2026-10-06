@@ -7,6 +7,7 @@ add_executable(
   livox_mid_360_intrinsic_calibration.cpp
   ../lidar_odometry_step_1/lidar_odometry_utils.cpp
   ../lidar_odometry_step_1/lidar_odometry_utils_optimizers.cpp
+  ../lidar_odometry_step_1/points_global_spill.cpp
 )
 
 target_include_directories(

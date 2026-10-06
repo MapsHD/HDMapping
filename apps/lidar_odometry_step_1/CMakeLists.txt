@@ -21,6 +21,8 @@ set(SOURCES
   lidar_odometry_utils.h lidar_odometry_utils.cpp
   lidar_odometry_utils_optimizers.cpp
   lidar_odometry.cpp lidar_odometry.h
+  points_global_spill.h points_global_spill.cpp
+  raw_cloud_loader.h raw_cloud_loader.cpp
   toml_io.h toml_io.cpp
   "../../core/src/utils.cpp"
 )

@@ -9,6 +9,8 @@ set(SOURCES
   ../lidar_odometry_step_1/lidar_odometry.cpp
   ../lidar_odometry_step_1/lidar_odometry_utils.cpp
   ../lidar_odometry_step_1/lidar_odometry_utils_optimizers.cpp
+  ../lidar_odometry_step_1/points_global_spill.cpp
+  ../lidar_odometry_step_1/raw_cloud_loader.cpp
     "../../core/src/utils.cpp"
 )
 

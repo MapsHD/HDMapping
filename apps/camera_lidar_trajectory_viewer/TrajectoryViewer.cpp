@@ -12,8 +12,8 @@
 #include <CalibCore/Trajectory.h>
 #include <Core/e57_utils.h>
 #include <Core/pfd_wrapper.hpp>
-#include <HDMapping/PoseInterpolation.h>
 #include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
+#include <HDMapping/PoseInterpolation.h>
 #include <RaylibWidgets/CenterOfRotationWindow.h>
 #include <RaylibWidgets/CompassRuler.h>
 #include <RaylibWidgets/OrbitCamera.h>
@@ -1685,7 +1685,8 @@ static void exportE57Session(AppState& s)
         return;
     }
 
-    const std::string description = std::string("HDMapping ") + HDMAPPING_CONFIGURE_PROJECT_VERSION + " camera_lidar_trajectory_viewer segment";
+    const std::string description =
+        std::string("HDMapping ") + HDMAPPING_CONFIGURE_PROJECT_VERSION + " camera_lidar_trajectory_viewer segment";
 
     const size_t nSeg = s.exportSegments.size();
     std::vector<std::vector<Eigen::Vector3d>> segPts(nSeg), segCols(nSeg);

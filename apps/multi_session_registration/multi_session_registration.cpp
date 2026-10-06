@@ -616,8 +616,8 @@ void loop_closure_gui()
         // visible session
         const auto& firstSessionRef = sessions[first_session_index];
         const auto& secondSessionRef = sessions[second_session_index];
-        HDMAPPING_ASSERT(firstSessionRef.point_clouds_container.point_clouds.size() > 1, "First session should have at least one cloud");
-        HDMAPPING_ASSERT(secondSessionRef.point_clouds_container.point_clouds.size() > 1, "Second session should have at least one cloud");
+        HDMAPPING_ASSERT(!firstSessionRef.point_clouds_container.point_clouds.empty(), "First session should have at least one cloud");
+        HDMAPPING_ASSERT(!secondSessionRef.point_clouds_container.point_clouds.empty(), "Second session should have at least one cloud");
 
         const int firstSessionUpper = firstSessionRef.point_clouds_container.point_clouds.size();
         const int secondSessionUpper = secondSessionRef.point_clouds_container.point_clouds.size();
@@ -3600,7 +3600,7 @@ void display()
             changed |= ImGui::MenuItem("1m grid##xz", nullptr, &gui_xz_grid_1x1);
             changed |= ImGui::MenuItem("0.1m grid##xz", nullptr, &gui_xz_grid_01x01);
             if (ImGui::MenuItem("Export xz intersection", nullptr, false, gui_xz_intersection))
-                export_intersection_all_sessions(gui_xz_intersection, gui_yz_intersection, gui_xy_intersection, "_xz_intersection.laz");
+                export_intersection_all_sessions(true, false, false, "_xz_intersection.laz");
 
             ImGui::Separator();
             changed |= ImGui::MenuItem("yz_intersection", nullptr, &gui_yz_intersection);
@@ -3608,7 +3608,7 @@ void display()
             changed |= ImGui::MenuItem("1m grid##yz", nullptr, &gui_yz_grid_1x1);
             changed |= ImGui::MenuItem("0.1m grid##yz", nullptr, &gui_yz_grid_01x01);
             if (ImGui::MenuItem("Export yz intersection", nullptr, false, gui_yz_intersection))
-                export_intersection_all_sessions(gui_xz_intersection, gui_yz_intersection, gui_xy_intersection, "_yz_intersection.laz");
+                export_intersection_all_sessions(false, true, false, "_yz_intersection.laz");
 
             ImGui::Separator();
             changed |= ImGui::MenuItem("xy_intersection", nullptr, &gui_xy_intersection);
@@ -3616,7 +3616,7 @@ void display()
             changed |= ImGui::MenuItem("1m grid##xy", nullptr, &gui_xy_grid_1x1);
             changed |= ImGui::MenuItem("0.1m grid##xy", nullptr, &gui_xy_grid_01x01);
             if (ImGui::MenuItem("Export xy intersection", nullptr, false, gui_xy_intersection))
-                export_intersection_all_sessions(gui_xz_intersection, gui_yz_intersection, gui_xy_intersection, "_xy_intersection.laz");
+                export_intersection_all_sessions(false, false, true, "_xy_intersection.laz");
 
             if (changed)
             {
@@ -3834,7 +3834,7 @@ void display()
 
     if (!prev_is_loop_closure_gui && is_loop_closure_gui)
     {
-        spdlog::debug("Closed loop open gui");
+        spdlog::debug("Open loop open gui");
         on_loop_closure_gui_open();
     }
     if (is_loop_closure_gui)

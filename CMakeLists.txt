@@ -35,6 +35,7 @@ option(BUILD_WITH_BUNDLED_GLEW "Build with bundled GLEW" ON)
 option(BUILD_WITH_BUNDLED_LIBLASZIP "Build with bundled Lib LASZIP" ON)
 option(BUILD_WITH_BUNDLED_ONETBB "Build with bundled oneTBB" ON)
 option(BUILD_WITH_PYBIND "Enable pybind11 bindings" OFF)
+option(HDMAPPING_ASSERT_ALWAYS_ABORT "Make HDMAPPING_ASSERT() abort on failure even in release (NDEBUG) builds" OFF)
 
 # Add definitions for all projects
 add_definitions(-DHDMAPPING_VERSION_MAJOR=${HDMAPPING_VERSION_MAJOR})
@@ -46,12 +47,18 @@ add_definitions(-D_USE_MATH_DEFINES)
 if (MSVC)
     add_definitions(-DNOMINMAX)
     add_definitions(-DWIN32_LEAN_AND_MEAN)
+    # HDMAPPING_ASSERT's __VA_OPT__ needs the conforming preprocessor;
+    add_compile_options(/Zc:preprocessor)
 endif()
 
 if(APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
     add_compile_definitions(USE_EXECUTION_PAR_UNSEQ=0)
 else()
     add_compile_definitions(USE_EXECUTION_PAR_UNSEQ=1)
+endif()
+
+if(HDMAPPING_ASSERT_ALWAYS_ABORT)
+    add_compile_definitions(HDMAPPING_ASSERT_ALWAYS_ABORT)
 endif()
 
 # Expand module seatch path

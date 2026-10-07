@@ -48,7 +48,8 @@ target_link_libraries(
   rlimgui
   imguizmo_raylib
   ${PLATFORM_LASZIP_LIB}
-  ${PLATFORM_MISCELLANEOUS_LIBS})
+  ${PLATFORM_MISCELLANEOUS_LIBS}
+  spdlog::spdlog)
 
 if(WIN32)
   add_custom_command(

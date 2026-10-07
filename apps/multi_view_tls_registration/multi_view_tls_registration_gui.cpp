@@ -3704,7 +3704,7 @@ void renderLoopClosure(
                              static_cast<unsigned char>(pointClouds[idx].render_color[2] * 255.f),
                              255 };
                 scan_renderer.drawCachedWithTransform(
-                    static_cast<size_t>(idx), delta, c, static_cast<float>(pointClouds[idx].point_size), false);
+                    static_cast<size_t>(idx), delta, c, static_cast<float>(pointClouds[idx].point_size), ScanColorMode::Flat);
             }
         }
     }
@@ -5680,9 +5680,9 @@ void display()
                         save_intersection(
                             session,
                             output_file_name,
-                            session.point_clouds_container.xz_intersection,
-                            session.point_clouds_container.yz_intersection,
-                            session.point_clouds_container.xy_intersection,
+                            /*xz_intersection=*/true,
+                            /*yz_intersection=*/false,
+                            /*xy_intersection=*/false,
                             session.point_clouds_container.intersection_width);
                     }
                 }
@@ -5704,9 +5704,9 @@ void display()
                         save_intersection(
                             session,
                             output_file_name,
-                            session.point_clouds_container.xz_intersection,
-                            session.point_clouds_container.yz_intersection,
-                            session.point_clouds_container.xy_intersection,
+                            /*xz_intersection=*/false,
+                            /*yz_intersection=*/true,
+                            /*xy_intersection=*/false,
                             session.point_clouds_container.intersection_width);
                     }
                 }
@@ -5728,9 +5728,9 @@ void display()
                         save_intersection(
                             session,
                             output_file_name,
-                            session.point_clouds_container.xz_intersection,
-                            session.point_clouds_container.yz_intersection,
-                            session.point_clouds_container.xy_intersection,
+                            /*xz_intersection=*/false,
+                            /*yz_intersection=*/false,
+                            /*xy_intersection=*/true,
                             session.point_clouds_container.intersection_width);
                     }
                 }

@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <iostream>
 #include <map>
+#include <memory>
 #include <pch/pch.h>
 #include <vector>
 
@@ -45,6 +46,9 @@ inline std::string get_software_version()
     return HDMAPPING_VERSION_STRING;
 }
 
+struct RawCloudLoader; // raw_cloud_loader.h: raw point clouds loaded per file during step 1
+class PointsGlobalSpill; // points_global_spill.h: step 2's map buffer kept in a file
+
 struct LidarOdometryParams
 {
     // version information - automatically generated from CMake build system
@@ -55,6 +59,18 @@ struct LidarOdometryParams
     // performance
     bool useMultithread = true;
     double real_time_threshold_seconds = 10.0; // for realtime use: threshold_nr_poses * 0.005, where 0.005 is related with IMU frequency
+
+    // memory (results are unchanged by either option; see doc/virtual_memory.md)
+    // load each raw point-cloud file when step 1 reaches its time range and free it once step 1 has passed it,
+    // instead of holding every file in memory before step 1 starts
+    bool lazy_load_raw_clouds = true;
+    // non-empty: keep step 2's map buffer (every frame's points between sliding-window resets) in a temporary file
+    // in this directory instead of in memory; the file is removed when step 2 ends
+    std::string points_global_spill_directory = "";
+
+    // runtime state of the two options above, not parameters (not saved to the parameter file)
+    std::shared_ptr<RawCloudLoader> raw_cloud_loader;
+    PointsGlobalSpill* points_global_spill = nullptr;
 
     // filter points
     double filter_threshold_xy_inner = 0.3; // filtering points during load
@@ -269,6 +285,24 @@ void update_rgd_hierarchy(
     const NDT::GridParameters& rgd_params_outdoor,
     NDTBucketMapType& buckets_outdoor,
     LookupStats& stats);
+
+// the same two with the ray-cast decision (upstream: buffer size < 100000) made by the caller
+void update_rgd_ray(
+    const NDT::GridParameters& rgd_params,
+    NDTBucketMapType& buckets,
+    const std::vector<Point3Di>& points_global,
+    const Eigen::Vector3d& viewport,
+    size_t* lookup_count,
+    bool ray_cast);
+void update_rgd_hierarchy_ray(
+    const NDT::GridParameters& rgd_params_indoor,
+    NDTBucketMapType& buckets_indoor,
+    const std::vector<Point3Di>& points_global,
+    const Eigen::Vector3d& viewport,
+    const NDT::GridParameters& rgd_params_outdoor,
+    NDTBucketMapType& buckets_outdoor,
+    LookupStats& stats,
+    bool ray_cast);
 
 void update_rgd_spherical_coordinates(
     const NDT::GridParameters& rgd_params,

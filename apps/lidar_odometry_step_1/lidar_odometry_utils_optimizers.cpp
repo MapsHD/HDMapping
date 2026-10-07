@@ -1,5 +1,6 @@
 #include "hdmapping_profiler.hpp"
 #include "lidar_odometry_utils.h"
+#include "points_global_spill.h"
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
 #include <tbb/combinable.h>
@@ -2067,6 +2068,7 @@ bool process_worker_step_lidar_odometry_core(
     constexpr double outdoor_range_squared = 5.0 * 5.0; // 25.0
     const double max_distance_squared = params.max_distance_lidar * params.max_distance_lidar;
 
+    std::vector<int> touched_bins_indoor, touched_bins_outdoor;
     const auto build_normal_vector_histograms = [&]()
     {
         auto process_chunk = [&](size_t chunk)
@@ -2138,14 +2140,27 @@ bool process_worker_step_lidar_odometry_core(
                 process_chunk(c);
         }
 
-        std::fill(table_buckets_nv_indoor.begin(), table_buckets_nv_indoor.end(), 0.0);
-        std::fill(table_buckets_nv_outdoor.begin(), table_buckets_nv_outdoor.end(), 0.0);
+        // Zero only the bins the previous build wrote (the tables are this frame's, zero-initialised) instead of all
+        // 2 x 101^3 doubles every iteration: the same table contents (integer counts summed exactly), ~16 MB of
+        // memory writes per iteration fewer.
+        for (const int b : touched_bins_indoor)
+            table_buckets_nv_indoor[b] = 0.0;
+        for (const int b : touched_bins_outdoor)
+            table_buckets_nv_outdoor[b] = 0.0;
+        touched_bins_indoor.clear();
+        touched_bins_outdoor.clear();
         for (size_t c = 0; c < num_hist_chunks; ++c)
         {
             for (const auto& [bin, count] : chunk_hist_indoor[c])
+            {
                 table_buckets_nv_indoor[bin] += static_cast<double>(count);
+                touched_bins_indoor.push_back(bin);
+            }
             for (const auto& [bin, count] : chunk_hist_outdoor[c])
+            {
                 table_buckets_nv_outdoor[bin] += static_cast<double>(count);
+                touched_bins_outdoor.push_back(bin);
+            }
         }
     };
 
@@ -2239,6 +2254,31 @@ bool process_worker_step_update_rgd_after(
             params.buckets_outdoor.clear();
         }
 
+        if (PointsGlobalSpill* spill = params.points_global_spill)
+        {
+            acc_distance = 0;
+            std::scoped_lock lock(params.mutex_buckets_indoor, params.mutex_buckets_outdoor);
+            // the upstream decimate() below discards its result: the buffer is never decimated, so neither is this
+            const Eigen::Vector3d viewport = worker_data.intermediate_trajectory[0].translation();
+            spill->reset(
+                [&](const std::vector<Point3Di>& chunk, bool ray_cast)
+                {
+                    if (params.ablation_study_use_hierarchical_rgd)
+                        update_rgd_hierarchy_ray(
+                            params.in_out_params_indoor,
+                            params.buckets_indoor,
+                            chunk,
+                            viewport,
+                            params.in_out_params_outdoor,
+                            params.buckets_outdoor,
+                            lookup_stats,
+                            ray_cast);
+                    else
+                        update_rgd_ray(
+                            params.in_out_params_indoor, params.buckets_indoor, chunk, viewport, &lookup_stats.indoor_lookups, ray_cast);
+                });
+            return true;
+        }
         std::vector<Point3Di> points_global_new;
         points_global_new.reserve(points_global.size() / 2 + 1);
         for (int k = points_global.size() / 2; k < points_global.size(); k++)
@@ -2346,7 +2386,33 @@ bool process_worker_step_update_rgd_after(
     return true;
 }
 
+static bool compute_step_2_impl(
+    std::vector<WorkerData>& worker_data,
+    LidarOdometryParams& params,
+    double& ts_failure,
+    std::atomic<float>& loProgress,
+    const std::atomic<bool>& pause,
+    bool debugMsg);
+
 bool compute_step_2(
+    std::vector<WorkerData>& worker_data,
+    LidarOdometryParams& params,
+    double& ts_failure,
+    std::atomic<float>& loProgress,
+    const std::atomic<bool>& pause,
+    bool debugMsg)
+{
+    try
+    {
+        return compute_step_2_impl(worker_data, params, ts_failure, loProgress, pause, debugMsg);
+    } catch (const std::runtime_error& e) // a points_global spill I/O failure; its files are already removed
+    {
+        spdlog::error("{}", e.what());
+        return false;
+    }
+}
+
+static bool compute_step_2_impl(
     std::vector<WorkerData>& worker_data,
     LidarOdometryParams& params,
     double& ts_failure,
@@ -2366,6 +2432,7 @@ bool compute_step_2(
     double total_optimization_time_seconds = 0.0;
     LookupStats lookup_stats;
     std::vector<Point3Di> points_global;
+    PointsGlobalSpill spill(params); // a spill directory set: points_global lives in this call's file, removed at the end
 
     spdlog::stopwatch stopwatch_worker;
     if (initialize_lidar_odometry(worker_data, params, ts_failure, loProgress, pause, debugMsg, lookup_stats))
@@ -2565,7 +2632,10 @@ bool compute_step_2(
             {
                 Point3Di pp = intermediate_points[j];
                 pp.point = worker_data[i].intermediate_trajectory[intermediate_points[j].index_pose] * pp.point;
-                points_global.push_back(pp);
+                if (PointsGlobalSpill* sp = params.points_global_spill)
+                    sp->append(pp);
+                else
+                    points_global.push_back(pp);
             }
             HDMAP_ZONE_END(transform_pts);
 
@@ -2603,6 +2673,7 @@ bool compute_step_2(
         const double avg_iteration_ms = (total_iterations > 0) ? (total_optimization_time_seconds * 1000.0 / total_iterations) : 0.0;
         spdlog::info("avg_iteration_time: {:.3f}ms", avg_iteration_ms);
         spdlog::debug("lookup_stats: indoor={} outdoor_lookups={}", lookup_stats.indoor_lookups, lookup_stats.outdoor_lookups);
+        spill.finish();
         return true;
     }
     else

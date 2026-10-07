@@ -29,6 +29,8 @@ public:
 
         { "useMultithread", &LidarOdometryParams::useMultithread },
         { "real_time_threshold_seconds", &LidarOdometryParams::real_time_threshold_seconds },
+        { "lazy_load_raw_clouds", &LidarOdometryParams::lazy_load_raw_clouds },
+        { "points_global_spill_directory", &LidarOdometryParams::points_global_spill_directory },
         { "filter_threshold_xy_inner", &LidarOdometryParams::filter_threshold_xy_inner },
         { "filter_threshold_xy_outer", &LidarOdometryParams::filter_threshold_xy_outer },
         { "decimation", &LidarOdometryParams::decimation },
@@ -123,7 +125,7 @@ public:
 
     std::map<std::string, std::vector<std::string>> CATEGORIES = {
         { "version_info", { "software_version", "config_version", "build_date" } },
-        { "performance", { "useMultithread", "real_time_threshold_seconds" } },
+        { "performance", { "useMultithread", "real_time_threshold_seconds", "lazy_load_raw_clouds", "points_global_spill_directory" } },
         { "filter_points",
           { "filter_threshold_xy_inner",
             "filter_threshold_xy_outer",

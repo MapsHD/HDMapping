@@ -74,6 +74,8 @@ target_sources(lidar_odometry_py
         ${CMAKE_SOURCE_DIR}/apps/lidar_odometry_step_1/lidar_odometry.cpp
         ${CMAKE_SOURCE_DIR}/apps/lidar_odometry_step_1/lidar_odometry_utils.cpp
         ${CMAKE_SOURCE_DIR}/apps/lidar_odometry_step_1/lidar_odometry_utils_optimizers.cpp
+        ${CMAKE_SOURCE_DIR}/apps/lidar_odometry_step_1/points_global_spill.cpp
+        ${CMAKE_SOURCE_DIR}/apps/lidar_odometry_step_1/raw_cloud_loader.cpp
         ${CMAKE_SOURCE_DIR}/apps/lidar_odometry_step_1/toml_io.cpp
 )
 

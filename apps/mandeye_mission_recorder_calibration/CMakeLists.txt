@@ -7,6 +7,7 @@ set(SOURCES
   mandeye_mission_recorder_calibration.cpp
   ../lidar_odometry_step_1/lidar_odometry_utils.cpp
   ../lidar_odometry_step_1/lidar_odometry_utils_optimizers.cpp
+  ../lidar_odometry_step_1/points_global_spill.cpp
     "../../core/src/utils.cpp"
 )
 

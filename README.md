@@ -128,7 +128,7 @@ project wiki: **https://github.com/MapsHD/HDMapping/wiki**
 # Our datasets
 - [[HUMANOID-LIO-DATASET]](https://zenodo.org/records/21318128)
 - [[Annotated ground truth for LiDAR SLAM loop closures]](https://zenodo.org/records/18527593)
-- [[Depth-Visual-Inertial Dataset for 3D Indoor Reconstruction - HD Mapping ground truths]]https://zenodo.org/records/23069933
+- [[Depth-Visual-Inertial Dataset for 3D Indoor Reconstruction - HD Mapping ground truths]](https://zenodo.org/records/23069933)
 
 # Sponsors
 

@@ -145,6 +145,8 @@ add_subdirectory(apps/multi_view_tls_registration)
 add_subdirectory(apps/multi_view_tls_registration_legacy)
 add_subdirectory(apps/multi_session_registration)
 add_subdirectory(apps/multi_session_registration_legacy)
+add_subdirectory(apps/session_uncertainty_calculation)
+add_subdirectory(apps/session_to_session_rigid_registration)
 
 if(BUILD_WITH_UTILITY_APPLICATION)
     add_subdirectory(apps/split_multi_livox)

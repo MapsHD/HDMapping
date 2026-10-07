@@ -542,6 +542,35 @@ void getClosestTrajectoriesPoint(
     camera.moveEulerRotationCenterTo(center);
 }
 
+void setNewRotationCenterToClosestTrajectoryPoint(const std::vector<Session>& sessions, int x, int y)
+{
+    const auto laser_beam = GetLaserBeam(x, y);
+    double min_distance = std::numeric_limits<double>::max();
+    Eigen::Vector3d center;
+
+    for (const auto& session : sessions)
+    {
+        if (!session.visible)
+            continue;
+        for (const auto& pc : session.point_clouds_container.point_clouds)
+            for (const auto& node : pc.local_trajectory)
+            {
+                Eigen::Vector3d vp = pc.m_pose * node.m_pose.translation();
+                double dist = distance_point_to_line(vp, laser_beam);
+                if (dist < min_distance)
+                {
+                    min_distance = dist;
+                    center = vp;
+                }
+            }
+    }
+
+    if (min_distance == std::numeric_limits<double>::max())
+        setNewRotationCenter(x, y);
+    else
+        setNewRotationCenter(center);
+}
+
 void setNewRotationCenter(int x, int y)
 {
     RegistrationPlaneFeature::Plane pl;

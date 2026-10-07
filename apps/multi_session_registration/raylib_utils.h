@@ -101,6 +101,9 @@ void getClosestTrajectoriesPoint(
     int& index_loop_closure_target,
     bool KeyShift,
     double& time_stamp_offset);
+//! Ctrl + middle/right click outside loop closure picking (like Step 2): moves the rotation center to the
+//! trajectory point of a visible session closest to the mouse ray, or to the z = 0 plane if there is none.
+void setNewRotationCenterToClosestTrajectoryPoint(const std::vector<Session>& sessions, int x, int y);
 void setNewRotationCenter(int x, int y);
 //! Moves the rotation center directly to a known world point (e.g. the gizmo's position),
 //! skipping the screen-pick raycast the (x, y) overload does.

@@ -70,7 +70,7 @@ static const std::vector<ShortcutEntry> appShortcuts = { { "Normal keys", "A", "
                                                          { "", "F", "" },
                                                          { "", "Ctrl+F", "" },
                                                          { "", "G", "" },
-                                                         { "", "Ctrl+G", "" },
+                                                         { "", "Ctrl+G", "Move center of rotation to gizmo" },
                                                          { "", "H", "" },
                                                          { "", "Ctrl+H", "" },
                                                          { "", "I", "" },
@@ -135,8 +135,8 @@ static const std::vector<ShortcutEntry> appShortcuts = { { "Normal keys", "A", "
                                                          { "", "Shift + scroll", "" },
                                                          { "", "Shift + drag", "" },
                                                          { "", "Ctrl + left click", "" },
-                                                         { "", "Ctrl + right click", "" },
-                                                         { "", "Ctrl + middle click", "" } };
+                                                         { "", "Ctrl + right click", "change center of rotation" },
+                                                         { "", "Ctrl + middle click", "change center of rotation" } };
 
 float m_gizmo[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 
@@ -2179,8 +2179,8 @@ void settings_gui()
                     }
 
                     // set rotation center to gizmo
-                    const auto& session = sessions[index_gizmo];
-                    if (session.point_clouds_container.point_clouds.size() > 0)
+                    if (index_gizmo >= 0 && index_gizmo < sessions.size() &&
+                        sessions[index_gizmo].point_clouds_container.point_clouds.size() > 0)
                     {
                         setNewRotationCenter(sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose.translation());
                     }
@@ -2986,6 +2986,20 @@ void display()
     if (is_loop_closure_gui || number_visible_sessions == 1 || number_visible_sessions == 2)
         if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_M, false))
             is_loop_closure_gui = !is_loop_closure_gui;
+
+    // Ctrl+G: bring the rotation center to the gizmo (session or edge gizmo, both kept in m_gizmo).
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_G, false))
+    {
+        const bool session_gizmo_visible = std::any_of(
+            sessions.begin(),
+            sessions.end(),
+            [](const Session& s)
+            {
+                return s.is_gizmo && !s.is_ground_truth && !s.point_clouds_container.point_clouds.empty();
+            });
+        if (session_gizmo_visible || (edge_gizmo && !edges.empty()))
+            setNewRotationCenter(Eigen::Map<const Eigen::Matrix4f>(m_gizmo).block<3, 1>(0, 3).cast<double>());
+    }
 
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_O, false))
         openProject();
@@ -3904,12 +3918,9 @@ void mouse(int glut_button, int state, int x, int y)
                     io.KeyShift,
                     time_stamp_offset);
             }
-            else
+            else if (io.KeyCtrl)
             {
-                if (update_rotation_center)
-                {
-                    setNewRotationCenter(x, y);
-                }
+                setNewRotationCenterToClosestTrajectoryPoint(sessions, x, y);
             }
         }
 

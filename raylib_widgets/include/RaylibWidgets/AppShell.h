@@ -30,7 +30,7 @@ void ImGuiHyperlink(const char* url, ImVec4 color = ImVec4(0.2f, 0.4f, 0.8f, 1.0
 // line in the window) or one starting with "https://" (rendered as a
 // clickable ImGuiHyperlink()); appShortcuts is rendered via
 // ShowShortcutsTable(). versionString/buildDate go into a "Version: %s (%s)"
-// line (pass e.g. HDMAPPING_VERSION_STRING and __DATE__).
+// line (pass e.g. HDMAPPING_CONFIGURE_PROJECT_VERSION and __DATE__).
 void ShowInfoWindow(
     bool& open, const std::vector<std::string>& infoLines, const std::vector<ShortcutEntry>& appShortcuts,
     const char* versionString, const char* buildDate);

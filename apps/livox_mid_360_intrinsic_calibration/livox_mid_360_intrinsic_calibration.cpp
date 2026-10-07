@@ -23,7 +23,7 @@
 
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
 
-#include <HDMapping/Version.hpp>
+#include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
 
 #include <filesystem>
 #include <mutex>
@@ -1225,7 +1225,7 @@ bool initGL(int* argc, char** argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("livox_mid_360_intrinsic_calibration " HDMAPPING_VERSION_STRING);
+    glutCreateWindow("livox_mid_360_intrinsic_calibration " HDMAPPING_CONFIGURE_PROJECT_VERSION);
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 

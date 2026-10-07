@@ -18,7 +18,7 @@
 
 #include <portable-file-dialogs.h>
 
-#include <HDMapping/Version.hpp>
+#include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
 
 #ifdef _WIN32
 #include "resource.h"
@@ -28,7 +28,7 @@
 
 #include "multi_session_factor_graph.h"
 
-std::string winTitle = std::string("Step 3 (Multi session registration) ") + HDMAPPING_VERSION_STRING;
+std::string winTitle = std::string("Step 3 (Multi session registration) ") + HDMAPPING_CONFIGURE_PROJECT_VERSION;
 
 std::vector<std::string> infoLines = {
     "This program is third/final step in MANDEYE process",

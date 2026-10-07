@@ -20,7 +20,7 @@
 
 #include <Core/transformations.h>
 
-#include <HDMapping/Version.hpp>
+#include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
 
 Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, float picking_plane_height);
 
@@ -302,7 +302,7 @@ bool initGL(int* argc, char** argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("hd_mapper " HDMAPPING_VERSION_STRING);
+    glutCreateWindow("hd_mapper " HDMAPPING_CONFIGURE_PROJECT_VERSION);
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 

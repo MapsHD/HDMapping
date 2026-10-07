@@ -28,7 +28,7 @@
 #include <cmath>
 #include <filesystem>
 
-#include <HDMapping/Version.hpp>
+#include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
 
 #include "tbb/tbb.h"
 #include <mutex>
@@ -43,7 +43,7 @@
 
 ///////////////////////////////////////////////////////////////////////////////////
 
-std::string winTitle = std::string("Raw data viewer ") + HDMAPPING_VERSION_STRING;
+std::string winTitle = std::string("Raw data viewer ") + HDMAPPING_CONFIGURE_PROJECT_VERSION;
 
 std::vector<std::string> infoLines = { "This program is optional step in MANDEYE process",
                                        "",

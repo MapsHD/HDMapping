@@ -15,7 +15,7 @@
 
 #include <Eigen/Eigen>
 
-#include <HDMapping/Version.hpp>
+#include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
 
 #include <Core/pfd_wrapper.hpp>
 #include <Core/session.h>
@@ -821,7 +821,7 @@ bool initGL(int* argc, char** argv)
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
 
-    glutCreateWindow("precision_forestry_tools " HDMAPPING_VERSION_STRING);
+    glutCreateWindow("precision_forestry_tools " HDMAPPING_CONFIGURE_PROJECT_VERSION);
 
     glutDisplayFunc(display);
     glutMotionFunc(motion);

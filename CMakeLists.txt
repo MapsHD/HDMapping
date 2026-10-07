@@ -1,16 +1,12 @@
 cmake_minimum_required(VERSION 4.0.0)
 
-project(hd-mapping)
+project(hd-mapping VERSION 0.105.0)
 
 # Common settings
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Versioning settings
-set(HDMAPPING_VERSION_MAJOR 0)
-set(HDMAPPING_VERSION_MINOR 105)
-set(HDMAPPING_VERSION_PATCH 0)
 
 # Set up common paths
 get_filename_component(REPOSITORY_DIRECTORY ${CMAKE_CURRENT_LIST_DIR} ABSOLUTE)
@@ -36,11 +32,6 @@ option(BUILD_WITH_BUNDLED_LIBLASZIP "Build with bundled Lib LASZIP" ON)
 option(BUILD_WITH_BUNDLED_ONETBB "Build with bundled oneTBB" ON)
 option(BUILD_WITH_PYBIND "Enable pybind11 bindings" OFF)
 option(HDMAPPING_ASSERT_ALWAYS_ABORT "Make HDMAPPING_ASSERT() abort on failure even in release (NDEBUG) builds" OFF)
-
-# Add definitions for all projects
-add_definitions(-DHDMAPPING_VERSION_MAJOR=${HDMAPPING_VERSION_MAJOR})
-add_definitions(-DHDMAPPING_VERSION_MINOR=${HDMAPPING_VERSION_MINOR})
-add_definitions(-DHDMAPPING_VERSION_PATCH=${HDMAPPING_VERSION_PATCH})
 
 add_definitions(-D_USE_MATH_DEFINES)
 
@@ -91,6 +82,9 @@ endif()
 #     set(CMAKE_PDB_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 #     set(CMAKE_COMPILE_PDB_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 # endif()
+
+# Configure shared header
+include(${REPOSITORY_DIRECTORY}/cmake/configure.cmake)
 
 # Include cmake configs
 include(cmake/cpu_optimizations.cmake)

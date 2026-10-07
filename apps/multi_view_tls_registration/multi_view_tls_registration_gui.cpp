@@ -90,7 +90,7 @@
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
 #include "multi_view_tls_registration.h"
 
-#include <HDMapping/Version.hpp>
+#include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
 
 #include "WGS84toCartesian/WGS84toCartesian.hpp"
 #include "wgs84_do_puwg92/wgs84_do_puwg92.h"
@@ -863,7 +863,7 @@ bool consWin = true;
 #endif
 bool consImGui = false;
 
-std::string winTitle = std::string("Step 2 (Multi view TSL registration) ") + HDMAPPING_VERSION_STRING;
+std::string winTitle = std::string("Step 2 (Multi view TSL registration) ") + HDMAPPING_CONFIGURE_PROJECT_VERSION;
 
 std::vector<std::string> infoLines = {
     "This program is second step in MANDEYE process",
@@ -3097,7 +3097,7 @@ void saveSessionAsE57()
     if (out.empty())
         return;
 
-    const std::string description = std::string("HDMapping ") + HDMAPPING_VERSION_STRING + " session";
+    const std::string description = std::string("HDMapping ") + HDMAPPING_CONFIGURE_PROJECT_VERSION + " session";
 
     std::vector<mandeye::e57io::E57WriteScan> scans;
     scans.reserve(session.point_clouds_container.point_clouds.size());
@@ -6114,7 +6114,7 @@ void display()
 
     raylib_widgets::showEulerCenterOfRotationWindow(cor_gui, app_state.camera, xText, yText, zText);
 
-    raylib_widgets::ShowInfoWindow(app_state.info_gui, infoLines, appShortcuts, HDMAPPING_VERSION_STRING, __DATE__);
+    raylib_widgets::ShowInfoWindow(app_state.info_gui, infoLines, appShortcuts, HDMAPPING_CONFIGURE_PROJECT_VERSION, __DATE__);
 
     draw_translate_preview();
 

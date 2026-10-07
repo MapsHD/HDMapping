@@ -18,7 +18,7 @@
 #include <filesystem>
 #include <sstream>
 
-#include <HDMapping/Version.hpp>
+#include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
 
 #include <mutex>
 
@@ -37,7 +37,7 @@
 
 ///////////////////////////////////////////////////////////////////////////////////
 
-std::string winTitle = std::string("MR calibration ") + HDMAPPING_VERSION_STRING;
+std::string winTitle = std::string("MR calibration ") + HDMAPPING_CONFIGURE_PROJECT_VERSION;
 
 std::vector<std::string> infoLines = { "This program is optional step in MANDEYE process",
                                        "",

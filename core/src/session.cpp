@@ -4,7 +4,7 @@
 
 #include <nlohmann/json.hpp>
 
-#include <HDMapping/Version.hpp>
+#include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
 
 namespace fs = std::filesystem;
 
@@ -331,7 +331,7 @@ bool Session::save(
     j["initial_poses_file_name"] = initial_poses_file_name; // point_clouds_container.initial_poses_file_name;
     j["out_poses_file_name"] = point_clouds_container.out_poses_file_name;
     j["ground_truth"] = is_ground_truth;
-    j["exporting_software_version"] = HDMAPPING_VERSION_STRING;
+    j["exporting_software_version"] = HDMAPPING_CONFIGURE_PROJECT_VERSION;
     jj["Session Settings"] = j;
 
     nlohmann::json jloop_closure_edges;

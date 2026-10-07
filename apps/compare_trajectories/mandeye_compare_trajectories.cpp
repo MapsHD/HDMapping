@@ -22,7 +22,7 @@
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
 #include <filesystem>
 
-#include <HDMapping/Version.hpp>
+#include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
 
 namespace fs = std::filesystem;
 
@@ -988,7 +988,7 @@ bool initGL(int* argc, char** argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("mandeye trajectory compare data viewer " HDMAPPING_VERSION_STRING);
+    glutCreateWindow("mandeye trajectory compare data viewer " HDMAPPING_CONFIGURE_PROJECT_VERSION);
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 

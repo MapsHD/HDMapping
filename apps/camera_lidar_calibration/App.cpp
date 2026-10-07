@@ -3,7 +3,7 @@
 #include "raymath.h"
 #include "rlImGui.h"
 #include <CalibCore/CameraCalibrationSolver.h>
-#include <HDMapping/Version.hpp>
+#include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
 #include <RaylibWidgets/CompassRuler.h>
 #include <RaylibWidgets/PointPicking.h>
 #include <RaylibWidgets/WindowFit.h>
@@ -739,7 +739,7 @@ void App::run()
     // rendered as flat-shaded point sprites (no polygon edges to smooth),
     // so the visual benefit was marginal anyway.
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
-    InitWindow(W, H, ("LiDAR-Camera Calibration " HDMAPPING_VERSION_STRING));
+    InitWindow(W, H, ("LiDAR-Camera Calibration " HDMAPPING_CONFIGURE_PROJECT_VERSION));
     raylib_widgets::fitWindowToScreen();
     // The 340px-wide side panel is fixed-width; below this the 3D/image
     // views and the panel start overlapping instead of scrolling.

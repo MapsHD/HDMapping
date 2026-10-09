@@ -457,7 +457,7 @@ inline void save_intersection(
     }
 }
 
-inline void save_all_to_las(const Session& session, std::string output_las_name, bool as_local, bool skip_ts_0)
+inline bool save_all_to_las(const Session& session, std::string output_las_name, bool as_local, bool skip_ts_0)
 {
     Eigen::Affine3d first_pose = Eigen::Affine3d::Identity();
     bool found_first_pose = false;
@@ -474,7 +474,7 @@ inline void save_all_to_las(const Session& session, std::string output_las_name,
     if (!writer.open(output_las_name, offset.x(), offset.y(), offset.z()))
     {
         std::cout << "problem with saving file: " << output_las_name << std::endl;
-        return;
+        return false;
     }
 
     for (size_t scan_idx = 0; scan_idx < clouds.size(); ++scan_idx)
@@ -506,10 +506,12 @@ inline void save_all_to_las(const Session& session, std::string output_las_name,
                 double ts = (i < p.timestamps.size()) ? p.timestamps[i] : 0.0;
 
                 if (!writer.writePoint(vp, inten, ts, offset.x(), offset.y(), offset.z(), psid))
-                    return;
+                {
+                    return false;
+                }
             }
         }
     }
 
-    writer.close();
+    return writer.close();
 }

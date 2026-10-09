@@ -153,14 +153,14 @@ void save_trajectories_to_laz(
     }
 }
 
-void createDXFPolyline(const std::string& filename, const std::vector<Eigen::Vector3d>& points)
+bool createDXFPolyline(const std::string& filename, const std::vector<Eigen::Vector3d>& points)
 {
     std::ofstream dxfFile(filename);
     dxfFile << std::setprecision(20);
     if (!dxfFile.is_open())
     {
         std::cerr << "Failed to open file: " << filename << std::endl;
-        return;
+        return false;
     }
 
     // DXF header
@@ -196,10 +196,16 @@ void createDXFPolyline(const std::string& filename, const std::vector<Eigen::Vec
     dxfFile << "0\nEOF\n";
 
     dxfFile.close();
+    if (!dxfFile.good())
+    {
+        std::cerr << "Failed to write file: " << filename << std::endl;
+        return false;
+    }
     std::cout << "DXF file created: " << filename << std::endl;
+    return true;
 }
 
-void save_trajectories(
+bool save_trajectories(
     Session& session,
     std::string output_file_name,
     float curve_consecutive_distance_meters,
@@ -303,12 +309,20 @@ void save_trajectories(
         if (!save_to_dxf)
         {
             outfile.close();
+            if (!outfile.good())
+            {
+                std::cerr << "Failed to write file: " << output_file_name << std::endl;
+                return false;
+            }
+            return true;
         }
         else
         {
-            createDXFPolyline(output_file_name, polylinePoints);
+            return createDXFPolyline(output_file_name, polylinePoints);
         }
     }
+    std::cerr << "Failed to open file: " << output_file_name << std::endl;
+    return false;
 }
 
 void save_scale_board_to_laz(const Session& session, std::string output_file_name, float dec, float side_len)

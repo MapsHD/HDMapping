@@ -159,11 +159,11 @@ void save_trajectories_to_laz(
 
 void save_scale_board_to_laz(const Session& session, std::string output_file_name, float dec, float side_len = -1.0);
 
-void createDXFPolyline(const std::string& filename, const std::vector<Eigen::Vector3d>& points);
+bool createDXFPolyline(const std::string& filename, const std::vector<Eigen::Vector3d>& points);
 
 // void load_available_geo_points(Session& session, std::string input_file_name);
 
-void save_trajectories(
+bool save_trajectories(
     Session& session,
     std::string output_file_name,
     float curve_consecutive_distance_meters,

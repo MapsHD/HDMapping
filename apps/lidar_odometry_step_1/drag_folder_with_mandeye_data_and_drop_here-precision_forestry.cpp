@@ -2217,10 +2217,7 @@ void display()
 
 void on_exit()
 {
-    // remove cache
-    std::cout << "remove cache: '" << params.working_directory_cache << "' START" << std::endl;
-    std::filesystem::remove_all(params.working_directory_cache);
-    std::cout << "remove cache: '" << params.working_directory_cache << "' FINISHED" << std::endl;
+    remove_cache(params);
 }
 
 void mouse(int glut_button, int state, int x, int y)

@@ -31,6 +31,8 @@ bool compute_step_1(
     const std::atomic<bool>& pause);
 // after a successful step 1: free the raw clouds (and the lazy loader) — nothing after step 1 reads them
 void release_raw_clouds(std::vector<std::vector<Point3Di>>& pointsPerFile, LidarOdometryParams& params);
+// remove params.working_directory_cache; call only once nothing reads worker_data[*].*_cache_file_name any more
+void remove_cache(const LidarOdometryParams& params);
 void run_consistency(std::vector<WorkerData>& worker_data, const LidarOdometryParams& params);
 void filter_reference_buckets(LidarOdometryParams& params);
 void load_reference_point_clouds(const std::vector<std::string>& input_file_names, LidarOdometryParams& params);

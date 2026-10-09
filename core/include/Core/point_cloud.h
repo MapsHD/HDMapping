@@ -61,7 +61,7 @@ public:
 
     struct LocalTrajectoryNode
     {
-        std::pair<double, double> timestamps;
+        std::pair<double, double> timestamps; // <lidar_timestamp, unix_timestamp>
         Eigen::Affine3d m_pose;
         Eigen::Vector3d imu_om_fi_ka;
         Eigen::Vector3d imu_diff_angle_om_fi_ka_deg;

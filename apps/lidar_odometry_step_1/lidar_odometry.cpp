@@ -1192,6 +1192,19 @@ void release_raw_clouds(std::vector<std::vector<Point3Di>>& pointsPerFile, Lidar
     release_freed_heap();
 }
 
+void remove_cache(const LidarOdometryParams& params)
+{
+    if (params.working_directory_cache.empty())
+        return;
+    std::cout << "remove cache: '" << params.working_directory_cache << "' START" << std::endl;
+    std::error_code ec;
+    fs::remove_all(params.working_directory_cache, ec);
+    if (ec)
+        std::cerr << "remove cache: '" << params.working_directory_cache << "' FAILED: " << ec.message() << std::endl;
+    else
+        std::cout << "remove cache: '" << params.working_directory_cache << "' FINISHED" << std::endl;
+}
+
 std::vector<WorkerData> run_lidar_odometry(const std::string& input_dir, LidarOdometryParams& params)
 {
     HDMAP_ZONE_SCOPE("run_lidar_odometry");

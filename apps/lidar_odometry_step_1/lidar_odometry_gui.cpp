@@ -2626,10 +2626,7 @@ void display()
 
 void on_exit()
 {
-    // remove cache
-    std::cout << "remove cache: '" << params.working_directory_cache << "' START" << std::endl;
-    std::filesystem::remove_all(params.working_directory_cache);
-    std::cout << "remove cache: '" << params.working_directory_cache << "' FINISHED" << std::endl;
+    remove_cache(params);
 }
 
 void mouse(int glut_button, int state, int x, int y)
@@ -2759,6 +2756,7 @@ int main(int argc, char* argv[])
                 const fs::path result_dir = get_next_result_path(working_directory);
                 save_results(false, elapsed_seconds.count(), working_directory, worker_data, params, result_dir);
                 std::cout << "Results saved to folder: '" << result_dir.string() << "'" << std::endl;
+                remove_cache(params);
             }
         }
         else if (argc == 4) // runnning from command line with custom params
@@ -2789,6 +2787,7 @@ int main(int argc, char* argv[])
                       << "Elapsed time: " << formatTime(elapsed_seconds.count()).c_str() << "s\n";
 
             save_results(false, elapsed_seconds.count(), working_directory, worker_data, params, argv[3]);
+            remove_cache(params);
         }
         else // full GUI mode
         {

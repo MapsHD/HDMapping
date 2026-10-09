@@ -43,7 +43,7 @@ bool PointClouds::load(
     std::getline(infile, line);
     std::istringstream iss(line);
 
-    int num_scans;
+    int num_scans = 0;
     iss >> num_scans;
 
     std::cout << "number of scans: " << num_scans << std::endl;
@@ -133,13 +133,13 @@ bool PointClouds::update_poses_from_RESSO(const std::string& folder_with_point_c
     if (!infile.good())
     {
         std::cout << "problem with file: '" << poses_file_name << "' (!infile.good())" << std::endl;
-        //	return false;
+        return false;
     }
     std::string line;
     std::getline(infile, line);
     std::istringstream iss(line);
 
-    int num_scans;
+    int num_scans = 0;
     iss >> num_scans;
 
     std::cout << "number of scans: " << num_scans << std::endl;
@@ -226,13 +226,13 @@ bool PointClouds::update_poses_from_RESSO_inverse(const std::string& folder_with
     if (!infile.good())
     {
         std::cout << "problem with file: '" << poses_file_name << "' (!infile.good())" << std::endl;
-        //	return false;
+        return false;
     }
     std::string line;
     std::getline(infile, line);
     std::istringstream iss(line);
 
-    int num_scans;
+    int num_scans = 0;
     iss >> num_scans;
 
     std::cout << "number of scans: " << num_scans << std::endl;
@@ -330,7 +330,7 @@ bool PointClouds::update_initial_poses_from_RESSO(const std::string& folder_with
     std::getline(infile, line);
     std::istringstream iss(line);
 
-    int num_scans;
+    int num_scans = 0;
     iss >> num_scans;
 
     std::cout << "number of scans: " << num_scans << std::endl;

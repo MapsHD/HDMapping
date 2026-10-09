@@ -219,17 +219,25 @@ bool Session::load(const std::string& file_name, bool is_decimate, double bucket
                 std::cout << "updated: " << point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
             }
 
-            if (!point_clouds_container.update_poses_from_RESSO(working_directory.c_str(), poses_file_name.c_str()))
+            // fallback
+            std::string poses_source_file_name = poses_file_name;
+            std::error_code ec;
+            if (!fs::exists(poses_file_name, ec) || fs::file_size(poses_file_name, ec) == 0)
+            {
+                std::cout << "poses file '" << poses_file_name << "' is missing or empty, using initial poses from '"
+                          << initial_poses_file_name << "'" << std::endl;
+                poses_source_file_name = initial_poses_file_name;
+            }
+
+            if (!point_clouds_container.update_poses_from_RESSO(working_directory.c_str(), poses_source_file_name.c_str()))
             {
                 std::cout << __FILE__ << " " << __LINE__ << std::endl;
                 std::cout << "check input files" << std::endl;
                 return false;
             }
-            else
-            {
-                std::cout << "updated: " << point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
-                point_clouds_container.poses_file_name = poses_file_name;
-            }
+
+            std::cout << "updated: " << point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+            point_clouds_container.poses_file_name = poses_file_name;
         }
 
         pose_graph_loop_closure.edges = loop_closure_edges;

@@ -6589,7 +6589,12 @@ int exportSessionToDirectory(const fs::path& input_file, const fs::path& output_
             return 1;
         }
         missing_unix_timestamps |= std::any_of(
-            pc.local_trajectory.begin(), pc.local_trajectory.end(), [](const auto& node) { return node.timestamps.second == 0.0; });
+            pc.local_trajectory.begin(),
+            pc.local_trajectory.end(),
+            [](const auto& node)
+            {
+                return node.timestamps.second == 0.0;
+            });
     }
     if (missing_unix_timestamps)
         spdlog::warn("Some Unix trajectory timestamps are missing; their exported values remain zero");
@@ -6627,8 +6632,7 @@ int main(int argc, char* argv[])
         {
             std::cout << winTitle << "\n\n"
                       << "USAGE:\n"
-                      << std::filesystem::path(argv[0]).stem().string()
-                      << " <input_file> [--export <directory> [--same-as-gui]] /?\n\n"
+                      << std::filesystem::path(argv[0]).stem().string() << " <input_file> [--export <directory> [--same-as-gui]] /?\n\n"
                       << "where\n"
                       << "   <input_file>         Path to Mandeye JSON Session file (*.mjs, *.json)\n"
                       << "   --export <directory> Export global LAZ and quaternion CSV with Lidar/Unix timestamps, then exit;\n"
@@ -6647,8 +6651,7 @@ int main(int argc, char* argv[])
         {
             if (std::string(argv[i]) == "--export")
             {
-                if (export_requested || i + 1 == argc || std::string(argv[i + 1]).empty() ||
-                    std::string(argv[i + 1]).rfind("--", 0) == 0)
+                if (export_requested || i + 1 == argc || std::string(argv[i + 1]).empty() || std::string(argv[i + 1]).rfind("--", 0) == 0)
                 {
                     spdlog::error("--export requires exactly one directory argument");
                     return 1;

@@ -1173,6 +1173,7 @@ bool PointClouds::load_whu_tls(
             if (!infile.good())
             {
                 // std::cout << "problem with file: '" << trj_path.string() << "'" << std::endl;
+                spdlog::error("Failed opening trajectory: '{}'", trj_path.string());
                 return false;
             }
 
@@ -1268,6 +1269,7 @@ bool PointClouds::load_whu_tls(
 
     //// load actual pointclouds
     point_clouds.resize(point_clouds_nodata.size());
+    std::vector<unsigned char> load_success(point_clouds_nodata.size(), 1);
 
     std::transform(
 #if USE_EXECUTION_PAR_UNSEQ
@@ -1292,10 +1294,20 @@ bool PointClouds::load_whu_tls(
                         //         << sum_points_after_decimation << std::endl;
                     }
                 }
+                else
+                {
+                    load_success[&pc - point_clouds_nodata.data()] = 0;
+                }
             }
 
             return pc;
         });
+
+    if (std::find(load_success.begin(), load_success.end(), 0) != load_success.end())
+    {
+        spdlog::error("Failed loading one or more point clouds");
+        return false;
+    }
 
     // calculate average position of a subset of points from all clouds to center the point clouds around the origin
     if (calculate_offset)

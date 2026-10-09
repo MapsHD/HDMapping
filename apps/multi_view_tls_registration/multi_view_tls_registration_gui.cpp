@@ -6548,20 +6548,145 @@ bool initGL(int* argc, char** argv, const std::string& winTitleArg, void (*)(), 
     return true;
 }
 
+int exportSessionToDirectory(const fs::path& input_file, const fs::path& output_directory, bool same_as_gui)
+{
+    const fs::path laz_file = output_directory / "all_step_2.laz";
+    const fs::path trajectory_file = output_directory / "trajectories.csv";
+    if (!fs::is_regular_file(input_file))
+    {
+        spdlog::error("Session file does not exist or is not a regular file: '{}'", input_file.string());
+        return 1;
+    }
+    if (fs::exists(laz_file) || fs::exists(trajectory_file))
+    {
+        spdlog::error("Export files already exist in '{}'; refusing to overwrite them", output_directory.string());
+        return 1;
+    }
+
+    Session export_session;
+    if (!export_session.load(
+            input_file.string(),
+            same_as_gui && tls_registration.is_decimate,
+            tls_registration.bucket_x,
+            tls_registration.bucket_y,
+            tls_registration.bucket_z,
+            same_as_gui && tls_registration.calculate_offset))
+    {
+        spdlog::error("Failed loading session: '{}'", input_file.string());
+        return 1;
+    }
+    if (export_session.point_clouds_container.point_clouds.empty())
+    {
+        spdlog::error("Session contains no point clouds: '{}'", input_file.string());
+        return 1;
+    }
+    bool missing_unix_timestamps = false;
+    for (const auto& pc : export_session.point_clouds_container.point_clouds)
+    {
+        if ((!same_as_gui && pc.points_local.empty()) || pc.local_trajectory.empty())
+        {
+            spdlog::error("Point cloud has no points or trajectory: '{}'", pc.file_name);
+            return 1;
+        }
+        missing_unix_timestamps |= std::any_of(
+            pc.local_trajectory.begin(), pc.local_trajectory.end(), [](const auto& node) { return node.timestamps.second == 0.0; });
+    }
+    if (missing_unix_timestamps)
+        spdlog::warn("Some Unix trajectory timestamps are missing; their exported values remain zero");
+
+    fs::create_directories(output_directory);
+    if (!save_all_to_las(export_session, laz_file.string(), false, true))
+    {
+        spdlog::error("Failed exporting global LAZ: '{}'", laz_file.string());
+        return 1;
+    }
+    if (!save_trajectories(
+            export_session,
+            trajectory_file.string(),
+            tls_registration.curve_consecutive_distance_meters,
+            tls_registration.not_curve_consecutive_distance_meters,
+            same_as_gui && tls_registration.is_trajectory_export_downsampling,
+            true,
+            true,
+            true,
+            false))
+    {
+        spdlog::error("Failed exporting trajectory: '{}'", trajectory_file.string());
+        return 1;
+    }
+    spdlog::info("Exported global LAZ to '{}' and trajectory to '{}'", laz_file.string(), trajectory_file.string());
+    return 0;
+}
+
 int main(int argc, char* argv[])
 {
+    bool export_requested = false;
     try
     {
         if (checkClHelp(argc, argv))
         {
             std::cout << winTitle << "\n\n"
                       << "USAGE:\n"
-                      << std::filesystem::path(argv[0]).stem().string() << " <input_file> /?\n\n"
+                      << std::filesystem::path(argv[0]).stem().string()
+                      << " <input_file> [--export <directory> [--same-as-gui]] /?\n\n"
                       << "where\n"
-                      << "   <input_file>         Path to Mandeye JSON Session file (*.mjs)\n"
+                      << "   <input_file>         Path to Mandeye JSON Session file (*.mjs, *.json)\n"
+                      << "   --export <directory> Export global LAZ and quaternion CSV with Lidar/Unix timestamps, then exit;\n"
+                      << "                        requires *.mjs or *.json, creates directory, refuses existing export files\n"
+                      << "   --same-as-gui        Use GUI default loading/export settings (requires --export)\n"
                       << "   -h, /h, --help, /?   Show this help and exit\n\n";
 
             return 0;
+        }
+
+        // Parse optional headless export without changing normal GUI startup.
+        fs::path export_directory;
+        bool same_as_gui = false;
+        std::vector<std::string> input_arguments;
+        for (int i = 1; i < argc; ++i)
+        {
+            if (std::string(argv[i]) == "--export")
+            {
+                if (export_requested || i + 1 == argc || std::string(argv[i + 1]).empty() ||
+                    std::string(argv[i + 1]).rfind("--", 0) == 0)
+                {
+                    spdlog::error("--export requires exactly one directory argument");
+                    return 1;
+                }
+                export_requested = true;
+                export_directory = argv[++i];
+            }
+            else if (std::string(argv[i]) == "--same-as-gui")
+            {
+                if (same_as_gui)
+                {
+                    spdlog::error("--same-as-gui may only be specified once");
+                    return 1;
+                }
+                same_as_gui = true;
+            }
+            else
+                input_arguments.emplace_back(argv[i]);
+        }
+        if (same_as_gui && !export_requested)
+        {
+            spdlog::error("--same-as-gui requires --export");
+            return 1;
+        }
+        if (export_requested)
+        {
+            if (input_arguments.size() != 1)
+            {
+                spdlog::error("--export requires exactly one session input");
+                return 1;
+            }
+            const std::string ext = lowerExtension(input_arguments.front());
+            if (ext != ".mjs" && ext != ".json")
+            {
+                spdlog::error("Unsupported session extension '{}'; expected .mjs or .json", ext);
+                return 1;
+            }
+            return exportSessionToDirectory(input_arguments.front(), export_directory, same_as_gui);
         }
 
         // search for available geoid models in the system and populate the menu
@@ -6642,14 +6767,15 @@ int main(int argc, char* argv[])
     } catch (const std::bad_alloc& e)
     {
         spdlog::error("System is out of memory : {}", e.what());
-        mandeye::fd::OutOfMemMessage();
+        if (!export_requested)
+            mandeye::fd::OutOfMemMessage();
     } catch (const std::exception& e)
     {
-        spdlog::error(e.what());
+        spdlog::error("{}", e.what());
     } catch (...)
     {
         spdlog::error("Unknown fatal error occurred!");
     }
 
-    return 0;
+    return export_requested ? 1 : 0;
 }

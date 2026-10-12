@@ -8,8 +8,75 @@
 
 namespace fs = std::filesystem;
 
+bool Session::is_point_cloud_file(const std::string& file_name)
+{
+    std::string ext = fs::path(file_name).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    return ext == ".laz" || ext == ".las";
+}
+
+bool Session::load_from_point_cloud(
+    const std::string& file_name, bool is_decimate, double bucket_x, double bucket_y, double bucket_z, bool calculate_offset)
+{
+    this->session_file_name = file_name;
+    std::cout << "Loading point cloud as session: '" << file_name << "'" << std::endl;
+
+    if (!fs::exists(file_name))
+    {
+        std::cout << "point cloud file does not exist: '" << file_name << "'" << std::endl;
+        return false;
+    }
+
+    if (!point_clouds_container.load_whu_tls(
+            { file_name }, is_decimate, bucket_x, bucket_y, bucket_z, calculate_offset, this->load_cache_mode) ||
+        point_clouds_container.point_clouds.empty() || point_clouds_container.point_clouds[0].points_local.empty())
+    {
+        std::cout << "can't load point cloud: '" << file_name << "'" << std::endl;
+        return false;
+    }
+
+    working_directory = fs::path(file_name).parent_path().string();
+
+    // No poses files: the session exists only in memory
+    point_clouds_container.poses_file_name = "";
+    point_clouds_container.initial_poses_file_name = "";
+
+    render_color[0] = float(rand() % 255) / 255.0;
+    render_color[1] = float(rand() % 255) / 255.0;
+    render_color[2] = float(rand() % 255) / 255.0;
+
+    for (auto& pc : point_clouds_container.point_clouds)
+    {
+        pc.m_pose = Eigen::Affine3d::Identity();
+        pc.m_initial_pose = pc.m_pose;
+        pc.m_pose_temp = pc.m_pose;
+        pc.pose = pose_tait_bryan_from_affine_matrix(pc.m_pose);
+
+        // Multi-session code reads the first trajectory node (time offset, export), so a single scan gets one
+        if (pc.local_trajectory.empty())
+        {
+            PointCloud::LocalTrajectoryNode node;
+            node.timestamps = { 0, 0 };
+            node.m_pose = Eigen::Affine3d::Identity();
+            node.imu_om_fi_ka = { 0, 0, 0 };
+            node.imu_diff_angle_om_fi_ka_deg = { 0, 0, 0 };
+            pc.local_trajectory.push_back(node);
+        }
+
+        pc.render_color[0] = pc.traj_color[0] = render_color[0];
+        pc.render_color[1] = pc.traj_color[1] = render_color[1];
+        pc.render_color[2] = pc.traj_color[2] = render_color[2];
+    }
+
+    std::cout << "loaded " << point_clouds_container.point_clouds[0].points_local.size() << " points" << std::endl;
+    return true;
+}
+
 bool Session::load(const std::string& file_name, bool is_decimate, double bucket_x, double bucket_y, double bucket_z, bool calculate_offset)
 {
+    if (is_point_cloud_file(file_name))
+        return load_from_point_cloud(file_name, is_decimate, bucket_x, bucket_y, bucket_z, calculate_offset);
+
     this->session_file_name = file_name;
     std::cout << "Loading file: '" << file_name << "'" << std::endl;
     // point_clouds_container.point_clouds.clear();

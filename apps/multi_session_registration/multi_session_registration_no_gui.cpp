@@ -415,6 +415,9 @@ bool save_results(std::vector<Session>& sessions)
     {
         if (!session.is_ground_truth)
         {
+            // Sessions loaded from a single point cloud live in memory only and have no poses file
+            if (Session::is_point_cloud_file(session.session_file_name))
+                continue;
             std::cout << "saving result to: " << session.point_clouds_container.poses_file_name << std::endl;
             session.point_clouds_container.save_poses(fs::path(session.point_clouds_container.poses_file_name).string(), false);
         }

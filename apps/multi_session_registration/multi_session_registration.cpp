@@ -1385,6 +1385,48 @@ bool save_results(std::vector<Session>& sessions)
     return true;
 }
 
+// Writes the world poses of all visible scans (scan pose * local trajectory node) as TUM
+// ("t[s] x y z qx qy qz qw"), sorted by time, with repeated timestamps dropped.
+bool save_session_trajectory_as_tum(const Session& session, const std::string& file_name)
+{
+    std::vector<std::pair<double, Eigen::Affine3d>> poses;
+    for (const auto& pc : session.point_clouds_container.point_clouds)
+    {
+        if (!pc.visible)
+            continue;
+        for (const auto& node : pc.local_trajectory)
+            poses.emplace_back(node.timestamps.first, pc.m_pose * node.m_pose);
+    }
+    std::stable_sort(
+        poses.begin(),
+        poses.end(),
+        [](const auto& a, const auto& b)
+        {
+            return a.first < b.first;
+        });
+
+    std::ofstream outfile(file_name);
+    if (!outfile.is_open())
+    {
+        std::cerr << "Failed to create file: " << file_name << std::endl;
+        return false;
+    }
+
+    size_t written = 0;
+    for (size_t i = 0; i < poses.size(); i++)
+    {
+        if (i > 0 && poses[i].first == poses[i - 1].first)
+            continue;
+        const Eigen::Vector3d pos = poses[i].second.translation();
+        const Eigen::Quaterniond q(poses[i].second.rotation());
+        outfile << std::fixed << std::setprecision(9) << poses[i].first / 1e9 << " " << std::setprecision(10) << pos.x() << " " << pos.y()
+                << " " << pos.z() << " " << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << "\n";
+        written++;
+    }
+    std::cout << "Saved " << written << " poses to TUM: " << file_name << std::endl;
+    return outfile.good();
+}
+
 Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking& observation_picking)
 {
     const auto laser_beam = GetLaserBeam(x, y);
@@ -3079,6 +3121,31 @@ void display()
                 save_results(sessions);
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
                 ImGui::SetTooltip("Overwrite the poses file of every session except ground truth");
+
+            if (ImGui::BeginMenu("Export trajectory as TUM", loaded_sessions && !sessions.empty()))
+            {
+                for (size_t i = 0; i < sessions.size(); i++)
+                {
+                    const Session& session = sessions[i];
+                    // A point cloud session has no trajectory, only its scan pose
+                    if (Session::is_point_cloud_file(session.session_file_name))
+                        continue;
+
+                    const fs::path session_path(session.session_file_name);
+                    const std::string folder_name = session_path.parent_path().filename().string();
+                    const std::string label = folder_name + "/" + session_path.filename().string() + "##tum" + std::to_string(i);
+                    if (ImGui::MenuItem(label.c_str()))
+                    {
+                        const std::string output_file_name = mandeye::fd::SaveFileDialog(
+                            "Export trajectory as TUM", mandeye::fd::Tum_filter, ".txt", folder_name + "_trajectory_tum.txt");
+                        if (!output_file_name.empty() && !save_session_trajectory_as_tum(session, output_file_name))
+                            pfd::message("Export failed", "Could not write '" + output_file_name + "'", pfd::choice::ok, pfd::icon::error);
+                    }
+                }
+                ImGui::EndMenu();
+            }
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                ImGui::SetTooltip("Save the current poses of one session as a TUM trajectory (t[s] x y z qx qy qz qw)");
 
             ImGui::Separator();
             if (ImGui::BeginMenu("Save all marked trajectories", sessions.size() > 0))

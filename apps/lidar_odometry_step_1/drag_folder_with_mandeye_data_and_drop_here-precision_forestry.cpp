@@ -746,6 +746,11 @@ void settings_gui()
             ImGui::NewLine();
 
             ImGui::Checkbox("Use motion from previous step", &params.use_motion_from_previous_step);
+            ImGui::Checkbox("Lidar-only odometry (no IMU)", &params.lidar_only_odometry);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip(
+                    "Predict each window's rotation and translation from the previous one (constant velocity) instead of from "
+                    "the IMU. For recordings without a usable IMU, e.g. a synthetic stationary one.");
             if (params.use_vqf)
             {
                 ImGui::InputDouble("VQF tauAcc [s]", &params.vqf_tauAcc, 0.0, 0.0, "%.3f");
@@ -1920,6 +1925,12 @@ void display()
                 {
                     params.ablation_study_use_anisotropic_weighting = !params.ablation_study_use_anisotropic_weighting;
                 }
+                ImGui::MenuItem("5: No IMU, lidar-only odometry (combine with 1-3)", nullptr, &params.lidar_only_odometry);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(
+                        "For recordings without IMU data, written with a synthetic stationary IMU (e.g. ouster_pcap_to_laz "
+                        "--stationary-imu): each window's rotation and translation are predicted from the previous window instead of "
+                        "from the IMU.");
 
                 ImGui::EndMenu();
             }

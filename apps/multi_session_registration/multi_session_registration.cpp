@@ -1365,6 +1365,12 @@ bool save_results(std::vector<Session>& sessions)
     {
         if (!session.is_ground_truth)
         {
+            // Sessions loaded from a single point cloud live in memory only and have no poses file
+            if (Session::is_point_cloud_file(session.session_file_name))
+            {
+                std::cout << "not saving poses of point cloud session: " << session.session_file_name << std::endl;
+                continue;
+            }
             std::cout << "saving result to: " << session.point_clouds_container.poses_file_name << std::endl;
             if (!session.point_clouds_container.save_poses(fs::path(session.point_clouds_container.poses_file_name).string(), false))
                 failed += "'" + session.point_clouds_container.poses_file_name + "'\n";
@@ -1509,7 +1515,11 @@ void saveProject()
 
 void addSession()
 {
-    auto input_file_names = mandeye::fd::OpenFileDialog("Add session(s)", mandeye::fd::Session_filter, true);
+    // A single point cloud (*.laz, *.las) is loaded as an in-memory session, see Session::load_from_point_cloud
+    static const std::vector<std::string> session_or_point_cloud_filter = {
+        "Session or point cloud (*.mjs, *.json, *.laz, *.las)", "*.mjs *.json *.laz *.las", "All files", "*"
+    };
+    auto input_file_names = mandeye::fd::OpenFileDialog("Add session(s)", session_or_point_cloud_filter, true);
 
     if (input_file_names.size() > 0)
     {
@@ -1542,8 +1552,8 @@ bool addSessionFile(const std::string& path)
     return true;
 }
 
-// Drag & drop: a project (*.mjp) replaces the current one; session files (*.mjs, *.json) are added and loaded
-// right away (appended to already loaded sessions, which keep their in-memory state).
+// Drag & drop: a project (*.mjp) replaces the current one; session files (*.mjs, *.json) and single point clouds
+// (*.laz, *.las) are added and loaded right away (appended to already loaded sessions, which keep their in-memory state).
 void loadDroppedFiles()
 {
     FilePathList dropped_files = LoadDroppedFiles();
@@ -1570,7 +1580,7 @@ void loadDroppedFiles()
     for (const auto& path : paths)
     {
         const std::string ext = ext_of(path);
-        if (ext != ".mjs" && ext != ".json")
+        if (ext != ".mjs" && ext != ".json" && !Session::is_point_cloud_file(path.string()))
         {
             std::cout << "Ignoring dropped file: '" << path.string() << "'" << std::endl;
             continue;
@@ -1581,7 +1591,11 @@ void loadDroppedFiles()
 
     if (added.empty())
     {
-        pfd::message("Unsupported file", "Drop a project (*.mjp) or session files (*.mjs, *.json).", pfd::choice::ok, pfd::icon::warning);
+        pfd::message(
+            "Unsupported file",
+            "Drop a project (*.mjp), session files (*.mjs, *.json) or point clouds (*.laz, *.las).",
+            pfd::choice::ok,
+            pfd::icon::warning);
         return;
     }
 

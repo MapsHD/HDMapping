@@ -30,7 +30,12 @@ public:
     GroundControlPoints ground_control_points;
     ControlPoints control_points;
 
+    // file_name is a session (*.mjs, *.json) or a single point cloud (*.laz, *.las), see load_from_point_cloud
     bool load(const std::string& file_name, bool is_decimate, double bucket_x, double bucket_y, double bucket_z, bool calculate_offset);
+    // Builds a session in memory from one point cloud: identity pose, one identity trajectory node, no session files
+    bool load_from_point_cloud(
+        const std::string& file_name, bool is_decimate, double bucket_x, double bucket_y, double bucket_z, bool calculate_offset);
+    static bool is_point_cloud_file(const std::string& file_name);
     bool save(
         const std::string& file_name, const std::string& poses_file_name, const std::string& initial_poses_file_name, bool is_subsession);
     void fill_session_from_worker_data(

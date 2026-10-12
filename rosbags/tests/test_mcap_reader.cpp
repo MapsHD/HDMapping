@@ -79,13 +79,16 @@ std::vector<rosbags::McapImuSample> makeImuSamples(size_t n, double t0)
 // One point as stored in a LAZ file, decoded exactly the way
 // load_point_cloud() (apps/lidar_odometry_step_1/lidar_odometry_utils.cpp) does:
 // coordinates from the header scale/offset, timestamp straight out of gps_time,
-// lidar id out of user_data.
+// lidar id out of user_data. point_format and rgb are not read by
+// load_point_cloud(); they are here to check what the writer stores.
 struct LazPoint
 {
     double x, y, z;
     double gps_time;
     uint16_t intensity;
     uint8_t user_data;
+    uint8_t point_format;
+    uint16_t rgb[3];
 };
 
 std::vector<LazPoint> readLaz(const fs::path& path)
@@ -115,6 +118,9 @@ std::vector<LazPoint> readLaz(const fs::path& path)
         p.gps_time = point->gps_time;
         p.intensity = point->intensity;
         p.user_data = point->user_data;
+        p.point_format = header->point_data_format;
+        for (int k = 0; k < 3; ++k)
+            p.rgb[k] = point->rgb[k];
         out.push_back(p);
     }
 
@@ -363,6 +369,51 @@ TEST_CASE("MandeyeSessionWriter: LAZ stores unscaled gps_time, zero lidar id and
         // with no calibration entry would make it drop the points.
         CHECK(decoded[i].user_data == 0);
         CHECK(decoded[i].intensity == static_cast<uint16_t>(points[i].intensity));
+        CHECK(decoded[i].point_format == 1);
+    }
+
+    fs::remove_all(dir);
+}
+
+TEST_CASE("MandeyeSessionWriter: with_rgb writes point format 3 with 16-bit colour")
+{
+    const auto dir = tempPath("hdmapping_session_laz_rgb");
+    fs::remove_all(dir);
+
+    const auto points = makeReaderPoints(50, 1234.5);
+    std::vector<rosbags::MandeyeSessionWriter::Rgb> rgb;
+    for (size_t i = 0; i < points.size(); ++i)
+        rgb.push_back({static_cast<uint16_t>(i * 1000), static_cast<uint16_t>(65535 - i), static_cast<uint16_t>(i)});
+    {
+        rosbags::MandeyeSessionWriter writer(dir, /*with_rgb=*/true);
+        REQUIRE_MESSAGE(writer.isOpen(), writer.error());
+        REQUIRE(writer.beginChunk(0));
+        REQUIRE(writer.addPoints(points, rgb));
+        REQUIRE(writer.addPoints(points)); // no colours given: black
+        CHECK_FALSE(writer.addPoints(points, std::vector<rosbags::MandeyeSessionWriter::Rgb>(rgb.begin(), rgb.begin() + 3))); // not one colour per point
+        REQUIRE(writer.endChunk());
+    }
+
+    const auto decoded = readLaz(dir / "lidar0000.laz");
+    REQUIRE(decoded.size() == 2 * points.size());
+    for (size_t i = 0; i < points.size(); ++i)
+    {
+        CHECK(decoded[i].point_format == 3);
+        CHECK(decoded[i].gps_time == points[i].timestamp);
+        CHECK(decoded[i].intensity == static_cast<uint16_t>(points[i].intensity));
+        for (int k = 0; k < 3; ++k)
+        {
+            CHECK(decoded[i].rgb[k] == rgb[i][k]);
+            CHECK(decoded[points.size() + i].rgb[k] == 0);
+        }
+    }
+
+    SUBCASE("colours on a writer opened without with_rgb are refused")
+    {
+        rosbags::MandeyeSessionWriter writer(dir);
+        REQUIRE(writer.beginChunk(1));
+        CHECK_FALSE(writer.addPoints(points, rgb));
+        CHECK(writer.error().find("with_rgb") != std::string::npos);
     }
 
     fs::remove_all(dir);

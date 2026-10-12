@@ -1,5 +1,6 @@
 #pragma once
 #include "McapWriter.h" // McapPoint, McapImuSample
+#include <array>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
@@ -22,6 +23,9 @@ namespace rosbags
 //   gps_time   = McapPoint::timestamp    (absolute seconds, unscaled)
 //   user_data  = 0                       (lidar id; single sensor per session)
 //   intensity  = McapPoint::intensity    (clamped to uint16)
+//   red/green/blue (with_rgb only)       LAS 16-bit colour, point format 3
+//                                        instead of 1; load_point_cloud() reads
+//                                        neither the colour nor the format
 //
 // The IMU csv uses the modern named-column format load_imu() prefers, in the
 // column order concatenate_multi_livox already writes, with both timestamps in
@@ -29,8 +33,12 @@ namespace rosbags
 class MandeyeSessionWriter
 {
 public:
-	// Creates `dir` if it does not exist.
-	explicit MandeyeSessionWriter(const std::filesystem::path& dir);
+	// One point's LAS colour (red, green, blue, full 16-bit scale).
+	using Rgb = std::array<uint16_t, 3>;
+
+	// Creates `dir` if it does not exist. `with_rgb` writes every chunk as LAS
+	// point format 3 (format 1 + RGB) instead of format 1.
+	explicit MandeyeSessionWriter(const std::filesystem::path& dir, bool with_rgb = false);
 	~MandeyeSessionWriter();
 
 	// Non-copyable
@@ -42,7 +50,10 @@ public:
 
 	// Opens lidar<index:%04d>.laz. Any chunk still open is closed first.
 	bool beginChunk(int index);
+	// Without colours, a with_rgb writer stores black.
 	bool addPoints(const std::vector<McapPoint>& points);
+	// `rgb` is parallel to `points`; only valid on a with_rgb writer.
+	bool addPoints(const std::vector<McapPoint>& points, const std::vector<Rgb>& rgb);
 	bool endChunk();
 
 	// Writes imu<index:%04d>.csv in one shot. Samples are written in the order

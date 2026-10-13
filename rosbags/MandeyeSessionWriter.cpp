@@ -34,6 +34,7 @@ struct MandeyeSessionWriter::Impl
 	std::filesystem::path dir;
 	std::string error;
 	bool open = false;
+	bool withRgb = false;
 
 	laszip_POINTER writer = nullptr;
 	laszip_point* point = nullptr;
@@ -50,10 +51,11 @@ struct MandeyeSessionWriter::Impl
 	}
 };
 
-MandeyeSessionWriter::MandeyeSessionWriter(const std::filesystem::path& dir)
+MandeyeSessionWriter::MandeyeSessionWriter(const std::filesystem::path& dir, bool with_rgb)
 	: impl_(std::make_unique<Impl>())
 {
 	impl_->dir = dir;
+	impl_->withRgb = with_rgb;
 
 	std::error_code ec;
 	std::filesystem::create_directories(dir, ec);
@@ -110,8 +112,9 @@ bool MandeyeSessionWriter::beginChunk(int index)
 	header->global_encoding = (1 << 0);
 	header->version_major = 1;
 	header->version_minor = 2;
-	header->point_data_format = 1; // XYZ + intensity + user_data + gps_time
-	header->point_data_record_length = 28;
+	// 1: XYZ + intensity + user_data + gps_time; 3: the same + 16-bit RGB.
+	header->point_data_format = impl_->withRgb ? 3 : 1;
+	header->point_data_record_length = impl_->withRgb ? 34 : 28;
 	header->number_of_point_records = 0;
 	header->number_of_points_by_return[0] = 0;
 	header->number_of_points_by_return[1] = 0;
@@ -135,13 +138,30 @@ bool MandeyeSessionWriter::beginChunk(int index)
 
 bool MandeyeSessionWriter::addPoints(const std::vector<McapPoint>& points)
 {
+	return addPoints(points, {});
+}
+
+bool MandeyeSessionWriter::addPoints(const std::vector<McapPoint>& points, const std::vector<Rgb>& rgb)
+{
 	if(!isOpen())
 		return false;
 	if(!impl_->writer)
 		return impl_->fail("addPoints() called with no chunk open");
+	if(!rgb.empty() && (!impl_->withRgb || rgb.size() != points.size()))
+		return impl_->fail(
+			impl_->withRgb ? "addPoints(): " + std::to_string(rgb.size()) + " colours for " + std::to_string(points.size()) + " points"
+						   : "addPoints(): colours given to a writer opened without with_rgb");
 
-	for(const auto& p : points)
+	for(size_t i = 0; i < points.size(); ++i)
 	{
+		const auto& p = points[i];
+		if(impl_->withRgb)
+		{
+			const Rgb colour = rgb.empty() ? Rgb{} : rgb[i];
+			impl_->point->rgb[0] = colour[0];
+			impl_->point->rgb[1] = colour[1];
+			impl_->point->rgb[2] = colour[2];
+		}
 		impl_->point->intensity = static_cast<laszip_U16>(std::clamp(p.intensity, 0.0f, 65535.0f));
 		impl_->point->return_number = 1;
 		impl_->point->number_of_returns = 1;

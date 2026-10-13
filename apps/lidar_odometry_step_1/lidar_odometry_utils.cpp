@@ -532,6 +532,9 @@ std::vector<Point3Di> load_point_cloud(
 
     int counter_ts0 = 0;
     int counter_filtered_points = 0;
+    // LAS point formats carrying rgb: 2, 3, 5, 7, 8, 10
+    const int fmt = header->point_data_format;
+    const bool has_rgb = fmt == 2 || fmt == 3 || fmt == 5 || fmt == 7 || fmt == 8 || fmt == 10;
 
     for (laszip_U32 j = 0; j < header->number_of_point_records; j++)
     {
@@ -566,6 +569,12 @@ std::vector<Point3Di> load_point_cloud(
         p.lidarid = id;
         p.timestamp = point->gps_time;
         p.intensity = point->intensity;
+        if (has_rgb)
+        {
+            p.rgb[0] = static_cast<uint8_t>(point->rgb[0] >> 8);
+            p.rgb[1] = static_cast<uint8_t>(point->rgb[1] >> 8);
+            p.rgb[2] = static_cast<uint8_t>(point->rgb[2] >> 8);
+        }
 
         if (p.timestamp == 0 && ommit_points_with_timestamp_equals_zero)
         {

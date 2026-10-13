@@ -124,6 +124,9 @@ struct LidarOdometryParams
 
     // lidar odometry control
     bool use_motion_from_previous_step = true;
+    // No usable IMU: predict each window's rotation and translation from the
+    // previous window (constant velocity) instead of from the IMU orientation.
+    bool lidar_only_odometry = false;
     int nr_iter = 100;
     NDT::GridParameters in_out_params_indoor;
     NDT::GridParameters in_out_params_outdoor;

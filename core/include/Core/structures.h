@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -70,6 +71,8 @@ struct Point3Di
     float intensity;
     int index_pose;
     uint8_t lidarid;
+    // 8-bit colour from LAS rgb (16-bit >> 8); all zero when the source has none. Sits in the padding after lidarid.
+    uint8_t rgb[3] = { 0, 0, 0 };
     int index_point;
 };
 
@@ -84,6 +87,7 @@ struct Point3DiDisk
     float intensity;
     int32_t index_pose;
     uint8_t lidarid;
+    uint8_t rgb[3];
     int32_t index_point;
 };
 #pragma pack(pop)
@@ -126,6 +130,7 @@ inline void convert_to_disk(const Point3Di& src, Point3DiDisk& dst)
     dst.intensity = src.intensity;
     dst.index_pose = src.index_pose;
     dst.lidarid = src.lidarid;
+    std::copy(std::begin(src.rgb), std::end(src.rgb), dst.rgb);
     dst.index_point = src.index_point;
 }
 
@@ -136,6 +141,7 @@ inline void convert_from_disk(const Point3DiDisk& src, Point3Di& dst)
     dst.intensity = src.intensity;
     dst.index_pose = src.index_pose;
     dst.lidarid = src.lidarid;
+    std::copy(std::begin(src.rgb), std::end(src.rgb), dst.rgb);
     dst.index_point = src.index_point;
 }
 

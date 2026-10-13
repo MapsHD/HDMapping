@@ -5,6 +5,7 @@
 #include <Core/session.h>
 
 #include <algorithm>
+#include <array>
 #include <filesystem>
 #include <iostream>
 #include <string>
@@ -28,7 +29,8 @@ public:
     LazWriter(const LazWriter&) = delete;
     LazWriter& operator=(const LazWriter&) = delete;
 
-    bool open(const std::string& filename, double offset_x, double offset_y, double offset_z)
+    //! with_rgb writes LAS point format 3 (format 1 + rgb) instead of format 1.
+    bool open(const std::string& filename, double offset_x, double offset_y, double offset_z, bool with_rgb = false)
     {
         constexpr double scale = 0.0001;
 
@@ -49,8 +51,8 @@ public:
         header->global_encoding = (1 << 0);
         header->version_major = 1;
         header->version_minor = 2;
-        header->point_data_format = 1;
-        header->point_data_record_length = 28;
+        header->point_data_format = with_rgb ? 3 : 1;
+        header->point_data_record_length = with_rgb ? 34 : 28;
         header->number_of_point_records = 0;
         header->number_of_points_by_return[0] = 0;
         header->number_of_points_by_return[1] = 0;
@@ -86,9 +88,17 @@ public:
         double offset_x,
         double offset_y,
         double offset_z,
-        unsigned short point_source_id = 0)
+        unsigned short point_source_id = 0,
+        const uint8_t* rgb = nullptr)
     {
         point_->intensity = intensity;
+        if (rgb)
+        {
+            // 8-bit -> 16-bit LAS convention (value * 256), matching the readers' value / 256
+            point_->rgb[0] = static_cast<laszip_U16>(rgb[0]) << 8;
+            point_->rgb[1] = static_cast<laszip_U16>(rgb[1]) << 8;
+            point_->rgb[2] = static_cast<laszip_U16>(rgb[2]) << 8;
+        }
         point_->return_number = 1;
         point_->number_of_returns = 1;
         point_->gps_time = timestamp * 1e9;
@@ -164,16 +174,20 @@ inline bool exportLaz(
     double offset_x = 0.0,
     double offset_y = 0.0,
     double offset_alt = 0.0,
-    const std::vector<unsigned short>* point_source_ids = nullptr)
+    const std::vector<unsigned short>* point_source_ids = nullptr,
+    const std::vector<std::array<uint8_t, 3>>* colors = nullptr)
 {
+    const bool with_rgb = colors && colors->size() == pointcloud.size() && !colors->empty();
+
     LazWriter writer;
-    if (!writer.open(filename, offset_x, offset_y, offset_alt))
+    if (!writer.open(filename, offset_x, offset_y, offset_alt, with_rgb))
         return false;
 
     for (size_t i = 0; i < pointcloud.size(); i++)
     {
         const unsigned short psid = (point_source_ids && i < point_source_ids->size()) ? (*point_source_ids)[i] : 0;
-        if (!writer.writePoint(pointcloud[i], intensity[i], timestamps[i], offset_x, offset_y, offset_alt, psid))
+        const uint8_t* rgb = with_rgb ? (*colors)[i].data() : nullptr;
+        if (!writer.writePoint(pointcloud[i], intensity[i], timestamps[i], offset_x, offset_y, offset_alt, psid, rgb))
             return false;
     }
 
@@ -372,7 +386,8 @@ inline void points_to_vector(
     std::vector<unsigned short>& intensity,
     std::vector<double>& timestamps,
     bool use_first_pose,
-    bool save_index_pose)
+    bool save_index_pose,
+    std::vector<std::array<uint8_t, 3>>* colors = nullptr)
 {
     Eigen::Affine3d m_pose = trajectory[0].inverse();
     for (const auto& org_p : points)
@@ -391,6 +406,10 @@ inline void points_to_vector(
             pointcloud.push_back(p.point);
             intensity.push_back(p.intensity);
             timestamps.push_back(p.timestamp);
+            if (colors)
+            {
+                colors->push_back({ p.rgb[0], p.rgb[1], p.rgb[2] });
+            }
             if (save_index_pose)
             {
                 if (index_poses)

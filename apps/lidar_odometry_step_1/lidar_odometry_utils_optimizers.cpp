@@ -1728,6 +1728,50 @@ bool process_worker_step_1(
         }
     }
 
+    if (i > 1 && params.lidar_only_odometry)
+    {
+        // No IMU to follow (e.g. a synthetic stationary one): carry the previous
+        // window's motion -- rotation as well as translation, both in its body
+        // frame -- forward at constant velocity. The prediction is also the
+        // motion-model target, so the optimizer expects the current turn rate to
+        // continue rather than no rotation at all. Assumes evenly spaced nodes, as
+        // a synthetic IMU stream provides.
+        const auto& prev = prev_worker_data.intermediate_trajectory;
+        const Eigen::Affine3d delta = prev.front().inverse() * prev.back();
+        const Eigen::AngleAxisd rotation(delta.linear());
+        const double steps = static_cast<double>(prev.size() - 1);
+
+        Eigen::Affine3d step = Eigen::Affine3d::Identity();
+        if (delta.translation().norm() > 1.0 || rotation.angle() > 30.0 * DEG_TO_RAD)
+        {
+            spdlog::warn(
+                "lidar_only_odometry: previous window moved {:.2f} m / {:.1f} deg, predicting no motion instead",
+                delta.translation().norm(),
+                rotation.angle() * RAD_TO_DEG);
+        }
+        else if (steps > 0)
+        {
+            step.linear() = Eigen::AngleAxisd(rotation.angle() / steps, rotation.axis()).toRotationMatrix();
+            step.translation() = delta.translation() / steps;
+        }
+
+        std::vector<Eigen::Affine3d> new_trajectory;
+        new_trajectory.reserve(worker_data.intermediate_trajectory.size());
+        Eigen::Affine3d current_node = prev.back();
+        for (size_t tr = 0; tr < worker_data.intermediate_trajectory.size(); tr++)
+        {
+            if (tr > 0)
+                current_node = current_node * step;
+            new_trajectory.push_back(current_node);
+            worker_data.intermediate_trajectory_prediction.push_back(current_node);
+        }
+
+        worker_data.imu_prediction_vector = new_trajectory.back().translation() - new_trajectory.front().translation();
+        worker_data.intermediate_trajectory = new_trajectory;
+        worker_data.intermediate_trajectory_motion_model = new_trajectory;
+        return true;
+    }
+
     Eigen::Vector3d mean_shift(0.0, 0.0, 0.0);
     if (i > 1 && params.use_motion_from_previous_step)
     {

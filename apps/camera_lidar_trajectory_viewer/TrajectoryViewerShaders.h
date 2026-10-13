@@ -9,8 +9,8 @@
 
 namespace trajectory_viewer_shaders
 {
-    // colorPacked: float bits = 0x00RRGGBB; colorMode: 0=jet intensity, 1=RGB, 2=camera id, 3=in ROI/mask,
-    // 4=jet local depth (LiDAR range)
+    // colorPacked: float bits = 0xFFRRGGBB where FF is 1 when the RGB came from the LAZ, else 0; colorMode: 0=jet intensity, 1=RGB,
+    // 2=camera id, 3=in ROI/mask, 4=jet local depth (LiDAR range)
     inline constexpr const char* kVS = R"(
 #version 330
 // GLSL 330 has no 16-bit types: the integer attributes arrive widened to uint/int,
@@ -33,6 +33,7 @@ out float fragDepth;   // m; < 0 = unknown
 out vec4 vertColor;
 flat out float fragColorCameraId;
 flat out float fragInRoi;
+flat out float fragLazRgb; // 1 = RGB from the LAZ (no image colored the point)
 void main() {
     float range = float(lidarDepth) * 0.01;
     bool outOfRange = lidarDepth >= 0 && (range < minRange || (maxRange > 0.0 && range > maxRange));
@@ -50,6 +51,7 @@ void main() {
     fragIntensity = float(lidarIntensity) / 65535.0;
     fragDepth = lidarDepth >= 0 ? range : -1.0;
     vertColor = vec4(r, g, b, 1.0);
+    fragLazRgb = ((p >> 24) & 0xFFu) != 0u ? 1.0 : 0.0;
     fragColorCameraId = float(colorCameraId);
     // kFS's in-ROI states: 1 = kept, 0 = rejected, -1 = projects into no image
     fragInRoi = colorCameraId >= 0 ? 1.0 : (colorCameraId == -1 ? -1.0 : 0.0);
@@ -63,6 +65,7 @@ in float fragDepth;
 in vec4 vertColor;
 flat in float fragColorCameraId;
 flat in float fragInRoi;
+flat in float fragLazRgb;
 uniform int colorMode;
 uniform int selectedCamera;   // -1 = show all, else keep only points from this image
 uniform float depthColorMax;  // m: colorMode 4 maps 0..this onto the jet colormap
@@ -89,8 +92,8 @@ void main() {
 
     if (colorMode == 1)
     {
-        if (fragColorCameraId < 0.0)
-            discard; // not colored by any image — draw only colored points
+        if (fragColorCameraId < 0.0 && fragLazRgb < 0.5)
+            discard; // colored by no image and no LAZ RGB — draw only colored points
         finalColor = vertColor;
     }
     else if (colorMode == 2)

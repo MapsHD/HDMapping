@@ -28,6 +28,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -38,6 +39,7 @@
 #include <nlohmann/json.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/videoio.hpp>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -459,6 +461,10 @@ struct AppState
     bool flyoverUpdateSelectedCamera = true; //!< select the camera image nearest the playhead
     float flyoverYawDeg = 0.f; //!< look-around offset from the trajectory heading, + = left
     float flyoverPitchDeg = 0.f; //!< look-around offset from the trajectory pitch, + = up
+    cv::VideoWriter flyoverVideo; //!< open while the flyover is being recorded
+    cv::Size flyoverVideoSize; //!< frame size, fixed when the writer opened
+    std::string flyoverVideoPath;
+    int flyoverVideoFrames = 0;
     // ── fast-rotation image filter ─────────────────────────────────────────────
     //! Per-pose angular speed (deg/s), parallel to traj.poses — filled by
     //! loadSession(). Images captured while the rig turns faster than
@@ -1739,12 +1745,105 @@ static void exportE57Session(AppState& s)
         s.status = std::string("Export failed: ") + err;
 }
 
+//! Flyover video frame rate. Recording advances the playhead by exactly one frame
+//! of this per rendered frame, so the video plays smoothly however slowly the
+//! viewer renders while encoding.
+static constexpr double kFlyoverVideoFps = 30.0;
+
+//! Records the flyover from the start into flyover_<local time>.mp4 next to the
+//! executable, at the window's render resolution.
+static void startFlyoverRecording(AppState& s)
+{
+    const std::time_t now = std::time(nullptr);
+    char stamp[32];
+    std::strftime(stamp, sizeof(stamp), "%Y%m%d_%H%M%S", std::localtime(&now));
+    const std::string base = (fs::path(GetApplicationDirectory()) / (std::string("flyover_") + stamp)).string();
+
+    // Even dimensions: H.264's 4:2:0 chroma subsampling rejects odd ones.
+    s.flyoverVideoSize = cv::Size(GetRenderWidth() & ~1, GetRenderHeight() & ~1);
+    // H.264, else MPEG-4 Part 2 where no H.264 encoder is available, else
+    // OpenCV's built-in Motion JPEG writer, which needs no FFmpeg at all.
+    const std::pair<const char*, const char*> formats[] = { { ".mp4", "avc1" }, { ".mp4", "mp4v" }, { ".avi", "MJPG" } };
+    std::string path;
+    const char* codec = nullptr;
+    for (const auto& [ext, fourcc] : formats)
+    {
+        path = base + ext;
+        if (s.flyoverVideo.open(
+                path, cv::VideoWriter::fourcc(fourcc[0], fourcc[1], fourcc[2], fourcc[3]), kFlyoverVideoFps, s.flyoverVideoSize))
+        {
+            codec = fourcc;
+            break;
+        }
+    }
+    if (!s.flyoverVideo.isOpened())
+    {
+        s.status = "Cannot open a video writer in " + fs::path(base).parent_path().string();
+        std::fprintf(stderr, "Flyover video: %s (tried avc1, mp4v, MJPG)\n", s.status.c_str());
+        return;
+    }
+    std::printf(
+        "Flyover video: recording %s (%s, %dx%d @ %.0f fps)\n",
+        path.c_str(),
+        codec,
+        s.flyoverVideoSize.width,
+        s.flyoverVideoSize.height,
+        kFlyoverVideoFps);
+
+    s.flyoverVideoPath = path;
+    s.flyoverVideoFrames = 0;
+    s.flyoverProgress = 0.f;
+    s.flyoverPlaying = true;
+    s.status = "Recording flyover to " + path;
+}
+
+//! Finishes the flyover video; a no-op when not recording.
+static void stopFlyoverRecording(AppState& s)
+{
+    if (!s.flyoverVideo.isOpened())
+        return;
+    s.flyoverVideo.release();
+    s.status = "Saved flyover video (" + std::to_string(s.flyoverVideoFrames) + " frames): " + s.flyoverVideoPath;
+    std::printf(
+        "Flyover video: saved %s (%d frames, %.1f s)\n",
+        s.flyoverVideoPath.c_str(),
+        s.flyoverVideoFrames,
+        s.flyoverVideoFrames / kFlyoverVideoFps);
+}
+
+//! Appends the 3D view drawn so far this frame to the flyover video. Called
+//! before the compass and ImGui are drawn, so neither ends up in the video.
+static void writeFlyoverVideoFrame(AppState& s)
+{
+    const int w = GetRenderWidth();
+    const int h = GetRenderHeight();
+    if (w < 2 || h < 2)
+        return; // minimized
+    cv::Mat frame(h, w, CV_8UC3);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadPixels(0, 0, w, h, GL_BGR, GL_UNSIGNED_BYTE, frame.data);
+    cv::flip(frame, frame, 0); // GL rows run bottom-up
+
+    // A window resized since recording started is scaled to the writer's size.
+    cv::Mat even = frame(cv::Rect(0, 0, w & ~1, h & ~1));
+    cv::Mat out;
+    if (even.size() == s.flyoverVideoSize)
+        out = even;
+    else
+        cv::resize(even, out, s.flyoverVideoSize, 0, 0, cv::INTER_AREA);
+    s.flyoverVideo.write(out);
+    ++s.flyoverVideoFrames;
+}
+
 //! Opens the flyover bar and plays from the start, or closes it -- shared by the
-//! View menu item and Shift+F. Opening is a no-op without a trajectory.
+//! View menu item, Shift+F and the bar's Close button. Opening is a no-op
+//! without a trajectory; closing finishes any recording.
 static void toggleFlyover(AppState& s)
 {
     if (!s.flyover && s.traj.empty())
         return;
+    if (s.flyover)
+        stopFlyoverRecording(s);
     s.flyover = !s.flyover;
     s.flyoverProgress = 0.f;
     s.flyoverPlaying = s.flyover;
@@ -2530,11 +2629,16 @@ int main(int argc, char* argv[])
         // Flyover: while its bar is open the camera sits on the trajectory at
         // the playhead (orbit.viewPose) instead of following the euler fields
         // below -- also when paused, so scrubbing the timeline previews it.
+        // A recording only takes frames where the playhead moved, so pausing
+        // pauses the video too.
+        bool recordFlyoverFrame = false;
         if (s.flyover && s.flyoverPlaying)
         {
             const double durationSec = trajectoryDurationSec(s.traj);
+            const double dt = s.flyoverVideo.isOpened() ? 1.0 / kFlyoverVideoFps : GetFrameTime();
+            recordFlyoverFrame = s.flyoverVideo.isOpened();
             if (durationSec > 0.0)
-                s.flyoverProgress += float(GetFrameTime() * s.flyoverSpeed / durationSec);
+                s.flyoverProgress += float(dt * s.flyoverSpeed / durationSec);
             if (durationSec <= 0.0 || s.flyoverProgress >= 1.f)
             {
                 s.flyoverProgress = std::min(s.flyoverProgress, 1.f);
@@ -2610,6 +2714,12 @@ int main(int argc, char* argv[])
         drawScene(s);
 
         raylib_widgets::end3DMatrixStack(ImGui::GetIO().DisplaySize.x, ImGui::GetIO().DisplaySize.y);
+
+        if (recordFlyoverFrame)
+            writeFlyoverVideoFrame(s);
+        // Playback stops at the end of the trajectory, which ends the video.
+        if (!s.flyoverPlaying && s.flyoverProgress >= 1.f)
+            stopFlyoverRecording(s);
 
         if (s.showCompassRuler)
         {
@@ -3208,6 +3318,31 @@ int main(int argc, char* argv[])
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Space");
             ImGui::SameLine();
+            if (s.flyoverVideo.isOpened())
+            {
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.7f, 0.1f, 0.1f, 1.f));
+                if (ImGui::Button("Stop REC"))
+                    stopFlyoverRecording(s);
+                ImGui::PopStyleColor();
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(
+                        "%d frames (%.1f s) recorded to\n%s\nStops by itself at the end of the trajectory",
+                        s.flyoverVideoFrames,
+                        s.flyoverVideoFrames / kFlyoverVideoFps,
+                        s.flyoverVideoPath.c_str());
+            }
+            else
+            {
+                if (ImGui::Button("Record"))
+                    startFlyoverRecording(s);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(
+                        "Record the flyover from the start to flyover_<time>.mp4 next to the executable\n"
+                        "3D view only, at the window's resolution and %.0f fps;\n"
+                        "Speed, look-around and pausing apply while it records",
+                        kFlyoverVideoFps);
+            }
+            ImGui::SameLine();
             ImGui::Text("%7.1f / %.1f s", s.flyoverProgress * durationSec, durationSec);
             ImGui::SameLine();
             ImGui::SetNextItemWidth(160.f);
@@ -3246,10 +3381,7 @@ int main(int argc, char* argv[])
             const float closeW = ImGui::CalcTextSize("Close").x + style.FramePadding.x * 2.f;
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.f, ImGui::GetContentRegionAvail().x - closeW));
             if (ImGui::Button("Close"))
-            {
-                s.flyover = false;
-                s.flyoverPlaying = false;
-            }
+                toggleFlyover(s);
 
             flyoverTimeline("##flyoverTimeline", s.flyoverProgress, durationSec, timelineH);
             ImGui::End();

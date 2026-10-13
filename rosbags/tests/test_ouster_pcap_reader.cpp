@@ -133,6 +133,36 @@ std::vector<uint8_t> legacyImuPacket(uint64_t gyro_ts_ns, const float (&acc_g)[3
     return p;
 }
 
+struct ImuMeasurement
+{
+    uint64_t timestamp_ns;
+    bool valid;
+    float acc_ms2[3];
+    float gyro_rads[3];
+};
+
+// ACCEL32_GYRO32_NMEA with two measurements per packet.
+std::vector<uint8_t> accel32Gyro32NmeaImuPacket(const ImuMeasurement (&measurements)[2], uint64_t init_id = kInitId)
+{
+    std::vector<uint8_t> p(32 + 100 + 2 * 36 + 32, 0);
+    putLe(p, 0, 2, 2); // packet type
+    putLe(p, 4, init_id, 3);
+    putLe(p, 7, kSerial, 5);
+    for (size_t i = 0; i < 2; ++i)
+    {
+        const size_t m = 32 + 100 + i * 36;
+        putLe(p, m, measurements[i].timestamp_ns, 8);
+        putLe(p, m + 8, 31 + 32 * i, 2);
+        putLe(p, m + 10, measurements[i].valid ? 1 : 0, 2);
+        for (int k = 0; k < 3; ++k)
+        {
+            std::memcpy(&p[m + 12 + 4 * k], &measurements[i].acc_ms2[k], 4);
+            std::memcpy(&p[m + 24 + 4 * k], &measurements[i].gyro_rads[k], 4);
+        }
+    }
+    return p;
+}
+
 // Wraps a UDP payload in Ethernet/IPv4/UDP, split into IPv4 fragments carrying at
 // most `fragment_bytes` (a multiple of 8) of IP payload each; 0 = unfragmented.
 std::vector<std::vector<uint8_t>> udpFrames(const std::vector<uint8_t>& payload, uint16_t dport, uint16_t ip_id, size_t fragment_bytes = 0)
@@ -239,12 +269,14 @@ TEST_CASE("parseOusterMetadata: profile table, pixel_data_format, and refusals")
         CHECK(m.lidarPacketSize() == 32 + 2 * (12 + 4 * 12) + 32);
         CHECK(m.initialization_id == kInitId);
         CHECK(m.rgb_width == 0);
+        CHECK(!m.rgb_float16);
     }
     SUBCASE("the RGB16 profile name brings red, green, blue in words 2 and 3")
     {
         const auto m = parseOrFail(metadataJson("RNG19_RFL8_SIG16_NIR16_RGB16"));
         CHECK(m.pixel_bytes == 16);
         CHECK(m.rgb_width == 16);
+        CHECK(m.rgb_float16);
         CHECK(m.rgb_start_bit == std::array<int, 3>{64, 80, 96});
     }
     SUBCASE("pixel_data_format describes a profile no table knows")
@@ -264,6 +296,7 @@ TEST_CASE("parseOusterMetadata: profile table, pixel_data_format, and refusals")
         CHECK(m.range_start_bit == 0); // the first return, not range_capped_mm_1
         CHECK(m.reflectivity_start_bit == 24);
         CHECK(m.rgb_width == 16);
+        CHECK(m.rgb_float16);
         CHECK(m.rgb_start_bit == std::array<int, 3>{112, 128, 144}); // rgb_r, not rgb_r1
     }
     SUBCASE("an unknown profile without pixel_data_format is refused by name")
@@ -369,6 +402,40 @@ TEST_CASE("OusterPcapReader: LEGACY IMU is rotated into the sensor frame, deg/s 
     CHECK(s.acc_z == doctest::Approx(0.0));
     CHECK(s.gyro_x == doctest::Approx(0.0));
     CHECK(s.gyro_y == doctest::Approx(std::numbers::pi / 2));
+    CHECK(s.gyro_z == doctest::Approx(0.0));
+    fs::remove(path);
+}
+
+TEST_CASE("OusterPcapReader: ACCEL32_GYRO32_NMEA IMU is rotated into the sensor frame, m/s^2 -> g, invalid samples dropped")
+{
+    std::string json = metadataJson("RNG19_RFL8_SIG16_NIR16");
+    json.replace(json.find(R"("udp_profile_imu": "LEGACY")"), 27, R"("udp_profile_imu": "ACCEL32_GYRO32_NMEA")");
+    json.insert(json.rfind('}'), R"(, "imu_data_format": {"imu_measurements_per_packet": 2})");
+    const auto meta = parseOrFail(json);
+    CHECK(meta.imu_measurements_per_packet == 2);
+    CHECK(meta.imuPacketSize() == 32 + 100 + 2 * 36 + 32);
+
+    const fs::path path = fs::temp_directory_path() / "hdmapping_ouster_reader_imu_nmea.pcap";
+    const ImuMeasurement measurements[2] = {
+        {7'000'000'000, true, {9.80665f, 0.0f, 0.0f}, {0.5f, 0.0f, 0.0f}},
+        {7'001'562'500, false, {1.0f, 2.0f, 3.0f}, {1.0f, 2.0f, 3.0f}},
+    };
+    std::vector<std::vector<uint8_t>> frames = udpFrames(accel32Gyro32NmeaImuPacket(measurements), 7503, 1);
+    const auto foreign = udpFrames(accel32Gyro32NmeaImuPacket(measurements, kInitId + 1), 7503, 2);
+    frames.insert(frames.end(), foreign.begin(), foreign.end());
+    writePcap(path, frames);
+
+    const auto r = readAll(path, meta);
+    CHECK(r.stats.imu_packets == 1);
+    CHECK(r.stats.foreign_packets == 1);
+    REQUIRE(r.imu.size() == 1);
+    const auto& s = r.imu.front();
+    CHECK(s.timestamp == doctest::Approx(7.0));
+    CHECK(s.acc_x == doctest::Approx(0.0));
+    CHECK(s.acc_y == doctest::Approx(1.0)); // +X of the IMU is +Y of the sensor
+    CHECK(s.acc_z == doctest::Approx(0.0));
+    CHECK(s.gyro_x == doctest::Approx(0.0));
+    CHECK(s.gyro_y == doctest::Approx(0.5));
     CHECK(s.gyro_z == doctest::Approx(0.0));
     fs::remove(path);
 }

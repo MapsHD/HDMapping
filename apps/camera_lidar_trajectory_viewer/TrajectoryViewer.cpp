@@ -263,7 +263,7 @@ using trajectory_viewer_shaders::kVS;
 struct GpuPoint
 {
     float x, y, z; //!< chunk-local position (location 0)
-    float colorPacked; //!< float bits = 0x00RRGGBB (location 1)
+    float colorPacked; //!< float bits = 0xFFRRGGBB, FF = 1 when the RGB came from the LAZ (location 1)
     uint16_t intensity; //!< 0-1 scaled to 0-65535 (location 2)
     int16_t depthCm; //!< distance from the LiDAR when captured, cm; -1 = unknown (location 4)
     int32_t cameraId; //!< image that colored it; -1 = projects into no image, -2 = rejected by ROI/mask (location 3)
@@ -355,7 +355,7 @@ struct ColorPt
     uint8_t r, g, b;
     float intensity;
     int64_t ts_ns;
-    bool validColor; //!< RGB sampled from an image; false = intensity-gray fallback
+    bool validColor; //!< RGB from an image or the LAZ; false = intensity-gray fallback
     int16_t depthCm; //!< LiDAR range as GpuPoint::depthCm holds it; -1 = unknown
 };
 
@@ -466,11 +466,13 @@ struct AppState
     float maxImageAngSpeedDeg = 60.f; //!< deg/s threshold
     int angFilteredImgs = 0; //!< images skipped by the filter in the last colorize pass
 
-    bool useImageColor = false; //!< true once a colorize pass produced RGB data
+    bool useImageColor = false; //!< true once a colorize pass produced RGB data (from images or the LAZ)
+    bool lazHasRgb = false; //!< some scan_lio_*.laz carried RGB; it colors points no image does
     int colorMode = 0; //!< 0=intensity (jet), 1=RGB by image, 2=camera id, 3=in ROI/mask, 4=local depth (jet)
     float depthColorMax = 50.f; //!< m: local depth mode maps 0..this onto the jet colormap
     int coloredPts = 0; //!< points that received RGB from an image
     int uncoloredPts = 0; //!< points left as intensity-gray (no image / out of frustum / outside ROI)
+    int lazColoredPts = 0; //!< points no image colored that took their RGB from the LAZ
 
     char sessionBuf[512] = {};
     char calibBuf[512] = {};
@@ -786,6 +788,7 @@ static void loadSession(AppState& s)
 
 static void loadCloud(AppState& s)
 {
+    s.lazHasRgb = false;
     s.exportCloud.clear();
     s.exportSegments.clear();
     s.cloud.unload();
@@ -864,7 +867,8 @@ static void loadCloud(AppState& s)
     int cnt = 0;
     int step = std::max(1, s.cloudDecim);
     int coloredChunks = 0;
-    int coloredPts = 0, uncoloredPts = 0;
+    int coloredPts = 0, uncoloredPts = 0, lazColoredPts = 0;
+    bool lazHasRgb = false;
     int angFilteredImgs = 0; // camera frames dropped for excessive pose angular speed
     const bool dropFastImgs = s.filterFastImages && s.maxImageAngSpeedDeg > 0.f;
 
@@ -973,6 +977,7 @@ static void loadCloud(AppState& s)
             continue;
 
         int nImgs = (int)chunkImgs.size();
+        lazHasRgb |= pc.hasRgb;
 
         const size_t segBegin = s.exportCloud.size();
         std::vector<GpuPoint> gpuPoints; // this chunk's points, uploaded as its own part below
@@ -1137,8 +1142,19 @@ static void loadCloud(AppState& s)
                     }
                 }
             }
+            // No image colored it: fall back to the LAZ's own RGB, if any
+            bool lazColored = false;
+            if (camIdF < 0.f && pc.hasRgb)
+            {
+                // top byte flags it for kFS, which otherwise drops points no image colored
+                const uint32_t p = (1u << 24) | (uint32_t(pt.r) << 16) | (uint32_t(pt.g) << 8) | uint32_t(pt.b);
+                std::memcpy(&colorF, &p, 4);
+                lazColored = true;
+            }
             if (camIdF >= 0.f)
                 ++coloredPts;
+            else if (lazColored)
+                ++lazColoredPts;
             else
                 ++uncoloredPts;
 
@@ -1167,7 +1183,7 @@ static void loadCloud(AppState& s)
                   (uint8_t)(packed & 0xFF),
                   rawIntensity,
                   pt.ts_ns,
-                  camIdF >= 0.f,
+                  camIdF >= 0.f || lazColored,
                   depthCm });
 
             float d2 = pw.squaredNorm();
@@ -1187,11 +1203,13 @@ static void loadCloud(AppState& s)
 
         // chunkImgs and their cv::Mat memory are released here
     }
-    s.useImageColor = canColor && (coloredChunks > 0);
+    s.lazHasRgb = lazHasRgb;
+    s.useImageColor = (canColor && coloredChunks > 0) || lazHasRgb;
     if (s.useImageColor)
         s.colorMode = 1; // default to RGB display once RGB data is available
     s.coloredPts = coloredPts;
     s.uncoloredPts = uncoloredPts;
+    s.lazColoredPts = lazColoredPts;
     s.angFilteredImgs = angFilteredImgs;
 
     if (cnt > 0)
@@ -1214,6 +1232,8 @@ static void loadCloud(AppState& s)
         double pct = 100.0 * coloredPts / cnt;
         s.status += "  | Colored: " + std::to_string(coloredPts) + "  Uncolored: " + std::to_string(uncoloredPts) + "  (" +
             std::to_string((int)std::lround(pct)) + "%)";
+        if (lazHasRgb)
+            s.status += "  LAZ RGB: " + std::to_string(lazColoredPts);
     }
     if (angFilteredImgs > 0)
         s.status += "  | Fast-img filtered: " + std::to_string(angFilteredImgs);
@@ -2731,9 +2751,14 @@ int main(int argc, char* argv[])
                     ImGui::SetNextItemWidth(140.f);
                     ImGui::DragFloat("Depth color max", &s.depthColorMax, 0.5f, 1.f, 327.f, "%.1f m");
                 }
+                if (s.lazHasRgb && s.imagesFilenamesInTime.empty())
+                {
+                    if (ImGui::MenuItem("RGB (LAZ)", "Ctrl", s.colorMode == 1))
+                        s.colorMode = 1;
+                }
                 if (!s.imagesFilenamesInTime.empty())
                 {
-                    if (ImGui::MenuItem("RGB (image)", "Ctrl", s.colorMode == 1))
+                    if (ImGui::MenuItem(s.lazHasRgb ? "RGB (image, LAZ fallback)" : "RGB (image)", "Ctrl", s.colorMode == 1))
                         s.colorMode = 1;
                     if (ImGui::MenuItem("Camera ID", nullptr, s.colorMode == 2))
                         s.colorMode = 2;

@@ -68,6 +68,16 @@ namespace
             raw_ = fitted_ = true;
         }
 
+        // The colour words are IEEE half floats rather than unsigned integers.
+        void setFloat16(bool float16)
+        {
+            for (size_t v = 0; v < decode_.size(); ++v)
+            {
+                const double x = float16 ? halfToDouble(static_cast<uint16_t>(v)) : static_cast<double>(v);
+                decode_[v] = std::isfinite(x) && x > 0.0 ? x : 0.0; // NaN / inf / negative -> black
+            }
+        }
+
         // Grey-world white balance, white point at the 99th percentile of the
         // balanced values, gamma 2.2. Fitted once, so colour stays comparable
         // across chunks.
@@ -81,7 +91,7 @@ namespace
                     if (!hasColour(c))
                         continue;
                     for (int k = 0; k < 3; ++k)
-                        sum[k] += c[k];
+                        sum[k] += decode_[c[k]];
                     ++samples_;
                 }
             }
@@ -98,15 +108,15 @@ namespace
                     if (!hasColour(c))
                         continue;
                     for (int k = 0; k < 3; ++k)
-                        balanced.push_back(static_cast<float>(c[k] * gains_[k]));
+                        balanced.push_back(static_cast<float>(decode_[c[k]] * gains_[k]));
                 }
             }
-            white_ = 65535.0;
+            white_ = 1.0;
             if (!balanced.empty())
             {
                 const auto nth = balanced.begin() + static_cast<std::ptrdiff_t>(0.99 * static_cast<double>(balanced.size() - 1));
                 std::nth_element(balanced.begin(), nth, balanced.end());
-                white_ = std::max(1.0, static_cast<double>(*nth));
+                white_ = *nth > 0.0f ? static_cast<double>(*nth) : 1.0;
             }
 
             for (int k = 0; k < 3; ++k)
@@ -114,7 +124,7 @@ namespace
                 lut_[k].resize(65536);
                 for (size_t v = 0; v < lut_[k].size(); ++v)
                 {
-                    const double x = std::clamp(static_cast<double>(v) * gains_[k] / white_, 0.0, 1.0);
+                    const double x = std::clamp(decode_[v] * gains_[k] / white_, 0.0, 1.0);
                     lut_[k][v] = static_cast<uint16_t>(std::lround(65535.0 * std::pow(x, 1.0 / 2.2)));
                 }
             }
@@ -155,6 +165,26 @@ namespace
         }
 
     private:
+        static double halfToDouble(uint16_t h)
+        {
+            const int exponent = (h >> 10) & 0x1F;
+            const int mantissa = h & 0x3FF;
+            const double sign = (h & 0x8000) ? -1.0 : 1.0;
+            if (exponent == 0)
+                return sign * std::ldexp(mantissa, -24); // subnormal
+            if (exponent == 31)
+                return mantissa ? std::numeric_limits<double>::quiet_NaN() : sign * std::numeric_limits<double>::infinity();
+            return sign * std::ldexp(mantissa + 1024, exponent - 25);
+        }
+
+        static std::array<double, 65536> identity()
+        {
+            std::array<double, 65536> table{};
+            for (size_t v = 0; v < table.size(); ++v)
+                table[v] = static_cast<double>(v);
+            return table;
+        }
+
         static bool hasColour(const Rgb& c)
         {
             return !(c[0] == 0xFFFF && c[1] == 0xFFFF && c[2] == 0xFFFF);
@@ -166,6 +196,7 @@ namespace
         double white_ = 65535.0;
         size_t samples_ = 0;
         std::array<std::vector<uint16_t>, 3> lut_;
+        std::array<double, 65536> decode_ = identity(); // colour word -> linear value
     };
 
     void print_usage(const char* argv0)
@@ -191,7 +222,7 @@ namespace
         spdlog::error("  --rgb <auto|raw|off>     colour on RGB profiles, written as LAS point format 3 (default: auto)");
         spdlog::error("                           auto: white-balanced, exposed and gamma-corrected, fitted on the");
         spdlog::error("                                 first {:.0f} s of the recording and then kept fixed", kRgbFitSeconds);
-        spdlog::error("                           raw:  the sensor's 16-bit colour words unchanged");
+        spdlog::error("                           raw:  the sensor's 16-bit colour words unchanged (half-float bits on RGB16)");
         spdlog::error("                           off:  no colour (point format 1)");
         spdlog::error("");
         spdlog::error("Points are written in the Ouster SENSOR frame (lidar_to_sensor_transform applied), with");
@@ -415,8 +446,9 @@ int main(const int argc, const char** argv)
         options.lidar_port ? options.lidar_port : metadata.udp_port_lidar,
         options.imu_port ? options.imu_port : metadata.udp_port_imu,
         metadata.udp_profile_imu);
-    if (metadata.udp_profile_imu != "LEGACY")
-        spdlog::warn("IMU profile {} is not supported (LEGACY only) - IMU packets will be ignored", metadata.udp_profile_imu);
+    if (metadata.imuPacketSize() == 0)
+        spdlog::warn(
+            "IMU profile {} is not supported (LEGACY or ACCEL32_GYRO32_NMEA only) - IMU packets will be ignored", metadata.udp_profile_imu);
 
     rosbags::OusterPcapReader reader(pcap_path, metadata, options);
     if (!reader.isOpen())
@@ -440,6 +472,7 @@ int main(const int argc, const char** argv)
     RgbMapper rgb_mapper;
     if (rgb_mode == RgbMode::Raw)
         rgb_mapper.setRaw();
+    rgb_mapper.setFloat16(metadata.rgb_float16);
     std::vector<Rgb> mapped_rgb;
 
     std::vector<rosbags::McapImuSample> imu;
@@ -482,7 +515,7 @@ int main(const int argc, const char** argv)
             samples.push_back(&packet.rgb);
         rgb_mapper.fit(samples);
         spdlog::info(
-            "RGB: white balance x{:.3f}/{:.3f}/{:.3f}, white point {:.0f}, gamma 2.2 - fitted on the first {:.2f} s ({} coloured "
+            "RGB: white balance x{:.3f}/{:.3f}/{:.3f}, white point {:.4g}, gamma 2.2 - fitted on the first {:.2f} s ({} coloured "
             "points); --rgb raw writes the sensor's values instead",
             rgb_mapper.gains()[0],
             rgb_mapper.gains()[1],

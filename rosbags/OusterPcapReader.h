@@ -44,6 +44,9 @@ struct OusterMetadata
 	int reflectivity_width = 0; // 0 = profile has no reflectivity
 	std::array<int, 3> rgb_start_bit{}; // red, green, blue
 	int rgb_width = 0; // 0 = profile has no colour
+	// The 16-bit colour words are IEEE half floats (linear, HDR) -- how the Ouster
+	// SDK decodes FW 4.0 RGB16 -- not unsigned integers.
+	bool rgb_float16 = false;
 
 	std::vector<double> beam_altitude_angles_deg;
 	std::vector<double> beam_azimuth_angles_deg;
@@ -52,8 +55,13 @@ struct OusterMetadata
 	std::array<double, 16> lidar_to_sensor_transform{}; // row-major 4x4, mm
 	std::array<double, 16> imu_to_sensor_transform{}; // row-major 4x4, mm
 
+	// ACCEL32_GYRO32_NMEA only: samples per IMU packet (imu_data_format).
+	int imu_measurements_per_packet = 8;
+
 	// Bytes in one lidar UDP payload: packet header + columns + packet footer.
 	size_t lidarPacketSize() const;
+	// Bytes in one IMU UDP payload for udp_profile_imu; 0 = unsupported profile.
+	size_t imuPacketSize() const;
 };
 
 // Parses `json_text`. On failure returns false and fills `error`.
@@ -97,7 +105,7 @@ struct OusterPcapStats
 // calibrated reflectivity, the scale mandeye's own LAZ files use. On an RGB
 // profile each point's colour comes alongside, as the sensor's raw 16-bit words.
 //
-// IMU samples (LEGACY IMU profile only) are rotated into the sensor frame,
+// IMU samples (LEGACY or ACCEL32_GYRO32_NMEA profile) are rotated into the sensor frame,
 // gyro in rad/s, acceleration in g -- the units mandeye's imuNNNN.csv uses,
 // NOT the m/s^2 McapImuSample documents for bags; MandeyeSessionWriter writes
 // the values through unchanged.

@@ -23,6 +23,11 @@ constexpr size_t kPacketHeaderBytes = 32;
 constexpr size_t kPacketFooterBytes = 32;
 constexpr size_t kColumnHeaderBytes = 12; // u64 timestamp ns, u16 measurement_id, u16 status
 constexpr size_t kLegacyImuPacketBytes = 48;
+// ACCEL32_GYRO32_NMEA IMU packet: the lidar packet header, a 100-byte NMEA
+// block (ignored), N measurements, the packet footer.
+constexpr size_t kNmeaBlockBytes = 100;
+constexpr size_t kImuMeasurementBytes = 36; // u64 timestamp ns, u16 measurement_id, u16 status, 6 x f32
+constexpr double kStandardGravity = 9.80665;
 
 // Profiles whose channel data block is known without a pixel_data_format. All of
 // them carry the first return in word 0 -- range [18:0] in mm, reflectivity
@@ -139,6 +144,15 @@ size_t OusterMetadata::lidarPacketSize() const
 		   kPacketFooterBytes;
 }
 
+size_t OusterMetadata::imuPacketSize() const
+{
+	if(udp_profile_imu == "LEGACY")
+		return kLegacyImuPacketBytes;
+	if(udp_profile_imu == "ACCEL32_GYRO32_NMEA")
+		return kPacketHeaderBytes + kNmeaBlockBytes + static_cast<size_t>(imu_measurements_per_packet) * kImuMeasurementBytes + kPacketFooterBytes;
+	return 0;
+}
+
 bool parseOusterMetadata(const std::string& json_text, OusterMetadata& out, std::string& error)
 {
 	OusterMetadata m;
@@ -169,6 +183,13 @@ bool parseOusterMetadata(const std::string& json_text, OusterMetadata& out, std:
 		m.udp_port_lidar = config.value("udp_port_lidar", uint16_t{7502});
 		m.udp_port_imu = config.value("udp_port_imu", uint16_t{7503});
 		m.udp_profile_imu = config.value("udp_profile_imu", std::string("LEGACY"));
+		if(j.contains("imu_data_format"))
+			m.imu_measurements_per_packet = j["imu_data_format"].value("imu_measurements_per_packet", m.imu_measurements_per_packet);
+		if(m.imu_measurements_per_packet <= 0)
+		{
+			error = "metadata: imu_data_format.imu_measurements_per_packet must be positive";
+			return false;
+		}
 
 		const json& format = j["lidar_data_format"];
 		m.pixels_per_column = format.at("pixels_per_column").get<int>();
@@ -284,6 +305,8 @@ bool parseOusterMetadata(const std::string& json_text, OusterMetadata& out, std:
 				return false;
 			}
 		}
+
+		m.rgb_float16 = m.rgb_width == 16;
 
 		const json& beams = j["beam_intrinsics"];
 		const size_t beam_count = static_cast<size_t>(m.pixels_per_column);
@@ -465,9 +488,21 @@ struct OusterPcapReader::Impl
 		if(dport == options.lidar_port)
 			handleLidar(payload, length);
 		else if(dport == options.imu_port && meta.udp_profile_imu == "LEGACY")
-			handleImu(payload, length);
+			handleLegacyImu(payload, length);
+		else if(dport == options.imu_port && meta.udp_profile_imu == "ACCEL32_GYRO32_NMEA")
+			handleAccel32Gyro32NmeaImu(payload, length);
 		else
 			++stats.other_packets;
+	}
+
+	// Packet header init_id / serial number differ from the metadata's.
+	bool isForeign(const uint8_t* p) const
+	{
+		const uint64_t init_id = p[4] | (p[5] << 8) | (static_cast<uint64_t>(p[6]) << 16);
+		uint64_t sn = 0;
+		for(int i = 11; i >= 7; --i)
+			sn = (sn << 8) | p[i];
+		return (meta.has_initialization_id && init_id != meta.initialization_id) || (check_sn && sn != prod_sn);
 	}
 
 	void handleLidar(const uint8_t* p, size_t size)
@@ -477,11 +512,7 @@ struct OusterPcapReader::Impl
 			++stats.bad_size_packets;
 			return;
 		}
-		const uint64_t init_id = p[4] | (p[5] << 8) | (static_cast<uint64_t>(p[6]) << 16);
-		uint64_t sn = 0;
-		for(int i = 11; i >= 7; --i)
-			sn = (sn << 8) | p[i];
-		if((meta.has_initialization_id && init_id != meta.initialization_id) || (check_sn && sn != prod_sn))
+		if(isForeign(p))
 		{
 			++stats.foreign_packets;
 			return;
@@ -551,7 +582,24 @@ struct OusterPcapReader::Impl
 		rgb = {};
 	}
 
-	void handleImu(const uint8_t* p, size_t size)
+	// Rotates one sample (acceleration in g, gyro in rad/s, IMU frame) into the
+	// sensor frame and hands it on.
+	void emitImu(double timestamp, const double (&acc)[3], const double (&gyro)[3])
+	{
+		const auto& r = imu_rotation;
+		McapImuSample s;
+		s.timestamp = timestamp;
+		s.acc_x = static_cast<float>(r[0] * acc[0] + r[1] * acc[1] + r[2] * acc[2]);
+		s.acc_y = static_cast<float>(r[3] * acc[0] + r[4] * acc[1] + r[5] * acc[2]);
+		s.acc_z = static_cast<float>(r[6] * acc[0] + r[7] * acc[1] + r[8] * acc[2]);
+		s.gyro_x = static_cast<float>(r[0] * gyro[0] + r[1] * gyro[1] + r[2] * gyro[2]);
+		s.gyro_y = static_cast<float>(r[3] * gyro[0] + r[4] * gyro[1] + r[5] * gyro[2]);
+		s.gyro_z = static_cast<float>(r[6] * gyro[0] + r[7] * gyro[1] + r[8] * gyro[2]);
+		if(onImu)
+			onImu(s);
+	}
+
+	void handleLegacyImu(const uint8_t* p, size_t size)
 	{
 		// LEGACY IMU packet: u64 system / accel / gyro read times (ns), then
 		// accel x y z (g) and gyro x y z (deg/s) as float32.
@@ -560,24 +608,42 @@ struct OusterPcapReader::Impl
 			++stats.bad_size_packets;
 			return;
 		}
-		const double acc[3] = {leFloat(p + 24), leFloat(p + 28), leFloat(p + 32)};
-		const double gyro[3] = {leFloat(p + 36), leFloat(p + 40), leFloat(p + 44)};
 		constexpr double kDegToRad = std::numbers::pi / 180.0;
-		const auto& r = imu_rotation;
-
-		McapImuSample s;
+		const double acc[3] = {leFloat(p + 24), leFloat(p + 28), leFloat(p + 32)};
+		const double gyro[3] = {leFloat(p + 36) * kDegToRad, leFloat(p + 40) * kDegToRad, leFloat(p + 44) * kDegToRad};
+		++stats.imu_packets;
 		// The gyro read time follows the configured timestamp_mode, like the lidar
 		// column timestamps; the system timestamp is a diagnostic counter.
-		s.timestamp = static_cast<double>(le64(p + 16)) * 1e-9;
-		s.acc_x = static_cast<float>(r[0] * acc[0] + r[1] * acc[1] + r[2] * acc[2]);
-		s.acc_y = static_cast<float>(r[3] * acc[0] + r[4] * acc[1] + r[5] * acc[2]);
-		s.acc_z = static_cast<float>(r[6] * acc[0] + r[7] * acc[1] + r[8] * acc[2]);
-		s.gyro_x = static_cast<float>((r[0] * gyro[0] + r[1] * gyro[1] + r[2] * gyro[2]) * kDegToRad);
-		s.gyro_y = static_cast<float>((r[3] * gyro[0] + r[4] * gyro[1] + r[5] * gyro[2]) * kDegToRad);
-		s.gyro_z = static_cast<float>((r[6] * gyro[0] + r[7] * gyro[1] + r[8] * gyro[2]) * kDegToRad);
+		emitImu(static_cast<double>(le64(p + 16)) * 1e-9, acc, gyro);
+	}
+
+	void handleAccel32Gyro32NmeaImu(const uint8_t* p, size_t size)
+	{
+		// ACCEL32_GYRO32_NMEA (FW 3.1+): standard packet header, NMEA block, then
+		// per measurement u64 timestamp (ns, same clock as the lidar columns),
+		// u16 measurement_id, u16 status (bit 0 = valid), accel x y z (m/s^2)
+		// and gyro x y z (rad/s) as float32.
+		if(size != meta.imuPacketSize())
+		{
+			++stats.bad_size_packets;
+			return;
+		}
+		if(isForeign(p))
+		{
+			++stats.foreign_packets;
+			return;
+		}
 		++stats.imu_packets;
-		if(onImu)
-			onImu(s);
+		const uint8_t* m = p + kPacketHeaderBytes + kNmeaBlockBytes;
+		for(int i = 0; i < meta.imu_measurements_per_packet; ++i, m += kImuMeasurementBytes)
+		{
+			if(!(le16(m + 10) & 1))
+				continue;
+			const double acc[3] = {
+				leFloat(m + 12) / kStandardGravity, leFloat(m + 16) / kStandardGravity, leFloat(m + 20) / kStandardGravity};
+			const double gyro[3] = {leFloat(m + 24), leFloat(m + 28), leFloat(m + 32)};
+			emitImu(static_cast<double>(le64(m)) * 1e-9, acc, gyro);
+		}
 	}
 
 	// Feeds one IPv4 fragment in; once every byte of its datagram has arrived,

@@ -1,5 +1,7 @@
 #include <CalibCore/PointCloud.h>
 #include <laszip/laszip_api.h>
+#include <algorithm>
+#include <array>
 #include <limits>
 #include <cstdio>
 #include <regex>
@@ -9,6 +11,7 @@ namespace calib {
 void PointCloud::clear() {
     points.clear();
     minX = maxX = minY = maxY = minZ = maxZ = 0.f;
+    hasRgb = false;
 }
 
 bool PointCloud::load(const std::string& path) {
@@ -40,6 +43,12 @@ bool PointCloud::load(const std::string& path) {
     laszip_get_point_pointer(reader, &point);
 
     points.reserve(static_cast<size_t>(npoints));
+    std::vector<std::array<laszip_U16, 3>> rgb16; // raw LAS rgb, scaled once the range is known
+    laszip_U16 maxRgb = 0;
+
+    // LAS point formats with an rgb field
+    const int fmt = header->point_data_format;
+    const bool formatHasRgb = fmt == 2 || fmt == 3 || fmt == 5 || fmt == 7 || fmt == 8 || fmt == 10;
 
     float minInt =  std::numeric_limits<float>::max();
     float maxInt = -std::numeric_limits<float>::max();
@@ -59,6 +68,10 @@ bool PointCloud::load(const std::string& path) {
         p.z = static_cast<float>(coords[2]);
         p.intensity = static_cast<float>(point->intensity);
         p.ts_ns     = static_cast<int64_t>(point->gps_time);
+        if (formatHasRgb) {
+            rgb16.push_back({ point->rgb[0], point->rgb[1], point->rgb[2] });
+            maxRgb = std::max({ maxRgb, point->rgb[0], point->rgb[1], point->rgb[2] });
+        }
 
         if (p.x < xmin) xmin = p.x; if (p.x > xmax) xmax = p.x;
         if (p.y < ymin) ymin = p.y; if (p.y > ymax) ymax = p.y;
@@ -67,6 +80,19 @@ bool PointCloud::load(const std::string& path) {
         if (p.intensity > maxInt) maxInt = p.intensity;
 
         points.push_back(p);
+    }
+
+    // LAS rgb is 16-bit, but some writers store 8-bit values unscaled: no
+    // value above 255 means 8-bit, else take the high byte. All zeros = a
+    // writer with no colour source that still emitted an rgb format.
+    if (maxRgb > 0 && rgb16.size() == points.size()) {
+        hasRgb = true;
+        const int shift = maxRgb > 255 ? 8 : 0;
+        for (size_t i = 0; i < points.size(); ++i) {
+            points[i].r = static_cast<uint8_t>(rgb16[i][0] >> shift);
+            points[i].g = static_cast<uint8_t>(rgb16[i][1] >> shift);
+            points[i].b = static_cast<uint8_t>(rgb16[i][2] >> shift);
+        }
     }
 
     // Normalize intensity to [0,1]

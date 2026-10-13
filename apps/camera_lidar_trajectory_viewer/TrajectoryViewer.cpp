@@ -70,7 +70,7 @@ static const std::vector<raylib_widgets::ShortcutEntry> appShortcuts = {
     { "Special keys", "Left arrow", "Previous image (image preview)" },
     { "", "Right arrow", "Next image (image preview)" },
     { "", "Space", "Play/pause flyover" },
-    { "Mouse related", "Left click + drag", "Orbit camera" },
+    { "Mouse related", "Left click + drag", "Orbit camera (flyover: look around)" },
     { "", "Right click + drag", "Pan camera" },
     { "", "Scroll", "Zoom camera" },
     { "", "Ctrl+Right click", "Set center of rotation (ground plane)" },
@@ -448,7 +448,8 @@ struct AppState
 
     // ── flyover ───────────────────────────────────────────────────────────────
     //! Flyover mode: the bottom timeline bar is shown and the camera sits on the
-    //! trajectory at @ref flyoverProgress (mouse orbit/pan/zoom have no effect).
+    //! trajectory at @ref flyoverProgress (left-drag looks around instead of
+    //! orbiting; pan/zoom have no effect).
     bool flyover = false;
     bool flyoverPlaying = false; //!< advance flyoverProgress each frame
     float flyoverProgress = 0.f; //!< 0-1 position along the trajectory's time span
@@ -456,6 +457,8 @@ struct AppState
     float flyoverSmoothingSec = 1.f; //!< camera pose averaged over ± this much trajectory time; 0 = raw poses
     bool flyoverLevelHorizon = true; //!< remove the camera's roll, keeping heading and pitch
     bool flyoverUpdateSelectedCamera = true; //!< select the camera image nearest the playhead
+    float flyoverYawDeg = 0.f; //!< look-around offset from the trajectory heading, + = left
+    float flyoverPitchDeg = 0.f; //!< look-around offset from the trajectory pitch, + = up
     // ── fast-rotation image filter ─────────────────────────────────────────────
     //! Per-pose angular speed (deg/s), parallel to traj.poses — filled by
     //! loadSession(). Images captured while the rig turns faster than
@@ -1745,6 +1748,16 @@ static void toggleFlyover(AppState& s)
     s.flyover = !s.flyover;
     s.flyoverProgress = 0.f;
     s.flyoverPlaying = s.flyover;
+    s.flyoverYawDeg = 0.f;
+    s.flyoverPitchDeg = 0.f;
+}
+
+//! Turns the flyover view by a mouse drag, grab-the-scene style like the orbit
+//! drag (drag right turns left, drag down looks up), at the same 0.2 deg/px.
+static void dragFlyoverLook(AppState& s, float dx, float dy)
+{
+    s.flyoverYawDeg = std::remainder(s.flyoverYawDeg + dx * 0.2f, 360.f);
+    s.flyoverPitchDeg = std::clamp(s.flyoverPitchDeg + dy * 0.2f, -89.f, 89.f);
 }
 
 //! Plays or pauses the flyover, replaying from the start once it has reached the
@@ -2408,7 +2421,13 @@ int main(int argc, char* argv[])
             {
                 Vector2 d = GetMouseDelta();
                 if (IsMouseButtonDown(MOUSE_BUTTON_LEFT))
-                    s.orbit.dragOrbit(d.x, d.y);
+                {
+                    // Ortho ignores the flyover pose, so it keeps orbiting.
+                    if (s.flyover && !s.orbit.isOrtho)
+                        dragFlyoverLook(s, d.x, d.y);
+                    else
+                        s.orbit.dragOrbit(d.x, d.y);
+                }
                 if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT))
                 {
                     if (s.orbit.isOrtho)
@@ -2530,6 +2549,10 @@ int main(int argc, char* argv[])
             const int64_t ts = s.traj.timeAt(s.flyoverProgress);
             if (auto pose = s.traj.smoothedPose(ts, s.flyoverSmoothingSec))
             {
+                // Look-around offset in the rig frame (x forward, y left, z up),
+                // before leveling so the horizon stays level wherever you look.
+                pose->rotate(Eigen::AngleAxisf(s.flyoverYawDeg * DEG2RAD, Eigen::Vector3f::UnitZ()));
+                pose->rotate(Eigen::AngleAxisf(-s.flyoverPitchDeg * DEG2RAD, Eigen::Vector3f::UnitY()));
                 if (s.flyoverLevelHorizon)
                     pose->linear() = levelHorizon(pose->linear());
                 s.orbit.setViewPose(*pose);
@@ -3208,6 +3231,17 @@ int main(int argc, char* argv[])
                 ImGui::SetTooltip(
                     s.imageTsNs.empty() ? "No camera images loaded"
                                         : "Select the camera image nearest the playhead (Image Preview, highlighted frustum)");
+            ImGui::SameLine();
+            ImGui::BeginDisabled(s.flyoverYawDeg == 0.f && s.flyoverPitchDeg == 0.f);
+            if (ImGui::Button("Reset look"))
+            {
+                s.flyoverYawDeg = 0.f;
+                s.flyoverPitchDeg = 0.f;
+            }
+            ImGui::EndDisabled();
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                ImGui::SetTooltip(
+                    "Left-drag in the 3D view to look around\nyaw %+.0f deg, pitch %+.0f deg", s.flyoverYawDeg, s.flyoverPitchDeg);
             ImGui::SameLine();
             const float closeW = ImGui::CalcTextSize("Close").x + style.FramePadding.x * 2.f;
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.f, ImGui::GetContentRegionAvail().x - closeW));

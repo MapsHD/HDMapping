@@ -389,6 +389,9 @@ struct OusterPcapReader::Impl
 	{
 		if(error.empty())
 			error = std::move(message);
+		// Release the file: a rejected capture must not stay locked (Windows) for the reader's lifetime.
+		in.close();
+		open = false;
 		return false;
 	}
 

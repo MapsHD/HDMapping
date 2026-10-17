@@ -1,6 +1,7 @@
 // HDMapping Easy GUI: raw Mandeye recording -> lidar odometry (precision forestry preset) -> point cloud + trajectory.
 // See CLAUDE.md ("Easy GUI") for the decisions behind the pipeline.
 
+#include "export.h"
 #include "pipeline.h"
 #include "preflight.h"
 #include "settings.h"
@@ -13,12 +14,15 @@
 #include <raylib.h>
 #include <rlImGui.h>
 
+#include <algorithm>
+#include <atomic>
 #include <cstdio>
 #include <cstdlib>
 #include <future>
 #include <optional>
 #include <string>
 #include <thread>
+#include <vector>
 
 namespace fs = std::filesystem;
 using namespace easy_gui;
@@ -253,18 +257,18 @@ namespace
             return;
         }
 
-        // Stage list. Stage indices: 0 check+prepare, 1 odometry, 2 export (M2).
+        // Stage list. Stage indices: 0 check+prepare, 1 odometry, 2 export, 3 = all done.
         const bool failed = s.state == PipelineState::Failed;
         int current = 0;
-        if (s.stage == PipelineStage::Odometry || s.stage == PipelineStage::Cleanup)
+        if (s.stage == PipelineStage::Odometry)
             current = 1;
-        if (s.state == PipelineState::Succeeded)
+        if (s.stage == PipelineStage::Export || (s.stage == PipelineStage::Cleanup && !s.session_folder.empty()))
             current = 2;
+        if (s.state == PipelineState::Succeeded)
+            current = 3;
         stageRow("Check and prepare the recording", 0, current, failed && current == 0);
         stageRow("Lidar odometry (precision forestry settings)", 1, current, failed && current == 1);
-        ImGui::TextColored(kGrey, "[    ]");
-        ImGui::SameLine();
-        ImGui::TextDisabled("Export point cloud and trajectory (coming in the next version)");
+        stageRow("Export point cloud and trajectory", 2, current, failed && current == 2);
 
         if (s.state == PipelineState::Running)
         {
@@ -287,6 +291,12 @@ namespace
                     eta += ", about " + formatDuration(s.elapsed_s * (1.0 - overall) / overall) + " left";
                 ImGui::TextUnformatted("Overall");
                 ImGui::ProgressBar(static_cast<float>(overall), ImVec2(-1, 0), eta.c_str());
+            }
+            else if (s.stage == PipelineStage::Export)
+            {
+                ImGui::TextUnformatted(s.export_step.empty() ? "Exporting..." : s.export_step.c_str());
+                ImGui::ProgressBar(static_cast<float>(s.export_fraction), ImVec2(-1, 0));
+                ImGui::TextUnformatted(("Elapsed " + formatDuration(s.elapsed_s)).c_str());
             }
             else
             {
@@ -315,7 +325,20 @@ namespace
 
         ImGui::Spacing();
         if (s.state == PipelineState::Succeeded)
+        {
             wrappedColored(kGreen, s.message + " (took " + formatDuration(s.elapsed_s) + ")");
+            const OutputLayout out(app.output_folder);
+            const ExportStats& e = s.export_stats;
+            ImGui::BulletText(
+                "%s: %.1f million points (%.1f million from lidar odometry, %.1f million near points), %.0f MB",
+                out.point_cloud.filename().string().c_str(),
+                (e.odometry_points + e.near_points + e.check_band_points) / 1e6,
+                e.odometry_points / 1e6,
+                e.near_points / 1e6,
+                e.laz_bytes / 1e6);
+            ImGui::BulletText("%s: %zu scanner poses", out.trajectory.filename().string().c_str(), e.trajectory_nodes);
+            ImGui::BulletText("%s describes every field of both files.", out.readme.filename().string().c_str());
+        }
         else if (s.state == PipelineState::Cancelled)
             wrappedColored(kAmber, s.message);
         else
@@ -358,7 +381,7 @@ namespace
 {
     //! `easy_gui --headless <recording> <output folder>`: the same pipeline without a window, for scripted runs
     //! (the dev validation script) and remote machines. Exit code 0 = success, 1 = failed / refused, 2 = usage.
-    int runHeadless(const fs::path& recording, const fs::path& output_folder)
+    int runHeadless(const fs::path& recording, const fs::path& output_folder, double check_band_outer_m)
     {
         // Unbuffered, so progress shows up as it happens even when redirected to a file or pipe (MSVC treats _IOLBF as
         // full buffering); the output is a line every few seconds.
@@ -376,7 +399,7 @@ namespace
 
         Pipeline pipeline;
         std::string error;
-        if (!pipeline.start(PipelineRequest{ recording, output_folder, findStep1Executable(), Settings{} }, error))
+        if (!pipeline.start(PipelineRequest{ recording, output_folder, findStep1Executable(), Settings{}, check_band_outer_m }, error))
         {
             std::printf("[X] %s\n", error.c_str());
             return 1;
@@ -387,13 +410,16 @@ namespace
             const PipelineStatus s = pipeline.status();
             char line[256];
             const double f = s.step1.phaseFraction();
-            std::snprintf(
-                line,
-                sizeof(line),
-                "%s: %s overall %.0f%%",
-                phaseLabel(s.step1.phase),
-                f >= 0.0 ? (std::to_string(static_cast<int>(f * 100)) + "%,").c_str() : "",
-                s.step1.overallFraction() * 100.0);
+            if (s.stage == PipelineStage::Export)
+                std::snprintf(line, sizeof(line), "Export: %.0f%%", s.export_fraction * 100.0);
+            else
+                std::snprintf(
+                    line,
+                    sizeof(line),
+                    "%s: %s overall %.0f%%",
+                    phaseLabel(s.step1.phase),
+                    f >= 0.0 ? (std::to_string(static_cast<int>(f * 100)) + "%,").c_str() : "",
+                    s.step1.overallFraction() * 100.0);
             if (last != line)
                 std::printf("[%s] %s\n", formatDuration(s.elapsed_s).c_str(), line);
             last = line;
@@ -406,18 +432,100 @@ namespace
             std::printf("    detail: %s\n", s.detail.c_str());
         return s.state == PipelineState::Succeeded ? 0 : 1;
     }
+
+    //! Dev aid: `easy_gui --export-only <recording> <session.mjs> <output folder> [--check-band <m>]` runs only the
+    //! export, on an existing step 1 session of that recording (step 1 takes ~20 min on a 10-min walk; the export
+    //! about a minute). The output folder may exist; the three result files in it are overwritten.
+    int runExportOnly(const fs::path& recording, const fs::path& session_file, const fs::path& output_folder, double check_band_outer_m)
+    {
+        std::setvbuf(stdout, nullptr, _IONBF, 0);
+        const PreflightResult check = runPreflight(recording, output_folder);
+        if (check.files.pairs == 0)
+        {
+            std::printf("[X] no lidar/IMU file pairs in '%s'\n", recording.string().c_str());
+            return 1;
+        }
+        const OutputLayout out(output_folder);
+        ExportRequest request;
+        request.session_file = session_file;
+        request.recording = check.files;
+        request.lidar_id = std::max(0, check.lidar_id);
+        request.near_min_range_m = Settings{}.near_min_range_m;
+        request.check_band_outer_m = check_band_outer_m;
+        request.laz_file = out.point_cloud;
+        request.trajectory_file = out.trajectory;
+        request.readme_file = out.readme;
+
+        std::atomic<bool> cancel{ false };
+        int last_percent = -1;
+        ExportStats stats;
+        std::string error;
+        const bool ok = exportSession(
+            request,
+            cancel,
+            [&](double fraction, const std::string& step)
+            {
+                const int percent = static_cast<int>(fraction * 100);
+                if (percent / 10 != last_percent / 10)
+                    std::printf("[%3d%%] %s\n", percent, step.c_str());
+                last_percent = percent;
+            },
+            stats,
+            error);
+        if (!ok)
+        {
+            std::printf("[X] %s\n", error.c_str());
+            return 1;
+        }
+        std::printf(
+            "[OK] %llu odometry + %llu near + %llu check-band points; raw read %llu, no-return %llu, near outside trajectory %llu; "
+            "range %.3f - %.3f m; %zu poses; LAZ %llu bytes, CSV %llu bytes\n",
+            static_cast<unsigned long long>(stats.odometry_points),
+            static_cast<unsigned long long>(stats.near_points),
+            static_cast<unsigned long long>(stats.check_band_points),
+            static_cast<unsigned long long>(stats.raw_points_read),
+            static_cast<unsigned long long>(stats.raw_no_return),
+            static_cast<unsigned long long>(stats.raw_near_outside_trajectory),
+            stats.range_min_m,
+            stats.range_max_m,
+            stats.trajectory_nodes,
+            static_cast<unsigned long long>(stats.laz_bytes),
+            static_cast<unsigned long long>(stats.trajectory_bytes));
+        return 0;
+    }
+
+    //! Removes `--check-band <m>` from the arguments; returns the value, or 0 when absent.
+    double takeCheckBand(std::vector<std::string>& args)
+    {
+        for (size_t i = 0; i + 1 < args.size(); i++)
+            if (args[i] == "--check-band")
+            {
+                const double value = std::atof(args[i + 1].c_str());
+                args.erase(args.begin() + static_cast<long>(i), args.begin() + static_cast<long>(i) + 2);
+                return value;
+            }
+        return 0.0;
+    }
 } // namespace
 
 int main(int argc, char* argv[])
 {
-    if (argc > 1 && std::string(argv[1]) == "--headless")
+    std::vector<std::string> args(argv + 1, argv + argc);
+    if (!args.empty() && (args[0] == "--headless" || args[0] == "--export-only"))
     {
-        if (argc != 4)
-        {
-            std::printf("usage: %s --headless <recording folder> <output folder>\n", argv[0]);
-            return 2;
-        }
-        return runHeadless(argv[2], argv[3]);
+        const double check_band = takeCheckBand(args);
+        if (args[0] == "--headless" && args.size() == 3)
+            return runHeadless(args[1], args[2], check_band);
+        if (args[0] == "--export-only" && args.size() == 4)
+            return runExportOnly(args[1], args[2], args[3], check_band);
+        std::printf(
+            "usage: %s --headless <recording folder> <output folder> [--check-band <m>]\n"
+            "       %s --export-only <recording folder> <session.mjs> <output folder> [--check-band <m>]\n"
+            "--check-band <m> (testing): also export the raw points between the 1.0 m load filter and <m>, flagged\n"
+            "                 near_added = 2, to check that near points line up with the odometry points.\n",
+            argv[0],
+            argv[0]);
+        return 2;
     }
 
     // Dev aid: `--screenshot <file.png> [recording]` renders ~2 s, saves the window and exits (layout checks without

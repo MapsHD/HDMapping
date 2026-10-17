@@ -47,11 +47,11 @@ TEST_CASE("a plausible recording passes with a warning about the unmatched file"
     CHECK(hasFinding(r, Severity::Ok, "Recording looks good"));
     CHECK(hasFinding(r, Severity::Warning, "lidar0002.laz"));
 
-    // Disk estimate: 120 B per raw point of work space + 2.5x the paired raw LAZ size of results, always reported.
+    // Disk estimate: 120 B per raw point of work space + 2.25x the paired raw LAZ size of results, always reported.
     const uint64_t laz_bytes = fs::file_size(tmp.path / "rec" / "lidar0000.laz") + fs::file_size(tmp.path / "rec" / "lidar0001.laz");
     CHECK(r.raw_laz_bytes == laz_bytes);
     CHECK(r.estimated_work_bytes == 4000 * 120);
-    CHECK(r.estimated_result_bytes == laz_bytes * 5 / 2);
+    CHECK(r.estimated_result_bytes == laz_bytes * 9 / 4);
     CHECK(r.estimated_disk_bytes == r.estimated_work_bytes + r.estimated_result_bytes);
     CHECK(hasFinding(r, Severity::Ok, "Disk space: about"));
 }

@@ -116,17 +116,17 @@ function(add_core_target target_name with_gui)
     endif()
 endfunction()
 
-# core_no_gui is used by python bindings, lidar odometry test subprojects and session_to_mcap (console tools) only - if they are not build just do not waste time building core_no_gui
-if(BUILD_TESTING OR BUILD_WITH_PYBIND OR BUILD_WITH_CLI_TOOLS)
-    add_core_target(core_no_gui FALSE)
+# core_no_gui is used by python bindings, lidar odometry test subprojects, session_to_mcap (console tools) and
+# apps/easy_gui. Easy GUI is always built (its export reads sessions with Session), so core_no_gui is too; it was
+# previously only built with BUILD_TESTING, BUILD_WITH_PYBIND or BUILD_WITH_CLI_TOOLS.
+add_core_target(core_no_gui FALSE)
 
-    target_precompile_headers(core_no_gui
-        PRIVATE include/pch/pch.h
-    )
+target_precompile_headers(core_no_gui
+    PRIVATE include/pch/pch.h
+)
 
-    set_target_properties(core_no_gui PROPERTIES
-        POSITION_INDEPENDENT_CODE ON)
-endif()
+set_target_properties(core_no_gui PROPERTIES
+    POSITION_INDEPENDENT_CODE ON)
 
 add_core_target(core TRUE)
 target_link_libraries(core PUBLIC core_pfd)

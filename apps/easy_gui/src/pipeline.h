@@ -1,6 +1,7 @@
 #pragma once
 
 #include "child_process.h"
+#include "export.h"
 #include "preflight.h"
 #include "progress_parser.h"
 #include "settings.h"
@@ -10,6 +11,7 @@
 #include <deque>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -23,6 +25,8 @@ namespace easy_gui
         std::filesystem::path output_folder;
         std::filesystem::path step1_executable;
         Settings settings;
+        //! Dev/test only (ExportRequest::check_band_outer_m): > 0 adds alignment-check points to the export.
+        double check_band_outer_m = 0.0;
     };
 
     enum class PipelineState
@@ -39,6 +43,7 @@ namespace easy_gui
         Checking,
         Staging,
         Odometry,
+        Export,
         Cleanup
     };
 
@@ -51,6 +56,9 @@ namespace easy_gui
         std::string detail; // technical detail for the "details" view
         double elapsed_s = 0.0;
         std::filesystem::path session_folder; // step 1 session (session.mjs) once odometry succeeded
+        double export_fraction = 0.0; // 0..1 during PipelineStage::Export
+        std::string export_step; // what the export is doing right now
+        ExportStats export_stats; // filled once the export succeeded
     };
 
     //! Layout of an Easy GUI output folder.
@@ -63,13 +71,17 @@ namespace easy_gui
         std::filesystem::path staging; // work/staging: links to the recording; step 1 puts cache/ and preview/ here
         std::filesystem::path step1_parameters; // work/easy_gui_step1.toml
         std::filesystem::path session; // work/lio_session: step 1 output (session.mjs, scan_lio_N.laz, ...)
+        std::filesystem::path point_cloud; // point_cloud.laz: the exported point cloud
+        std::filesystem::path trajectory; // trajectory.csv
+        std::filesystem::path readme; // README.txt: describes the two files above
     };
 
     //! Locates lidar_odometry_step_1 next to the Easy GUI executable (plain build name or the installed,
     //! HDMAPPING_BINARY_PREFIX-ed one). The HDMAPPING_STEP1_EXECUTABLE environment variable overrides the search.
     std::filesystem::path findStep1Executable();
 
-    //! Runs the whole Easy GUI processing on a worker thread: re-check, stage, step 1 in a child process, clean up.
+    //! Runs the whole Easy GUI processing on a worker thread: re-check, stage, step 1 in a child process, export, clean
+    //! up.
     //! The GUI polls status() every frame; cancel() kills the child process.
     class Pipeline
     {
@@ -91,6 +103,7 @@ namespace easy_gui
 
     private:
         void run();
+        void runExport(const PreflightResult& check, const OutputLayout& out, const std::function<void(bool)>& cleanupWork);
         void log(const std::string& line);
         void setStage(PipelineStage stage);
         void finish(PipelineState state, const std::string& message, const std::string& detail = "");

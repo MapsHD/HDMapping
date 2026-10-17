@@ -5,6 +5,7 @@
 
 #include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
 
+#include <algorithm>
 #include <cstdlib>
 #include <ctime>
 #include <iomanip>
@@ -45,6 +46,9 @@ namespace easy_gui
         , staging(root_ / "work" / "staging")
         , step1_parameters(root_ / "work" / "easy_gui_step1.toml")
         , session(root_ / "work" / "lio_session")
+        , point_cloud(root_ / "point_cloud.laz")
+        , trajectory(root_ / "trajectory.csv")
+        , readme(root_ / "README.txt")
     {
     }
 
@@ -310,9 +314,79 @@ namespace easy_gui
                 std::lock_guard lock(mutex_);
                 status_.session_folder = out.session;
             }
-            cleanupWork(true);
-            finish(PipelineState::Succeeded, "Lidar odometry finished. The session is in '" + out.session.string() + "'.");
+            log("[easy_gui] " + timestamp() + " lidar odometry finished, exporting");
+            runExport(check, out, cleanupWork);
         }
         busy_ = false;
+    }
+
+    void Pipeline::runExport(const PreflightResult& check, const OutputLayout& out, const std::function<void(bool)>& cleanupWork)
+    {
+        setStage(PipelineStage::Export);
+        ExportRequest request;
+        request.session_file = out.session / "session.mjs";
+        request.recording = check.files;
+        request.lidar_id = std::max(0, check.lidar_id);
+        request.near_min_range_m = request_.settings.near_min_range_m;
+        request.check_band_outer_m = request_.check_band_outer_m;
+        request.laz_file = out.point_cloud;
+        request.trajectory_file = out.trajectory;
+        request.readme_file = out.readme;
+
+        std::string last_phase;
+        auto progress = [&](double fraction, const std::string& step)
+        {
+            // One log line per phase, not per scan/file: "Writing the point cloud (scan 3 of 113)" -> "Writing the point cloud"
+            const std::string phase = step.substr(0, step.find(" ("));
+            if (phase != last_phase)
+                log("[easy_gui] " + timestamp() + " export: " + phase);
+            last_phase = phase;
+            std::lock_guard lock(mutex_);
+            status_.export_fraction = fraction;
+            status_.export_step = step;
+        };
+
+        ExportStats stats;
+        std::string error;
+        const bool ok = exportSession(request, cancel_requested_, progress, stats, error);
+        std::error_code ec;
+        if (!ok)
+        {
+            for (const auto& f : { out.point_cloud, out.trajectory, out.readme })
+                fs::remove(f, ec);
+            if (cancel_requested_)
+            {
+                cleanupWork(false);
+                finish(PipelineState::Cancelled, "Processing was cancelled. Nothing was kept except the log file.");
+                return;
+            }
+            // NOTE: unlike the other failures, the odometry session stays: it took most of the run, and step 2 can
+            // open and export it.
+            cleanupWork(true);
+            finish(
+                PipelineState::Failed,
+                "Lidar odometry finished, but the export failed: " + error + " The lidar odometry result was kept in '" +
+                    out.session.string() + "'.");
+            return;
+        }
+
+        {
+            std::ostringstream s;
+            s << "[easy_gui] export: " << stats.odometry_points << " odometry points + " << stats.near_points << " near points";
+            if (stats.check_band_points)
+                s << " + " << stats.check_band_points << " check-band points";
+            s << " (" << stats.raw_no_return << " of " << stats.raw_points_read << " raw points were no-return, "
+              << stats.raw_near_outside_trajectory << " near candidates outside the trajectory), range " << stats.range_min_m << " - "
+              << stats.range_max_m << " m, " << stats.trajectory_nodes << " trajectory poses; point cloud " << stats.laz_bytes
+              << " bytes, trajectory " << stats.trajectory_bytes << " bytes";
+            log(s.str());
+        }
+        {
+            std::lock_guard lock(mutex_);
+            status_.export_fraction = 1.0;
+            status_.export_stats = stats;
+        }
+        cleanupWork(true);
+        finish(PipelineState::Succeeded, "Done. The point cloud and trajectory are in '" + out.root.string() + "'.");
     }
 } // namespace easy_gui

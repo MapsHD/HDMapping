@@ -98,3 +98,30 @@ TEST_CASE("a recording too short for odometry fails with a message, not a crash"
     CHECK_FALSE(s.message.empty());
     MESSAGE("message shown to the user: " << s.message);
 }
+
+TEST_CASE("a real run ends with the point cloud, the trajectory and the README" * doctest::skip(testRecording() == nullptr))
+{
+    easy_gui_test::TempDir tmp;
+    const fs::path out = tmp.path / "out";
+    Pipeline pipeline;
+    std::string error;
+    REQUIRE(pipeline.start(PipelineRequest{ testRecording(), out, findStep1Executable(), Settings{} }, error));
+    const PipelineStatus s = waitUntil(
+        pipeline,
+        [](const PipelineStatus& st)
+        {
+            return st.state != PipelineState::Running;
+        },
+        std::chrono::seconds(600));
+    REQUIRE_MESSAGE(s.state == PipelineState::Succeeded, s.message);
+    const OutputLayout layout(out);
+    CHECK(fs::file_size(layout.point_cloud) == s.export_stats.laz_bytes);
+    CHECK(fs::file_size(layout.trajectory) == s.export_stats.trajectory_bytes);
+    CHECK(fs::exists(layout.readme));
+    CHECK(s.export_stats.odometry_points > 0);
+    CHECK(s.export_stats.near_points > 0);
+    CHECK(s.export_stats.check_band_points == 0);
+    CHECK(s.export_stats.range_min_m >= Settings{}.near_min_range_m);
+    CHECK(fs::exists(layout.session / "session.mjs")); // kept for step 2
+    CHECK_FALSE(fs::exists(layout.staging));
+}

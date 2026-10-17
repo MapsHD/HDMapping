@@ -243,8 +243,9 @@ namespace easy_gui
 
     uint64_t estimateResultBytes(uint64_t raw_laz_bytes)
     {
-        // session ~0.85x + export ~1.5x + CSV, rounded up to 2.5x the raw LAZ size.
-        return raw_laz_bytes * 5 / 2;
+        // Measured on a 117 M-point forest walk (734 MB raw LAZ): session 0.82x + point cloud 1.24x + trajectory CSV
+        // 0.03x = 2.08x; 2.25x leaves some margin (the near-point share, and so the LAZ size, depends on the site).
+        return raw_laz_bytes * 9 / 4;
     }
 
     RecordingFiles classifyRecordingFiles(const fs::path& recording)

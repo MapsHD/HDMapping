@@ -13,6 +13,10 @@ namespace easy_gui
         static constexpr double kNearMinRangeLowest = 0.1;
         static constexpr double kNearMinRangeHighest = 0.95; // must stay below the 1.0 m load filter
 
+        //! Export option (default off while it is being evaluated): place all points from the raw files at their real
+        //! time instead of using lidar odometry's points (ExportRequest::place_by_raw_time).
+        bool place_by_raw_time = false;
+
         //! Keep the step 1 staging/preview folders after a successful run (for debugging).
         bool keep_work_files = false;
 

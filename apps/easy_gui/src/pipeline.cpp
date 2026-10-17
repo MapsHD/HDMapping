@@ -216,7 +216,7 @@ namespace easy_gui
         {
             std::ostringstream s;
             s << "[easy_gui] settings: near_min_range_m=" << request_.settings.near_min_range_m
-              << " keep_work_files=" << request_.settings.keep_work_files;
+              << " place_by_raw_time=" << request_.settings.place_by_raw_time << " keep_work_files=" << request_.settings.keep_work_files;
             log(s.str());
         }
         for (const auto& f : check.findings)
@@ -329,6 +329,7 @@ namespace easy_gui
         request.lidar_id = std::max(0, check.lidar_id);
         request.near_min_range_m = request_.settings.near_min_range_m;
         request.check_band_outer_m = request_.check_band_outer_m;
+        request.place_by_raw_time = request_.settings.place_by_raw_time;
         request.laz_file = out.point_cloud;
         request.trajectory_file = out.trajectory;
         request.readme_file = out.readme;
@@ -376,7 +377,7 @@ namespace easy_gui
             if (stats.check_band_points)
                 s << " + " << stats.check_band_points << " check-band points";
             s << " (" << stats.raw_no_return << " of " << stats.raw_points_read << " raw points were no-return, "
-              << stats.raw_near_outside_trajectory << " near candidates outside the trajectory), range " << stats.range_min_m << " - "
+              << stats.raw_outside_trajectory << " candidates outside the trajectory), range " << stats.range_min_m << " - "
               << stats.range_max_m << " m, " << stats.trajectory_nodes << " trajectory poses; point cloud " << stats.laz_bytes
               << " bytes, trajectory " << stats.trajectory_bytes << " bytes";
             log(s.str());

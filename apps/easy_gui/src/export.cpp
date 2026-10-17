@@ -224,13 +224,16 @@ namespace easy_gui
                 << "All times are Unix epoch seconds (UTC, seconds since 1970-01-01) as counted by the scanner's lidar\n"
                 << "clock. They are NOT GPS week time and NOT adjusted standard GPS time, even though the LAS field is called\n"
                 << "gps_time (the LAS header's global encoding bit 0 is 0 accordingly).\n"
-                << "Points from lidar odometry (near_added = 0) carry lidar odometry's time, not the raw measurement time:\n"
-                << "within each 0.1 s piece of the recording, odometry spreads its points' times evenly between the first and\n"
-                << "last pose of that piece. That is close to the measurement time (typically 1-4 ms off, at most about\n"
-                << "20 ms), but it cannot be used to match points to the raw files. Odometry also places each point with the\n"
-                << "pose at that time, so the same offset shows up as small position differences between odometry points\n"
-                << "and near points: usually a few millimetres, rarely more than 2 cm. Near points (near_added = 1) keep\n"
-                << "their raw measurement time.\n\n"
+                << (request.place_by_raw_time
+                        ? "Every point carries its raw measurement time (\"place by raw time\" export option): all points were\n"
+                          "taken from the raw recording and placed with the trajectory pose at that time.\n\n"
+                        : "Points from lidar odometry (near_added = 0) carry lidar odometry's time, not the raw measurement time:\n"
+                          "within each 0.1 s piece of the recording, odometry spreads its points' times evenly between the first and\n"
+                          "last pose of that piece. That is close to the measurement time (typically 1-4 ms off, at most about\n"
+                          "20 ms), but it cannot be used to match points to the raw files. Odometry also places each point with the\n"
+                          "pose at that time, so the same offset shows up as small position differences between odometry points\n"
+                          "and near points: usually a few millimetres, rarely more than 2 cm. Near points (near_added = 1) keep\n"
+                          "their raw measurement time.\n\n")
                 << "Point cloud fields (" << laz << ")\n"
                 << std::string(21 + laz.size(), '-') << "\n"
                 << "  X, Y, Z          position [m], 0.1 mm resolution\n"
@@ -242,7 +245,9 @@ namespace easy_gui
                 << "  return_number, number_of_returns  always 1; classification  always 0 (not classified)\n"
                 << "  range_m          extra bytes, float32: 3D distance from the lidar at the moment of measurement [m];\n"
                 << "                   can exceed " << outer << " for steep points, as that limit is horizontal\n"
-                << "  near_added       extra bytes, uint8: 0 = point from lidar odometry, 1 = near point added by Easy GUI\n"
+                << (request.place_by_raw_time
+                        ? "  near_added       extra bytes, uint8: 0 = point inside lidar odometry's distance limits, 1 = near point\n"
+                        : "  near_added       extra bytes, uint8: 0 = point from lidar odometry, 1 = near point added by Easy GUI\n")
                 << (stats.check_band_points ? "                   2 = TEST MODE alignment-check point (duplicate of an odometry point)\n"
                                             : "")
                 << "\n"
@@ -259,11 +264,17 @@ namespace easy_gui
                 << "    distance at most " << output_filter << ", and horizontal distance below " << outer << ", and\n"
                 << "  - it is a real return: points at exactly (0, 0, 0) or with time 0 are \"no return\" records and are\n"
                 << "    never exported.\n"
-                << "Each near point is placed with the trajectory pose lidar odometry uses for points measured at the same\n"
-                << "time (the last pose before the point), so it lines up with the odometry points. Points measured where\n"
+                << (request.place_by_raw_time
+                        ? "With the \"place by raw time\" option every point, not only the near points, is taken from the raw\n"
+                          "recording and placed with the last trajectory pose before its measurement time, including the\n"
+                          "points lidar odometry skips between its 0.1 s pieces. "
+                        : "Each near point is placed with the trajectory pose lidar odometry uses for points measured at the same\n"
+                          "time (the last pose before the point), so it lines up with the odometry points. ")
+                << "Points measured where\n"
                 << "the trajectory has no pose within 10 ms (start and end of the recording) are left out.\n"
-                << "Near points: " << formatCount(stats.near_points) << ", odometry points: " << formatCount(stats.odometry_points)
-                << ".\n\n"
+                << "Near points: " << formatCount(stats.near_points)
+                << (request.place_by_raw_time ? ", points inside lidar odometry's limits: " : ", odometry points: ")
+                << formatCount(stats.odometry_points) << ".\n\n"
                 << "Trajectory fields (" << csv << ", comma-separated, one header row)\n"
                 << std::string(53 + csv.size(), '-') << "\n"
                 << "  timestamp_unix_s   time of the pose [Unix epoch seconds], same clock as the point cloud's gps_time\n"
@@ -398,7 +409,8 @@ namespace easy_gui
             return false;
         }
         const uint8_t user_data = static_cast<uint8_t>(request.lidar_id);
-        const double work_units = static_cast<double>(clouds.size() + request.recording.pairs);
+        const size_t scans_to_copy = request.place_by_raw_time ? 0 : clouds.size();
+        const double work_units = static_cast<double>(scans_to_copy + request.recording.pairs);
         auto writePoint = [&](const Eigen::Vector3d& position, double time_s, uint16_t intensity, size_t scan, double range, NearFlag flag)
         {
             const ExtraBytes extra{ static_cast<float>(range), flag };
@@ -414,8 +426,8 @@ namespace easy_gui
             return writer.write(p, error);
         };
 
-        // --- 1. step 1's points, one scan at a time
-        for (size_t i = 0; i < clouds.size(); i++)
+        // --- 1. step 1's points, one scan at a time (not with place_by_raw_time: pass 2 places them from the raw files)
+        for (size_t i = 0; i < scans_to_copy; i++)
         {
             if (cancelled())
                 return false;
@@ -465,7 +477,7 @@ namespace easy_gui
             }
         }
 
-        // --- 2. near points from the raw recording, one file at a time
+        // --- 2. near points (with place_by_raw_time: all points) from the raw recording, one file at a time
         const double inner = params->filter_threshold_xy_inner;
         const double outer = params->filter_threshold_xy_outer;
         const double output_filter = params->threshould_output_filter;
@@ -474,8 +486,9 @@ namespace easy_gui
             if (cancelled())
                 return false;
             progress(
-                static_cast<double>(clouds.size() + f) / work_units,
-                "Adding the near points (file " + std::to_string(f + 1) + " of " + std::to_string(request.recording.pairs) + ")");
+                static_cast<double>(scans_to_copy + f) / work_units,
+                std::string(request.place_by_raw_time ? "Writing the point cloud" : "Adding the near points") + " (file " +
+                    std::to_string(f + 1) + " of " + std::to_string(request.recording.pairs) + ")");
 
             const fs::path& raw_file = request.recording.laz_files[f];
             LazReader reader;
@@ -501,17 +514,23 @@ namespace easy_gui
                 const Eigen::Vector3d lidar = reader.position();
                 const double range_xy = std::hypot(lidar.x(), lidar.y());
                 const double range = lidar.norm();
-                if (range < request.near_min_range_m || range_xy >= outer)
-                    continue;
                 const Eigen::Vector3d sensor = calibration * lidar;
 
-                // Exactly the complement of step 1's distance filters: load_point_cloud keeps
-                // inner < range_xy < outer, points_to_vector keeps |sensor| > threshould_output_filter.
+                // Step 1's distance filters: load_point_cloud keeps inner < range_xy < outer, points_to_vector keeps
+                // |sensor| > threshould_output_filter. Near points are exactly the complement, at close range.
+                const bool step1_keeps = range_xy > inner && range_xy < outer && sensor.norm() > output_filter;
                 NearFlag flag;
-                if (range_xy <= inner || sensor.norm() <= output_filter)
+                if (step1_keeps)
+                {
+                    if (request.place_by_raw_time)
+                        flag = kFromOdometry;
+                    else if (range_xy < request.check_band_outer_m)
+                        flag = kCheckBand;
+                    else
+                        continue; // exported from scan_lio_N.laz in pass 1
+                }
+                else if (range >= request.near_min_range_m && range_xy < outer)
                     flag = kNearAdded;
-                else if (range_xy < request.check_band_outer_m)
-                    flag = kCheckBand;
                 else
                     continue;
 
@@ -519,7 +538,7 @@ namespace easy_gui
                 const auto it = std::lower_bound(node_times.begin(), node_times.end(), t);
                 if (it == node_times.begin() || t - *(it - 1) > kNodeTolerance_s)
                 {
-                    stats.raw_near_outside_trajectory++;
+                    stats.raw_outside_trajectory++;
                     continue;
                 }
                 const Node& node = nodes[static_cast<size_t>(it - node_times.begin()) - 1];

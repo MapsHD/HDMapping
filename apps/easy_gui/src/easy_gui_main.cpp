@@ -181,6 +181,13 @@ namespace
                     "Points closer to the scanner than this are left out of the point cloud.\n"
                     "0.4 m (default) removes the operator's body and the handle.\n"
                     "Lower values keep more of the close surroundings but may include the operator.");
+            ImGui::Checkbox("Place all points by their measurement time (experimental)", &app.settings.place_by_raw_time);
+            ImGui::SameLine();
+            ImGui::TextDisabled("(?)");
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip(
+                    "Off (default): the point cloud uses lidar odometry's own points.\n"
+                    "On: every point is taken from the raw recording and placed at its exact measurement time.");
             ImGui::Checkbox("Keep intermediate files (for troubleshooting)", &app.settings.keep_work_files);
             ImGui::Unindent();
         }
@@ -381,7 +388,7 @@ namespace
 {
     //! `easy_gui --headless <recording> <output folder>`: the same pipeline without a window, for scripted runs
     //! (the dev validation script) and remote machines. Exit code 0 = success, 1 = failed / refused, 2 = usage.
-    int runHeadless(const fs::path& recording, const fs::path& output_folder, double check_band_outer_m)
+    int runHeadless(const fs::path& recording, const fs::path& output_folder, const Settings& settings, double check_band_outer_m)
     {
         // Unbuffered, so progress shows up as it happens even when redirected to a file or pipe (MSVC treats _IOLBF as
         // full buffering); the output is a line every few seconds.
@@ -399,7 +406,7 @@ namespace
 
         Pipeline pipeline;
         std::string error;
-        if (!pipeline.start(PipelineRequest{ recording, output_folder, findStep1Executable(), Settings{}, check_band_outer_m }, error))
+        if (!pipeline.start(PipelineRequest{ recording, output_folder, findStep1Executable(), settings, check_band_outer_m }, error))
         {
             std::printf("[X] %s\n", error.c_str());
             return 1;
@@ -436,7 +443,12 @@ namespace
     //! Dev aid: `easy_gui --export-only <recording> <session.mjs> <output folder> [--check-band <m>]` runs only the
     //! export, on an existing step 1 session of that recording (step 1 takes ~20 min on a 10-min walk; the export
     //! about a minute). The output folder may exist; the three result files in it are overwritten.
-    int runExportOnly(const fs::path& recording, const fs::path& session_file, const fs::path& output_folder, double check_band_outer_m)
+    int runExportOnly(
+        const fs::path& recording,
+        const fs::path& session_file,
+        const fs::path& output_folder,
+        const Settings& settings,
+        double check_band_outer_m)
     {
         std::setvbuf(stdout, nullptr, _IONBF, 0);
         const PreflightResult check = runPreflight(recording, output_folder);
@@ -450,8 +462,9 @@ namespace
         request.session_file = session_file;
         request.recording = check.files;
         request.lidar_id = std::max(0, check.lidar_id);
-        request.near_min_range_m = Settings{}.near_min_range_m;
+        request.near_min_range_m = settings.near_min_range_m;
         request.check_band_outer_m = check_band_outer_m;
+        request.place_by_raw_time = settings.place_by_raw_time;
         request.laz_file = out.point_cloud;
         request.trajectory_file = out.trajectory;
         request.readme_file = out.readme;
@@ -478,14 +491,14 @@ namespace
             return 1;
         }
         std::printf(
-            "[OK] %llu odometry + %llu near + %llu check-band points; raw read %llu, no-return %llu, near outside trajectory %llu; "
+            "[OK] %llu odometry + %llu near + %llu check-band points; raw read %llu, no-return %llu, outside trajectory %llu; "
             "range %.3f - %.3f m; %zu poses; LAZ %llu bytes, CSV %llu bytes\n",
             static_cast<unsigned long long>(stats.odometry_points),
             static_cast<unsigned long long>(stats.near_points),
             static_cast<unsigned long long>(stats.check_band_points),
             static_cast<unsigned long long>(stats.raw_points_read),
             static_cast<unsigned long long>(stats.raw_no_return),
-            static_cast<unsigned long long>(stats.raw_near_outside_trajectory),
+            static_cast<unsigned long long>(stats.raw_outside_trajectory),
             stats.range_min_m,
             stats.range_max_m,
             stats.trajectory_nodes,
@@ -506,6 +519,16 @@ namespace
             }
         return 0.0;
     }
+
+    //! Removes `flag` from the arguments; returns whether it was there.
+    bool takeFlag(std::vector<std::string>& args, const std::string& flag)
+    {
+        const auto it = std::find(args.begin(), args.end(), flag);
+        if (it == args.end())
+            return false;
+        args.erase(it);
+        return true;
+    }
 } // namespace
 
 int main(int argc, char* argv[])
@@ -514,15 +537,18 @@ int main(int argc, char* argv[])
     if (!args.empty() && (args[0] == "--headless" || args[0] == "--export-only"))
     {
         const double check_band = takeCheckBand(args);
+        Settings settings;
+        settings.place_by_raw_time = takeFlag(args, "--place-by-raw-time");
         if (args[0] == "--headless" && args.size() == 3)
-            return runHeadless(args[1], args[2], check_band);
+            return runHeadless(args[1], args[2], settings, check_band);
         if (args[0] == "--export-only" && args.size() == 4)
-            return runExportOnly(args[1], args[2], args[3], check_band);
+            return runExportOnly(args[1], args[2], args[3], settings, check_band);
         std::printf(
-            "usage: %s --headless <recording folder> <output folder> [--check-band <m>]\n"
-            "       %s --export-only <recording folder> <session.mjs> <output folder> [--check-band <m>]\n"
+            "usage: %s --headless <recording folder> <output folder> [--check-band <m>] [--place-by-raw-time]\n"
+            "       %s --export-only <recording folder> <session.mjs> <output folder> [--check-band <m>] [--place-by-raw-time]\n"
             "--check-band <m> (testing): also export the raw points between the 1.0 m load filter and <m>, flagged\n"
-            "                 near_added = 2, to check that near points line up with the odometry points.\n",
+            "                 near_added = 2, to check that near points line up with the odometry points.\n"
+            "--place-by-raw-time: place all points from the raw files at their real time (export option, default off).\n",
             argv[0],
             argv[0]);
         return 2;

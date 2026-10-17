@@ -368,7 +368,7 @@ TEST_CASE("exportSession: step 1 points as step 2 places them, near points with 
     CHECK(stats.check_band_points == 0);
     CHECK(stats.raw_points_read == file0.size() + file1.size());
     CHECK(stats.raw_no_return == 2);
-    CHECK(stats.raw_near_outside_trajectory == 2);
+    CHECK(stats.raw_outside_trajectory == 2);
     CHECK(stats.filter_threshold_xy_inner == 1.0);
     CHECK(stats.threshould_output_filter == 1.0); // Easy GUI's output setting, read back from the session
 
@@ -455,6 +455,35 @@ TEST_CASE("exportSession: step 1 points as step 2 places them, near points with 
         CHECK(c.near_added == kCheckBand);
         CHECK(near(c.xyz, S::pose(5) * band));
         CHECK(c.range_m == doctest::Approx(band.norm()));
+    }
+
+    SUBCASE("place_by_raw_time takes every point from the raw files, at its raw time")
+    {
+        request.place_by_raw_time = true;
+        request.check_band_outer_m = 1.2; // ignored in this mode
+        REQUIRE(exportSession(
+            request,
+            cancel,
+            [](double, const std::string&)
+            {
+            },
+            stats,
+            error));
+        CHECK(stats.odometry_points == 2); // the 3 m point and the 1.1 m point, not scan_lio's points
+        CHECK(stats.near_points == 2);
+        CHECK(stats.check_band_points == 0);
+        CHECK(stats.raw_outside_trajectory == 2);
+        const ReadFile rr = readLaz(request.laz_file);
+        REQUIRE(rr.points.size() == 4); // raw file order: near_a, 3 m, band, near_steep
+        CHECK(rr.points[0].near_added == kNearAdded);
+        CHECK(rr.points[1].near_added == kFromOdometry);
+        CHECK(near(rr.points[1].xyz, S::pose(5) * Eigen::Vector3d(3.0, 0.0, 0.0)));
+        CHECK(rr.points[1].gps_time == t5);
+        CHECK(rr.points[1].range_m == doctest::Approx(3.0));
+        CHECK(rr.points[2].near_added == kFromOdometry);
+        CHECK(near(rr.points[2].xyz, S::pose(5) * band));
+        CHECK(rr.points[3].near_added == kNearAdded);
+        CHECK(rr.points[3].point_source_id == 1);
     }
 
     SUBCASE("cancel stops the export")

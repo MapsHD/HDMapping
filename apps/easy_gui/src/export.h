@@ -28,6 +28,11 @@ namespace easy_gui
         //! Test mode: > 0 also adds the raw points with filter_threshold_xy_inner < horizontal range < this, which step 1
         //! exported too, flagged kCheckBand, so their placement can be compared with step 1's own points.
         double check_band_outer_m = 0.0;
+        //! Place every point from the raw files with the trajectory pose at its real gps_time, instead of taking step
+        //! 1's points (scan_lio_N.laz, placed at step 1's ramp time). Same distance filters and near-point rule; raw
+        //! gps_time is written; includes the raw points step 1 drops between its 0.1 s pieces. near_added = 0 then
+        //! means "inside step 1's distance limits". check_band_outer_m is ignored (those points are all included).
+        bool place_by_raw_time = false;
         std::filesystem::path laz_file;
         std::filesystem::path trajectory_file;
         std::filesystem::path readme_file;
@@ -42,7 +47,7 @@ namespace easy_gui
         uint64_t check_band_points = 0; // near_added = 2
         uint64_t raw_points_read = 0;
         uint64_t raw_no_return = 0; // (0,0,0) or gps_time 0: never exported
-        uint64_t raw_near_outside_trajectory = 0; // near candidates with no trajectory node within 10 ms
+        uint64_t raw_outside_trajectory = 0; // exported candidates with no trajectory node within 10 ms
         double range_min_m = 0.0;
         double range_max_m = 0.0;
         //! range_m histogram, 0.1 m bins from 0 m; the last bin collects everything beyond.

@@ -243,8 +243,8 @@ namespace easy_gui
 
     uint64_t estimateResultBytes(uint64_t raw_laz_bytes)
     {
-        // Measured on a 117 M-point forest walk (734 MB raw LAZ): session 0.82x + point cloud 1.24x + trajectory CSV
-        // 0.03x = 2.08x; 2.25x leaves some margin (the near-point share, and so the LAZ size, depends on the site).
+        // Measured on a 117 M-point forest walk (734 MB raw LAZ): session 0.82x + point cloud 1.29x (with near and gap
+        // points) + trajectory CSV 0.03x = 2.14x; 2.25x leaves some margin (the near-point share depends on the site).
         return raw_laz_bytes * 9 / 4;
     }
 

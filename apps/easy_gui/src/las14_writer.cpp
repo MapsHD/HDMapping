@@ -11,7 +11,7 @@ namespace easy_gui
     namespace
     {
         //! LAS 1.4 R15 "Extra Bytes" descriptor. Written by hand rather than with laszip_add_attribute(), which always
-        //! sets the "scale" option bit: readers then scale the values, so laspy would return the uint8 near_added flag as
+        //! sets the "scale" option bit: readers then scale the values, so laspy would return the uint8 point_origin field as
         //! float64.
 #pragma pack(push, 1)
         struct ExtraBytesDescriptor

@@ -120,6 +120,7 @@ TEST_CASE("a real run ends with the point cloud, the trajectory and the README" 
     CHECK(fs::exists(layout.readme));
     CHECK(s.export_stats.odometry_points > 0);
     CHECK(s.export_stats.near_points > 0);
+    CHECK(s.export_stats.gap_points > 0);
     CHECK(s.export_stats.check_band_points == 0);
     CHECK(s.export_stats.range_min_m >= Settings{}.near_min_range_m);
     CHECK(fs::exists(layout.session / "session.mjs")); // kept for step 2

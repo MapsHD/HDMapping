@@ -373,7 +373,8 @@ namespace easy_gui
 
         {
             std::ostringstream s;
-            s << "[easy_gui] export: " << stats.odometry_points << " odometry points + " << stats.near_points << " near points";
+            s << "[easy_gui] export: " << stats.odometry_points << " odometry points + " << stats.near_points << " near points + "
+              << stats.gap_points << " gap points";
             if (stats.check_band_points)
                 s << " + " << stats.check_band_points << " check-band points";
             s << " (" << stats.raw_no_return << " of " << stats.raw_points_read << " raw points were no-return, "

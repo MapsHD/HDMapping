@@ -35,14 +35,14 @@ namespace easy_gui
         //! Extra bytes of every exported point, in this order.
         const std::vector<ExtraBytesAttribute> kAttributes = {
             { ExtraBytesAttribute::Type::F32, "range_m", "3D distance from the lidar [m]" },
-            { ExtraBytesAttribute::Type::U8, "near_added", "0 odometry, 1 near point added" },
+            { ExtraBytesAttribute::Type::U8, "point_origin", "0 step 1, 1 near, 2 gap point" },
         };
 
 #pragma pack(push, 1)
         struct ExtraBytes
         {
             float range_m;
-            uint8_t near_added;
+            uint8_t point_origin;
         };
 #pragma pack(pop)
         static_assert(sizeof(ExtraBytes) == 5);
@@ -113,6 +113,9 @@ namespace easy_gui
             double time_s; // lidar clock (Unix epoch seconds on Mandeye)
             size_t scan;
             Eigen::Affine3d global; // scan pose (session_poses.mrp) x node pose relative to the scan
+            //! Last node of a step 1 piece (worker chunk): step 1 takes the points in [first node, last node) of each
+            //! piece, so raw points from this node until the next piece's first node are not in its output.
+            bool piece_end;
         };
 
         void addRange(ExportStats& stats, double range)
@@ -215,7 +218,7 @@ namespace easy_gui
                 << "are in metres in a local frame that starts at the scanner's first position (z up, from the IMU).\n\n"
                 << "Files\n-----\n"
                 << "  " << laz << "  point cloud (LAZ, LAS 1.4, point format 6), "
-                << formatCount(stats.odometry_points + stats.near_points + stats.check_band_points) << " points\n"
+                << formatCount(stats.odometry_points + stats.near_points + stats.gap_points + stats.check_band_points) << " points\n"
                 << "  " << csv << "  trajectory of the scanner (CSV), " << formatCount(stats.trajectory_nodes) << " poses\n"
                 << "  easy_gui.log  processing log\n"
                 << "  work/lio_session/  lidar odometry session; open session.mjs in multi_view_tls_registration_step_2\n"
@@ -225,15 +228,12 @@ namespace easy_gui
                 << "clock. They are NOT GPS week time and NOT adjusted standard GPS time, even though the LAS field is called\n"
                 << "gps_time (the LAS header's global encoding bit 0 is 0 accordingly).\n"
                 << (request.place_by_raw_time
-                        ? "Every point carries its raw measurement time (\"place by raw time\" export option): all points were\n"
-                          "taken from the raw recording and placed with the trajectory pose at that time.\n\n"
-                        : "Points from lidar odometry (near_added = 0) carry lidar odometry's time, not the raw measurement time:\n"
+                        ? "Every point carries its raw measurement time (experimental \"place by raw time\" export option).\n\n"
+                        : "Lidar odometry's points (point_origin = 0) carry lidar odometry's time, not the raw measurement time:\n"
                           "within each 0.1 s piece of the recording, odometry spreads its points' times evenly between the first and\n"
                           "last pose of that piece. That is close to the measurement time (typically 1-4 ms off, at most about\n"
-                          "20 ms), but it cannot be used to match points to the raw files. Odometry also places each point with the\n"
-                          "pose at that time, so the same offset shows up as small position differences between odometry points\n"
-                          "and near points: usually a few millimetres, rarely more than 2 cm. Near points (near_added = 1) keep\n"
-                          "their raw measurement time.\n\n")
+                          "20 ms), but it cannot be used to match points to the raw files. Near points and gap points\n"
+                          "(point_origin = 1, 2) carry their raw measurement time.\n\n")
                 << "Point cloud fields (" << laz << ")\n"
                 << std::string(21 + laz.size(), '-') << "\n"
                 << "  X, Y, Z          position [m], 0.1 mm resolution\n"
@@ -245,36 +245,41 @@ namespace easy_gui
                 << "  return_number, number_of_returns  always 1; classification  always 0 (not classified)\n"
                 << "  range_m          extra bytes, float32: 3D distance from the lidar at the moment of measurement [m];\n"
                 << "                   can exceed " << outer << " for steep points, as that limit is horizontal\n"
-                << (request.place_by_raw_time
-                        ? "  near_added       extra bytes, uint8: 0 = point inside lidar odometry's distance limits, 1 = near point\n"
-                        : "  near_added       extra bytes, uint8: 0 = point from lidar odometry, 1 = near point added by Easy GUI\n")
-                << (stats.check_band_points ? "                   2 = TEST MODE alignment-check point (duplicate of an odometry point)\n"
+                << "  point_origin     extra bytes, uint8: where the point comes from (see below)\n"
+                << (request.place_by_raw_time ? "                   0 = inside lidar odometry's distance limits, placed by raw time\n"
+                                              : "                   0 = lidar odometry's own point\n")
+                << "                   1 = near point, 2 = gap point (both added by Easy GUI)\n"
+                << (stats.check_band_points ? "                   3 = TEST MODE alignment-check point (duplicate of an odometry point)\n"
                                             : "")
                 << "\n"
-                << "Near points\n-----------\n"
+                << "Where the points come from\n--------------------------\n"
                 << "Lidar odometry only uses and exports points whose horizontal distance from the lidar (in the lidar's own\n"
                 << "frame) is between " << inner << " and " << outer << " and whose 3D distance is above " << output_filter
-                << ". Easy GUI adds back\n"
-                << "the raw "
-                << "points those limits removed at close range, so the cloud has no hole around the walking path:\n"
-                << "a raw point is added (near_added = 1) when\n"
-                << "  - its 3D distance from the lidar is at least " << near_min << " (closer returns are mostly the operator's\n"
-                << "    body and the scanner handle; the limit is the advanced setting \"Closest points kept\"), and\n"
-                << "  - lidar odometry left it out because of distance: horizontal distance at most " << inner << ", or 3D\n"
-                << "    distance at most " << output_filter << ", and horizontal distance below " << outer << ", and\n"
-                << "  - it is a real return: points at exactly (0, 0, 0) or with time 0 are \"no return\" records and are\n"
-                << "    never exported.\n"
+                << ", and it works in\n"
+                << "0.1 s pieces: it skips the raw points measured after the last pose of a piece and before the first pose\n"
+                << "of the next one (about 5 % of the recording time). Easy GUI adds both kinds of missing points back from\n"
+                << "the raw recording, so the cloud has no hole around the walking path and nothing is missing between the\n"
+                << "pieces.\n\n"
+                << "point_origin = 0 (" << formatCount(stats.odometry_points) << " points): "
+                << (request.place_by_raw_time ? "points inside lidar odometry's limits, taken from the raw recording.\n"
+                                              : "lidar odometry's own points, as it placed them.\n")
+                << "point_origin = 1, near points (" << formatCount(stats.near_points) << "): raw points that\n"
+                << "  - are at least " << near_min << " from the lidar in 3D (closer returns are mostly the operator's body and the\n"
+                << "    scanner handle; the limit is the advanced setting \"Closest points kept\"), and\n"
+                << "  - lidar odometry left out because of distance: horizontal distance at most " << inner << ", or 3D\n"
+                << "    distance at most " << output_filter << ", and horizontal distance below " << outer << ".\n"
+                << "point_origin = 2, gap points (" << formatCount(stats.gap_points) << "): raw points inside lidar odometry's distance\n"
+                << "  limits that it skipped between two 0.1 s pieces.\n"
+                << "Near and gap points are placed with the trajectory pose lidar odometry uses for points measured at the\n"
+                << "same time (the last pose before the point), so they line up with lidar odometry's points"
                 << (request.place_by_raw_time
-                        ? "With the \"place by raw time\" option every point, not only the near points, is taken from the raw\n"
-                          "recording and placed with the last trajectory pose before its measurement time, including the\n"
-                          "points lidar odometry skips between its 0.1 s pieces. "
-                        : "Each near point is placed with the trajectory pose lidar odometry uses for points measured at the same\n"
-                          "time (the last pose before the point), so it lines up with the odometry points. ")
-                << "Points measured where\n"
-                << "the trajectory has no pose within 10 ms (start and end of the recording) are left out.\n"
-                << "Near points: " << formatCount(stats.near_points)
-                << (request.place_by_raw_time ? ", points inside lidar odometry's limits: " : ", odometry points: ")
-                << formatCount(stats.odometry_points) << ".\n\n"
+                        ? ".\n"
+                        : " to within a few\nmillimetres (rarely more than 2 cm, because of lidar odometry's evenly spread times).\n")
+                << (request.place_by_raw_time
+                        ? "With the experimental \"place by raw time\" option, point_origin = 0 points are placed the same way.\n"
+                        : "")
+                << "Points at exactly (0, 0, 0) or with time 0 are \"no return\" records and are never exported, and points\n"
+                << "measured where the trajectory has no pose within 10 ms (start and end of the recording) are left out.\n\n"
                 << "Trajectory fields (" << csv << ", comma-separated, one header row)\n"
                 << std::string(53 + csv.size(), '-') << "\n"
                 << "  timestamp_unix_s   time of the pose [Unix epoch seconds], same clock as the point cloud's gps_time\n"
@@ -336,6 +341,13 @@ namespace easy_gui
         stats.filter_threshold_xy_inner = params->filter_threshold_xy_inner;
         stats.filter_threshold_xy_outer = params->filter_threshold_xy_outer;
         stats.threshould_output_filter = params->threshould_output_filter;
+        const int poses_per_piece = params->threshold_nr_poses;
+        stats.threshold_nr_poses = poses_per_piece;
+        if (poses_per_piece <= 0)
+        {
+            error = "The lidar odometry settings file has no valid threshold_nr_poses.";
+            return false;
+        }
 
         // --- poses and trajectories exactly as step 2 loads them; the points are streamed below instead
         progress(0.0, "Reading the lidar odometry result");
@@ -379,8 +391,15 @@ namespace easy_gui
                 error = "The lidar odometry result is incomplete: scan " + std::to_string(i) + " has no trajectory.";
                 return false;
             }
-            for (const auto& n : clouds[i].local_trajectory)
-                nodes.push_back({ n.timestamps.first / 1e9, i, clouds[i].m_pose * n.m_pose });
+            // Every step 1 piece has exactly threshold_nr_poses nodes, and save_result concatenates whole pieces into a
+            // scan, so the piece boundaries are at multiples of it within each scan.
+            const auto& trajectory = clouds[i].local_trajectory;
+            for (size_t j = 0; j < trajectory.size(); j++)
+                nodes.push_back(
+                    { trajectory[j].timestamps.first / 1e9,
+                      i,
+                      clouds[i].m_pose * trajectory[j].m_pose,
+                      static_cast<int>(j % poses_per_piece) == poses_per_piece - 1 });
         }
         std::stable_sort(
             nodes.begin(),
@@ -411,9 +430,10 @@ namespace easy_gui
         const uint8_t user_data = static_cast<uint8_t>(request.lidar_id);
         const size_t scans_to_copy = request.place_by_raw_time ? 0 : clouds.size();
         const double work_units = static_cast<double>(scans_to_copy + request.recording.pairs);
-        auto writePoint = [&](const Eigen::Vector3d& position, double time_s, uint16_t intensity, size_t scan, double range, NearFlag flag)
+        auto writePoint =
+            [&](const Eigen::Vector3d& position, double time_s, uint16_t intensity, size_t scan, double range, PointOrigin origin)
         {
-            const ExtraBytes extra{ static_cast<float>(range), flag };
+            const ExtraBytes extra{ static_cast<float>(range), origin };
             Las14Point p;
             p.position = position;
             p.gps_time = time_s;
@@ -422,7 +442,10 @@ namespace easy_gui
             p.user_data = user_data;
             p.extra_bytes = reinterpret_cast<const uint8_t*>(&extra);
             addRange(stats, range);
-            (flag == kFromOdometry ? stats.odometry_points : flag == kNearAdded ? stats.near_points : stats.check_band_points)++;
+            (origin == kStep1           ? stats.odometry_points
+                 : origin == kNearPoint ? stats.near_points
+                 : origin == kGapPoint  ? stats.gap_points
+                                        : stats.check_band_points)++;
             return writer.write(p, error);
         };
 
@@ -469,7 +492,7 @@ namespace easy_gui
                 const size_t node = it == times.begin() ? 0 : static_cast<size_t>(it - times.begin()) - 1;
                 const double range = (lidar_from_sensor * (sensor_from_local[node] * local)).norm();
 
-                if (!writePoint(pc.m_pose * local + offset, rp.gps_time / 1e9, rp.intensity, i, range, kFromOdometry))
+                if (!writePoint(pc.m_pose * local + offset, rp.gps_time / 1e9, rp.intensity, i, range, kStep1))
                 {
                     error = "Could not write the point cloud file (is the disk full?): " + error + ".";
                     return false;
@@ -477,7 +500,7 @@ namespace easy_gui
             }
         }
 
-        // --- 2. near points (with place_by_raw_time: all points) from the raw recording, one file at a time
+        // --- 2. near and gap points (with place_by_raw_time: all points) from the raw recording, one file at a time
         const double inner = params->filter_threshold_xy_inner;
         const double outer = params->filter_threshold_xy_outer;
         const double output_filter = params->threshould_output_filter;
@@ -487,7 +510,7 @@ namespace easy_gui
                 return false;
             progress(
                 static_cast<double>(scans_to_copy + f) / work_units,
-                std::string(request.place_by_raw_time ? "Writing the point cloud" : "Adding the near points") + " (file " +
+                std::string(request.place_by_raw_time ? "Writing the point cloud" : "Adding the near and gap points") + " (file " +
                     std::to_string(f + 1) + " of " + std::to_string(request.recording.pairs) + ")");
 
             const fs::path& raw_file = request.recording.laz_files[f];
@@ -519,30 +542,37 @@ namespace easy_gui
                 // Step 1's distance filters: load_point_cloud keeps inner < range_xy < outer, points_to_vector keeps
                 // |sensor| > threshould_output_filter. Near points are exactly the complement, at close range.
                 const bool step1_keeps = range_xy > inner && range_xy < outer && sensor.norm() > output_filter;
-                NearFlag flag;
-                if (step1_keeps)
-                {
-                    if (request.place_by_raw_time)
-                        flag = kFromOdometry;
-                    else if (range_xy < request.check_band_outer_m)
-                        flag = kCheckBand;
-                    else
-                        continue; // exported from scan_lio_N.laz in pass 1
-                }
-                else if (range >= request.near_min_range_m && range_xy < outer)
-                    flag = kNearAdded;
-                else
+                if (!step1_keeps && (range < request.near_min_range_m || range_xy >= outer))
                     continue;
 
                 const double t = rp.gps_time;
                 const auto it = std::lower_bound(node_times.begin(), node_times.end(), t);
                 if (it == node_times.begin() || t - *(it - 1) > kNodeTolerance_s)
                 {
-                    stats.raw_outside_trajectory++;
+                    if (!step1_keeps || request.place_by_raw_time)
+                        stats.raw_outside_trajectory++;
                     continue;
                 }
+                // Placed with the last node before the point (step 1's rule). Whether step 1 has the point depends on
+                // the last node at or before it: a piece's last node starts a gap step 1 skips.
                 const Node& node = nodes[static_cast<size_t>(it - node_times.begin()) - 1];
-                if (!writePoint(node.global * sensor + offset, t, rp.intensity, node.scan, range, flag))
+                const size_t at_or_before =
+                    static_cast<size_t>(std::upper_bound(node_times.begin(), node_times.end(), t) - node_times.begin()) - 1;
+                const bool in_gap = nodes[at_or_before].piece_end;
+
+                PointOrigin origin;
+                if (!step1_keeps)
+                    origin = kNearPoint;
+                else if (in_gap)
+                    origin = kGapPoint;
+                else if (request.place_by_raw_time)
+                    origin = kStep1;
+                else if (range_xy < request.check_band_outer_m)
+                    origin = kCheckBand;
+                else
+                    continue; // step 1 has this point: exported from scan_lio_N.laz in pass 1
+
+                if (!writePoint(node.global * sensor + offset, t, rp.intensity, node.scan, range, origin))
                 {
                     error = "Could not write the point cloud file (is the disk full?): " + error + ".";
                     return false;

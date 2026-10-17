@@ -29,7 +29,7 @@ namespace
         uint16_t point_source_id;
         uint8_t user_data;
         float range_m;
-        uint8_t near_added;
+        uint8_t point_origin;
     };
 
     struct ReadFile
@@ -80,7 +80,7 @@ namespace
             if (p->num_extra_bytes >= 5)
             {
                 std::memcpy(&q.range_m, p->extra_bytes, 4);
-                q.near_added = p->extra_bytes[4];
+                q.point_origin = p->extra_bytes[4];
             }
             r.points.push_back(q);
         }
@@ -249,7 +249,7 @@ TEST_CASE("Las14Writer writes LAS 1.4 point format 6 with named, unscaled extra 
     std::string error;
     REQUIRE(writer.open(
         file.string(),
-        { { ExtraBytesAttribute::Type::F32, "range_m", "range" }, { ExtraBytesAttribute::Type::U8, "near_added", "flag" } },
+        { { ExtraBytesAttribute::Type::F32, "range_m", "range" }, { ExtraBytesAttribute::Type::U8, "point_origin", "flag" } },
         Eigen::Vector3d(100.0, 200.0, 0.0),
         0.0001,
         "test",
@@ -287,7 +287,7 @@ TEST_CASE("Las14Writer writes LAS 1.4 point format 6 with named, unscaled extra 
     CHECK(r.header.max_z == doctest::Approx(5.0));
     REQUIRE(r.extra_names.size() == 2);
     CHECK(r.extra_names[0] == "range_m");
-    CHECK(r.extra_names[1] == "near_added");
+    CHECK(r.extra_names[1] == "point_origin");
     CHECK(r.extra_types[0] == 9); // float
     CHECK(r.extra_types[1] == 1); // unsigned char
     CHECK(r.extra_options[0] == 0); // no scale: readers return the raw float / uint8
@@ -299,9 +299,9 @@ TEST_CASE("Las14Writer writes LAS 1.4 point format 6 with named, unscaled extra 
     CHECK(r.points[0].point_source_id == 4321);
     CHECK(r.points[0].user_data == 2);
     CHECK(r.points[0].range_m == 12.5f);
-    CHECK(r.points[0].near_added == 1);
+    CHECK(r.points[0].point_origin == 1);
     CHECK(r.points[1].range_m == 0.0f);
-    CHECK(r.points[1].near_added == 0);
+    CHECK(r.points[1].point_origin == 0);
 }
 
 TEST_CASE("exportSession: step 1 points as step 2 places them, near points with step 1's transform chain")
@@ -316,6 +316,11 @@ TEST_CASE("exportSession: step 1 points as step 2 places them, near points with 
     const Eigen::Vector3d near_a(0.5, 0.3, 0.2); // horizontal 0.58 m, 3D 0.62 m: near point
     const Eigen::Vector3d near_steep(0.6, 0.0, 1.5); // horizontal 0.6 m but 3D 1.62 m: still a near point
     const Eigen::Vector3d band(1.1, 0.0, 0.0); // step 1 exports this one itself
+    // step 1 has 20 nodes per piece (threshold_nr_poses) and skips [last node of a piece, next piece's first node)
+    const Eigen::Vector3d gap_a(2.5, 1.0, 0.3);
+    const Eigen::Vector3d gap_b(-4.0, 2.0, 1.0);
+    const double t_gap_a = S::nodeTime(19) + 0.002;
+    const double t_gap_b = S::nodeTime(39) + 0.003;
     std::vector<RawPoint> file0 = {
         { near_a, t5, 11 },
         { Eigen::Vector3d(0.2, 0.1, 0.0), t5 }, // 3D 0.22 m < near_min_range
@@ -324,6 +329,9 @@ TEST_CASE("exportSession: step 1 points as step 2 places them, near points with 
         { Eigen::Vector3d(3.0, 0.0, 0.0), t5 }, // step 1's point
         { band, t5 },
         { near_a, S::kT0 - 1.0 }, // before the trajectory: no pose within 10 ms
+        { gap_a, t_gap_a, 13 }, // inside step 1's limits, but in the gap after piece 0 (nodes 0-19): gap point
+        { gap_b, t_gap_b }, // gap at the end of scan 0 (node 39 ends piece 1), before scan 1's first node
+        { Eigen::Vector3d(2.0, 0.5, 0.1), S::nodeTime(18) + 0.002 }, // inside a piece: step 1's point, not added
     };
     std::vector<RawPoint> file1 = {
         { near_steep, t47, 12 },
@@ -365,7 +373,9 @@ TEST_CASE("exportSession: step 1 points as step 2 places them, near points with 
     CHECK(stats.trajectory_nodes == 2 * S::kNodes);
     CHECK(stats.odometry_points == s.odometry_points);
     CHECK(stats.near_points == 2);
+    CHECK(stats.gap_points == 2);
     CHECK(stats.check_band_points == 0);
+    CHECK(stats.threshold_nr_poses == 20);
     CHECK(stats.raw_points_read == file0.size() + file1.size());
     CHECK(stats.raw_no_return == 2);
     CHECK(stats.raw_outside_trajectory == 2);
@@ -373,7 +383,7 @@ TEST_CASE("exportSession: step 1 points as step 2 places them, near points with 
     CHECK(stats.threshould_output_filter == 1.0); // Easy GUI's output setting, read back from the session
 
     const ReadFile r = readLaz(request.laz_file);
-    REQUIRE(r.points.size() == s.odometry_points + 2);
+    REQUIRE(r.points.size() == s.odometry_points + 4); // raw file order: near_a, gap_a, gap_b, near_steep
 
     // odometry points: scan pose x local point, range from the sensor frame, ramp time in seconds
     for (size_t i = 0; i < s.odometry_points; i++)
@@ -381,7 +391,7 @@ TEST_CASE("exportSession: step 1 points as step 2 places them, near points with 
         const auto& p = r.points[i];
         const int scan = static_cast<int>(i / (2 * S::kNodes));
         const int node = scan * S::kNodes + static_cast<int>(i % (2 * S::kNodes)) / 2;
-        CHECK(p.near_added == kFromOdometry);
+        CHECK(p.point_origin == kStep1);
         CHECK(p.point_source_id == scan);
         CHECK(p.user_data == S::kLidarId);
         CHECK(near(p.xyz, S::pose(node) * s.sensor_points[i]));
@@ -391,14 +401,26 @@ TEST_CASE("exportSession: step 1 points as step 2 places them, near points with 
 
     // near points: pose of the last node before the raw time, raw time and intensity kept
     const auto& a = r.points[s.odometry_points];
-    CHECK(a.near_added == kNearAdded);
+    CHECK(a.point_origin == kNearPoint);
     CHECK(near(a.xyz, S::pose(5) * near_a));
     CHECK(a.gps_time == t5);
     CHECK(a.intensity == 11);
     CHECK(a.point_source_id == 0);
     CHECK(a.range_m == doctest::Approx(near_a.norm()));
-    const auto& b = r.points[s.odometry_points + 1];
-    CHECK(b.near_added == kNearAdded);
+    // gap points: same placement rule, raw time, scan of the node
+    const auto& g = r.points[s.odometry_points + 1];
+    CHECK(g.point_origin == kGapPoint);
+    CHECK(near(g.xyz, S::pose(19) * gap_a));
+    CHECK(g.gps_time == t_gap_a);
+    CHECK(g.intensity == 13);
+    CHECK(g.point_source_id == 0);
+    CHECK(g.range_m == doctest::Approx(gap_a.norm()));
+    const auto& g2 = r.points[s.odometry_points + 2];
+    CHECK(g2.point_origin == kGapPoint);
+    CHECK(near(g2.xyz, S::pose(39) * gap_b));
+    CHECK(g2.point_source_id == 0);
+    const auto& b = r.points[s.odometry_points + 3];
+    CHECK(b.point_origin == kNearPoint);
     CHECK(near(b.xyz, S::pose(47) * near_steep));
     CHECK(b.point_source_id == 1);
     CHECK(b.range_m == doctest::Approx(near_steep.norm()));
@@ -434,7 +456,8 @@ TEST_CASE("exportSession: step 1 points as step 2 places them, near points with 
     const std::string text((std::istreambuf_iterator<char>(readme)), std::istreambuf_iterator<char>());
     CHECK(text.find("Unix epoch seconds") != std::string::npos);
     CHECK(text.find("at least 0.40 m") != std::string::npos);
-    CHECK(text.find("near_added") != std::string::npos);
+    CHECK(text.find("point_origin") != std::string::npos);
+    CHECK(text.find("gap points (2)") != std::string::npos);
 
     SUBCASE("check-band test mode adds the 1.0-1.2 m raw points with flag 2")
     {
@@ -450,9 +473,10 @@ TEST_CASE("exportSession: step 1 points as step 2 places them, near points with 
         CHECK(stats.near_points == 2);
         CHECK(stats.check_band_points == 1);
         const ReadFile rb = readLaz(request.laz_file);
-        REQUIRE(rb.points.size() == s.odometry_points + 3);
-        const auto& c = rb.points[s.odometry_points + 1]; // raw file order: near_a, band, near_steep
-        CHECK(c.near_added == kCheckBand);
+        CHECK(stats.gap_points == 2);
+        REQUIRE(rb.points.size() == s.odometry_points + 5);
+        const auto& c = rb.points[s.odometry_points + 1]; // raw file order: near_a, band, gap_a, gap_b, near_steep
+        CHECK(c.point_origin == kCheckBand);
         CHECK(near(c.xyz, S::pose(5) * band));
         CHECK(c.range_m == doctest::Approx(band.norm()));
     }
@@ -469,21 +493,25 @@ TEST_CASE("exportSession: step 1 points as step 2 places them, near points with 
             },
             stats,
             error));
-        CHECK(stats.odometry_points == 2); // the 3 m point and the 1.1 m point, not scan_lio's points
+        CHECK(stats.odometry_points == 3); // the 3 m, 1.1 m and node-18 points, not scan_lio's points
         CHECK(stats.near_points == 2);
+        CHECK(stats.gap_points == 2);
         CHECK(stats.check_band_points == 0);
         CHECK(stats.raw_outside_trajectory == 2);
         const ReadFile rr = readLaz(request.laz_file);
-        REQUIRE(rr.points.size() == 4); // raw file order: near_a, 3 m, band, near_steep
-        CHECK(rr.points[0].near_added == kNearAdded);
-        CHECK(rr.points[1].near_added == kFromOdometry);
+        REQUIRE(rr.points.size() == 7); // raw file order: near_a, 3 m, band, gap_a, gap_b, node 18, near_steep
+        CHECK(rr.points[0].point_origin == kNearPoint);
+        CHECK(rr.points[1].point_origin == kStep1);
         CHECK(near(rr.points[1].xyz, S::pose(5) * Eigen::Vector3d(3.0, 0.0, 0.0)));
         CHECK(rr.points[1].gps_time == t5);
         CHECK(rr.points[1].range_m == doctest::Approx(3.0));
-        CHECK(rr.points[2].near_added == kFromOdometry);
+        CHECK(rr.points[2].point_origin == kStep1);
         CHECK(near(rr.points[2].xyz, S::pose(5) * band));
-        CHECK(rr.points[3].near_added == kNearAdded);
-        CHECK(rr.points[3].point_source_id == 1);
+        CHECK(rr.points[3].point_origin == kGapPoint);
+        CHECK(rr.points[5].point_origin == kStep1);
+        CHECK(near(rr.points[5].xyz, S::pose(18) * Eigen::Vector3d(2.0, 0.5, 0.1)));
+        CHECK(rr.points[6].point_origin == kNearPoint);
+        CHECK(rr.points[6].point_source_id == 1);
     }
 
     SUBCASE("cancel stops the export")

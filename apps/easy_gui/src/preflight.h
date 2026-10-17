@@ -67,7 +67,7 @@ namespace easy_gui
     uint64_t estimateWorkBytes(uint64_t total_points);
 
     //! Disk space of what is kept: the step 1 session (scan_lio LAZ, 0.82x the raw LAZ size measured), the exported
-    //! LAZ (1.4 PF6 with extra bytes and the near points, 1.24x measured) and the trajectory CSV (0.03x): 2.25x.
+    //! LAZ (1.4 PF6 with extra bytes, near and gap points, 1.29x measured) and the trajectory CSV (0.03x): 2.25x.
     uint64_t estimateResultBytes(uint64_t raw_laz_bytes);
 
     //! True if `inner` is `outer` or lies inside it (both made absolute and normalised first).

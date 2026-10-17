@@ -11,12 +11,13 @@
 
 namespace easy_gui
 {
-    //! Values of near_added, the extra-bytes flag of every exported point.
-    enum NearFlag : uint8_t
+    //! Values of point_origin, the extra-bytes field of every exported point.
+    enum PointOrigin : uint8_t
     {
-        kFromOdometry = 0, // exported by lidar odometry (step 1)
-        kNearAdded = 1, // raw point step 1's distance filters removed, added by Easy GUI
-        kCheckBand = 2, // test mode only: raw point step 1 also exported, added again to check the alignment
+        kStep1 = 0, // lidar odometry's (step 1's) own point, placed by step 1
+        kNearPoint = 1, // raw point step 1's distance filters removed, added by Easy GUI at its real time
+        kGapPoint = 2, // raw point inside step 1's limits that step 1 skipped between its 0.1 s pieces, added at its real time
+        kCheckBand = 3, // test mode only: raw point step 1 also exported, added again to check the alignment
     };
 
     struct ExportRequest
@@ -26,12 +27,13 @@ namespace easy_gui
         int lidar_id = 0; // user_data of the raw points (single-lidar recordings only)
         double near_min_range_m = 0.4; // near points closer than this (3D) are left out
         //! Test mode: > 0 also adds the raw points with filter_threshold_xy_inner < horizontal range < this, which step 1
-        //! exported too, flagged kCheckBand, so their placement can be compared with step 1's own points.
+        //! exported too, as kCheckBand, so their placement can be compared with step 1's own points.
         double check_band_outer_m = 0.0;
-        //! Place every point from the raw files with the trajectory pose at its real gps_time, instead of taking step
-        //! 1's points (scan_lio_N.laz, placed at step 1's ramp time). Same distance filters and near-point rule; raw
-        //! gps_time is written; includes the raw points step 1 drops between its 0.1 s pieces. near_added = 0 then
-        //! means "inside step 1's distance limits". check_band_outer_m is ignored (those points are all included).
+        //! Experimental: place every point from the raw files with the trajectory pose at its real gps_time, instead of
+        //! taking step 1's points (scan_lio_N.laz, placed at step 1's ramp time). Same distance filters, near-point and
+        //! gap-point rules; raw gps_time is written. point_origin = 0 then means "inside step 1's distance limits, and
+        //! not in a gap". check_band_outer_m is ignored (those points are all included). Measured slightly less sharp
+        //! than the default (see CLAUDE.md), hence off.
         bool place_by_raw_time = false;
         std::filesystem::path laz_file;
         std::filesystem::path trajectory_file;
@@ -42,9 +44,10 @@ namespace easy_gui
     {
         size_t scans = 0;
         size_t trajectory_nodes = 0;
-        uint64_t odometry_points = 0; // near_added = 0
-        uint64_t near_points = 0; // near_added = 1
-        uint64_t check_band_points = 0; // near_added = 2
+        uint64_t odometry_points = 0; // point_origin = 0
+        uint64_t near_points = 0; // point_origin = 1
+        uint64_t gap_points = 0; // point_origin = 2
+        uint64_t check_band_points = 0; // point_origin = 3
         uint64_t raw_points_read = 0;
         uint64_t raw_no_return = 0; // (0,0,0) or gps_time 0: never exported
         uint64_t raw_outside_trajectory = 0; // exported candidates with no trajectory node within 10 ms
@@ -57,6 +60,7 @@ namespace easy_gui
         double filter_threshold_xy_inner = 0.0;
         double filter_threshold_xy_outer = 0.0;
         double threshould_output_filter = 0.0;
+        int threshold_nr_poses = 0; // trajectory poses per step 1 piece (worker chunk)
     };
 
     //! Called with the fraction done (0..1) and a short description of the current step.

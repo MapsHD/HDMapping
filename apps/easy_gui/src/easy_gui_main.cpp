@@ -337,11 +337,13 @@ namespace
             const OutputLayout out(app.output_folder);
             const ExportStats& e = s.export_stats;
             ImGui::BulletText(
-                "%s: %.1f million points (%.1f million from lidar odometry, %.1f million near points), %.0f MB",
+                "%s: %.1f million points (%.1f million from lidar odometry, %.1f million near and %.1f million gap points "
+                "added), %.0f MB",
                 out.point_cloud.filename().string().c_str(),
-                (e.odometry_points + e.near_points + e.check_band_points) / 1e6,
+                (e.odometry_points + e.near_points + e.gap_points + e.check_band_points) / 1e6,
                 e.odometry_points / 1e6,
                 e.near_points / 1e6,
+                e.gap_points / 1e6,
                 e.laz_bytes / 1e6);
             ImGui::BulletText("%s: %zu scanner poses", out.trajectory.filename().string().c_str(), e.trajectory_nodes);
             ImGui::BulletText("%s describes every field of both files.", out.readme.filename().string().c_str());
@@ -491,10 +493,11 @@ namespace
             return 1;
         }
         std::printf(
-            "[OK] %llu odometry + %llu near + %llu check-band points; raw read %llu, no-return %llu, outside trajectory %llu; "
+            "[OK] %llu odometry + %llu near + %llu gap + %llu check-band points; raw read %llu, no-return %llu, outside trajectory %llu; "
             "range %.3f - %.3f m; %zu poses; LAZ %llu bytes, CSV %llu bytes\n",
             static_cast<unsigned long long>(stats.odometry_points),
             static_cast<unsigned long long>(stats.near_points),
+            static_cast<unsigned long long>(stats.gap_points),
             static_cast<unsigned long long>(stats.check_band_points),
             static_cast<unsigned long long>(stats.raw_points_read),
             static_cast<unsigned long long>(stats.raw_no_return),
@@ -547,7 +550,7 @@ int main(int argc, char* argv[])
             "usage: %s --headless <recording folder> <output folder> [--check-band <m>] [--place-by-raw-time]\n"
             "       %s --export-only <recording folder> <session.mjs> <output folder> [--check-band <m>] [--place-by-raw-time]\n"
             "--check-band <m> (testing): also export the raw points between the 1.0 m load filter and <m>, flagged\n"
-            "                 near_added = 2, to check that near points line up with the odometry points.\n"
+            "                 point_origin = 3, to check that near points line up with the odometry points.\n"
             "--place-by-raw-time: place all points from the raw files at their real time (export option, default off).\n",
             argv[0],
             argv[0]);

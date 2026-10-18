@@ -3,6 +3,9 @@
 This document explains how Easy GUI works, why it is built the way it is, and how its output was validated. It is for
 collaborators and reviewers who know HDMapping. The user guide is [../README.md](../README.md).
 
+Naming: the user-facing name is **HDMapping Easy Forestry** (window title, user guide, release packages). Internally,
+the code keeps the name Easy GUI (`apps/easy_gui`, the `easy_gui` binary and targets), and so does this document.
+
 Contents:
 
 1. [Goal and scope](#1-goal-and-scope)
@@ -80,6 +83,11 @@ native message box on `bad_alloc`), and a real cancel: killing the process group
 ~8.5 GB. Building `easy_gui` also builds `lidar_odometry_step_1` (`add_dependencies`). Easy GUI finds it next to its own
 executable, under the plain name or the `HDMAPPING_BINARY_PREFIX` name; `HDMAPPING_STEP1_EXECUTABLE` overrides the
 lookup.
+
+**Building only Easy GUI:** `cmake -B build -DHDMAPPING_EASY_GUI_ONLY=ON` builds and installs only `easy_gui`,
+`lidar_odometry_step_1` and the libraries they link (plus `easy_gui_tests` with `BUILD_TESTING=ON`). The default is
+off, which leaves the upstream build unchanged. On macOS this mode also sets `CMAKE_OSX_DEPLOYMENT_TARGET` to 13.0
+(unless given), the lowest version the code builds for; without it the minimum is the build machine's macOS version.
 
 Quirks of headless step 1 (`lidar_odometry_step_1 <input> <params.toml> <output>`) that Easy GUI handles:
 
@@ -326,7 +334,9 @@ placed the near-point way and flagged `point_origin = 3`. Their nearest-neighbou
 
 Rebuilding step 1's ramp from the raw files for scans 40–49 reproduces all 7,595,561 step 1 points (≤ 0.17 mm) and
 shows that the whole difference comes from step 1's ramp time choosing a different node than the real time would:
-|ramp − raw| p50 1.2 ms, p99 11.6 ms, max 17 ms, giving displacements of p90 9 mm, max 56 mm.
+|ramp − raw| p50 1.2 ms, p99 11.6 ms, max 17 ms, giving displacements of p90 9 mm, max 56 mm. Displacements of this
+size have a negligible effect on sharpness and stem diameters: placing all points by raw time moves them by the same
+mechanism and changes ground and stem thickness by less than 1 mm and diameters by a median of 0.4 mm (§8).
 
 ### 7.4 Gap points sit where a missing slice of step 1's points would
 
@@ -393,6 +403,16 @@ always reports the breakdown, warns below 1.5× the estimate and refuses below 1
 - **Windows:** `child_process.cpp` has a Windows implementation (CreateProcess + job object) that has not been compiled
   yet.
 - **v2:** gated pose-graph loop closure (§1).
+- **Packaging (macOS, not done yet):**
+  - Bundle `easy_gui` and `lidar_odometry_step_1` in one `HDMapping Easy Forestry.app` (step 1 must stay next to
+    `easy_gui`), with their dylibs, and rewrite the library paths.
+  - Then re-sign the whole bundle ad hoc, because rewriting library paths invalidates the signatures and Apple silicon
+    refuses to run unsigned code: `codesign --force --deep -s - "HDMapping Easy Forestry.app"`. This must include the
+    bundled step 1 binary and every bundled dylib.
+  - Every bundled dylib must be built for macOS 13 too, or the app's real minimum is higher than the README says. A
+    build against Homebrew links `libproj` (into both programs) and `libhwloc` (through TBB), both built for the build
+    machine's macOS (26 here; the linker warns). Build them from source with `MACOSX_DEPLOYMENT_TARGET=13.0`, or drop
+    them from Easy GUI's link, and check every file with `vtool -show-build` (`minos`).
 
 Tests: `easy_gui_tests` (doctest, synthetic recordings and sessions). The integration tests against the real step 1
 binary run only when `EASY_GUI_TEST_RECORDING=<recording folder>` is set; a folder of symlinks to the first 4 file

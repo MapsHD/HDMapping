@@ -38,7 +38,7 @@ can continue there.
 
 | | Mac | Windows |
 |---|---|---|
-| System | macOS 13 (Ventura) or newer | Coming soon, not yet tested |
+| System | macOS 13 (Ventura) or newer | Windows 10 or 11, 64-bit (not yet tested on a real PC) |
 | Processor | Apple silicon (M1 or newer). Intel Macs are not supported in v1. | 64-bit Intel or AMD processor |
 | Memory (RAM) | 16 GB recommended | 16 GB recommended |
 
@@ -61,7 +61,8 @@ need to do this once.
 
 ### Mac
 
-1. Download **`EasyForestHDMapping-mac.dmg`** from *[download link — coming with the first release]*.
+1. Open the [releases page](https://github.com/MartinMokros/HDMapping-Easy-GUI/releases) and download the newest Easy Forest HDMapping release: the file
+   **`EasyForestHDMapping-mac.dmg`** under *Assets*.
 2. Double-click the `.dmg` file. In the window that opens, drag **Easy Forest HDMapping** onto the **Applications**
    folder.
 3. Open your **Applications** folder and double-click **Easy Forest HDMapping**.
@@ -74,11 +75,13 @@ need to do this once.
 From now on Easy Forest HDMapping opens normally. If macOS ever says the app **"is damaged and can't be opened"**, see
 [Troubleshooting](#troubleshooting).
 
-### Windows (coming soon, not yet tested)
+### Windows (not yet tested on a real PC)
 
-The Windows version has not been built and tested yet. These steps are what installation will look like:
+The Windows version is built and its automatic tests pass, but nobody has used it on a real Windows PC yet. If
+something goes wrong, please report it (see [Getting help](#getting-help)).
 
-1. Download **`EasyForestHDMapping-windows.zip`** from *[download link — coming with the first release]*.
+1. Open the [releases page](https://github.com/MartinMokros/HDMapping-Easy-GUI/releases) and download the newest Easy Forest HDMapping release: the file
+   **`EasyForestHDMapping-windows.zip`** under *Assets*.
 2. Before unpacking: right-click the downloaded `.zip` file → **Properties** → on the **General** tab, tick
    **Unblock** at the bottom → **OK**. (If there is no Unblock box, skip this step.)
 3. Right-click the `.zip` file → **Extract All…** → choose a folder, for example `Documents\Easy Forest HDMapping`

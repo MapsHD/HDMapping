@@ -33,15 +33,14 @@ jobs:
             echo "VERSION=$(git describe --tags --always)" >> "$GITHUB_ENV"
           fi
 
+      # Latest CMake: it has to know the generator of whatever Visual Studio the runner image ships.
       - uses: lukka/get-cmake@latest
-        with:
-          cmakeVersion: "~4.0.0"
 
       # HD_CPU_OPTIMIZATION=GENERIC: AUTO adds /arch:AVX2 when the runner's CPU has it, and the release must also run
       # on PCs without AVX2.
       - name: Configure
         run: |
-          cmake -B build -G "Visual Studio 17 2022" -A x64 \
+          cmake -B build -A x64 \
             -DHDMAPPING_EASY_GUI_ONLY=ON \
             -DBUILD_TESTING=ON \
             -DHD_CPU_OPTIMIZATION=GENERIC \

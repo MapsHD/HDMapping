@@ -8,8 +8,8 @@ the code keeps the name Easy GUI (`apps/easy_gui`, the `easy_gui` binary and tar
 
 Version: Easy Forest HDMapping has its own version (`EASY_FOREST_VERSION` in `apps/easy_gui/CMakeLists.txt`,
 equal to the `easy-forest-v*` tag). Window title, README.txt and easy_gui.log show both, e.g. "Easy Forest HDMapping
-0.1.0 (HDMapping 0.105.0)". The LAZ header's 32-character fields cannot hold that: generating software is
-"Easy Forest HDMapping 0.1.0", system identifier "HDMapping 0.105.0".
+0.2.0 (HDMapping 0.105.0)". The LAZ header's 32-character fields cannot hold that: generating software is
+"Easy Forest HDMapping 0.2.0", system identifier "HDMapping 0.105.0".
 
 Contents:
 
@@ -22,7 +22,8 @@ Contents:
 7. [Validation](#7-validation)
 8. [Experimental option: place every point by its raw time](#8-experimental-option-place-every-point-by-its-raw-time)
 9. [Resources: time, memory, disk](#9-resources-time-memory-disk)
-10. [Status and next steps](#10-status-and-next-steps)
+10. [Batch mode](#10-batch-mode)
+11. [Status and next steps](#11-status-and-next-steps)
 
 ---
 
@@ -40,6 +41,8 @@ Constraints:
 - Reuse HDMapping's code; do not duplicate its algorithms. `core_math` is not modified, and the existing apps behave
   as before.
 - Show progress and report errors in plain language.
+
+Since 0.2.0 it also processes several recordings in one go (batch mode, §10), each into its own output folder.
 
 Not in scope (v1): step 2 refinement, step 3 (multi-session), georeferencing (GNSS, control points), and rigs with
 more than one lidar. The pre-flight check refuses recordings with more than one lidar id.
@@ -74,6 +77,8 @@ Code in `apps/easy_gui`:
 | `src/forestry_preset.*` | Writes the step 1 parameter file with step 1's own `TomlIO`. |
 | `src/export.*`, `src/las14_writer.*` | The export (§6) and a streaming LAS 1.4 point format 6 LAZ writer with a hand-written extra-bytes VLR. |
 | `src/pipeline.*` | Worker thread that runs the stages above and publishes status for the GUI. |
+| `src/batch.*` | Batch mode (§10): discovery, output names, done markers, batch disk check, and `BatchRunner`, which runs `Pipeline` once per recording. |
+| `src/sleep_blocker.*` | Keeps the computer awake while a batch runs (§10.5). |
 | `src/easy_gui_main.cpp` | The window, plus the command-line modes below. |
 | `tests/` | `easy_gui_tests` (doctest). |
 | `scripts/check_export.py` | Acceptance checks for an export (§7). |
@@ -107,10 +112,11 @@ Quirks of headless step 1 (`lidar_odometry_step_1 <input> <params.toml> <output>
 | Mode | Purpose |
 |---|---|
 | `--headless <recording> <output>` | The whole pipeline without a window. Exit code 0 success, 1 failed or refused, 2 usage. |
+| `--batch <parent folder> <output>` | Batch mode without a window (§10). Exit code 0 when every selected recording succeeded or was already done, 1 otherwise or refused, 2 usage. Ctrl+C once = stop after current, twice = stop now. |
 | `--export-only <recording> <session.mjs> <output>` | Only the export, on an existing step 1 session (about 2.5 min instead of about 22). |
-| `--check-band <m>` (with either of the above) | Test mode for the alignment check, see §7.3. |
-| `--place-by-raw-time` (with either of the above) | The experimental export option of §8. |
-| `--screenshot <file.png> [recording]` | Renders the window for about 2 s, saves it and exits (for documentation). raylib saves into the working directory. |
+| `--check-band <m>` (with any of the above) | Test mode for the alignment check, see §7.3. |
+| `--place-by-raw-time` (with any of the above) | The experimental export option of §8. |
+| `--screenshot <file.png> [recording \| --batch <parent folder>]` | Renders the window for about 2 s, saves it and exits (for documentation). raylib saves into the working directory. `EASY_GUI_SCREENSHOT_START=1` starts the batch once it is ready and `EASY_GUI_SCREENSHOT_FRAME=<n>` takes the picture at frame n (30 per second), to capture a running or finished batch. |
 
 **Output folder:**
 
@@ -123,6 +129,7 @@ Quirks of headless step 1 (`lidar_odometry_step_1 <input> <params.toml> <output>
 | `work/easy_gui_step1.toml` | The parameters step 1 ran with. |
 | `work/lio_session/` | The step 1 session (`session.mjs` etc.). Kept, so it can be opened in step 2 for refinement or georeferencing. |
 | `work/staging/` | Removed after success unless "Keep intermediate files" is ticked. |
+| `easy_gui_done.txt` | Batch mode only: written once the result is complete (§10.4). |
 
 After a failure or a cancel, `work/` is removed, except that an export failure keeps `work/lio_session/`, since
 odometry took most of the run.
@@ -395,7 +402,116 @@ Measured on the test recording (117 M raw points, 10-minute walk):
 The pre-flight check therefore estimates 120 B per raw point of temporary space plus 2.25× the raw LAZ size for results,
 always reports the breakdown, warns below 1.5× the estimate and refuses below 1×.
 
-## 10. Status and next steps
+## 10. Batch mode
+
+"Several recordings" in the window and `--batch <parent folder> <output>` process many recordings one after another,
+for example the plots of a field day overnight. Each recording runs through the unchanged `Pipeline` (pre-flight
+re-check, staging, step 1 as a child process, export, clean-up), so its output folder is exactly that of a single run.
+
+```
+<output root>/
+   batch.log               what happened, with times (flushed per line)
+   batch_summary.csv       one row per recording and per skipped folder, rewritten after every recording
+   <output name>/          one per recording: the files of §2 (+ easy_gui_done.txt once finished)
+```
+
+### 10.1 Finding recordings
+
+`discoverRecordings` looks at the parent's direct subfolders, plus the parent itself (listed first, so a single
+recording folder also works). A recording is a folder in which `classifyRecordingFiles` finds at least one point cloud
+and one IMU file; the pre-flight check judges the rest. It is deliberately not recursive: a recording is the folder the
+scanner wrote, and a deeper search would also find step 1's own `cache/`/`preview/` folders of old manual runs and
+Easy GUI's staging links. Other subfolders are listed with a reason ("No IMU files", "Easy Forest HDMapping results,
+not a recording", "Recordings are only looked for one folder level down"). Hidden and system folders (`.*`, `$*`,
+`System Volume Information`) are left out silently.
+
+### 10.2 Output names
+
+The default is the recording's folder name, made unique ignoring ASCII case (the default file systems of macOS and
+Windows are case-insensitive) by appending `_2`, `_3`, ... A parent that is a recording and contains a recording of
+the same name is the common collision. A name is also passed over when its folder already holds files other than this
+recording's finished result or an unfinished attempt. Edited names are validated for both systems (no
+`/ \ : * ? " < > |` or control characters, no trailing dot or space, not `.`/`..`, not a Windows device name such as
+`CON` or `COM1`) and must be unique among the recordings that will run.
+
+The default output root is `Documents/Easy Forest HDMapping/<parent folder name>`. Unlike single mode it is reused when
+it holds an earlier batch (it contains `batch_summary.csv`), so that choosing the same parent folder again continues
+the batch.
+
+The batch refuses an output root inside any recording (`batchOutputProblem`): `batch.log` and the summary would be
+written there. The recordings' own output folders are covered by the per-recording check (§5.6).
+
+### 10.3 Checks before the start
+
+Every recording gets the single-mode pre-flight check against its own output folder, row by row on a background thread
+in the window (the recordings may be on a slow USB stick). A recording that fails cannot be selected; one that is
+already done (§10.4) is shown as such and skipped. The batch disk check needs
+
+  the largest temporary need of any one selected recording + the results of all selected recordings,
+
+because the recordings run one at a time and each frees its temporary space (§9) when it ends. Thresholds are those
+of single mode: refused below the estimate, a warning below 1.5×. Disk space is checked again before every recording
+(the pipeline repeats its pre-flight check), so a disk that fills up during the batch fails the affected recordings
+with the usual message instead of crashing step 1.
+
+### 10.4 Failures, done markers and restarting
+
+- A recording that fails (check, step 1 or export) is marked failed with the pipeline's plain-language message, and the
+  batch continues. Its output folder keeps what single mode keeps after a failure: the log, and the step 1 session if
+  only the export failed.
+- A recording that succeeds gets `easy_gui_done.txt`: version, recording path, a fingerprint, finish time, duration,
+  raw and exported point counts. The fingerprint is the number of file pairs, the total size of the paired files and
+  the first IMU timestamp. It identifies the recording without its path, because a USB stick can be mounted under
+  another name or drive letter after a restart; the IMU timestamp separates equally large recordings.
+- Restarting the same batch (same parent, same output root) skips recordings whose marker matches. Their summary rows
+  say `already_done` and take duration and point counts from the marker.
+- A recording whose output folder holds only Easy GUI's own run files (`easy_gui.log`, `work/`, `point_cloud.laz`,
+  `trajectory.csv`, `README.txt`) but no marker is an unfinished attempt (failed, stopped, power cut). The batch runs
+  the pipeline with `PipelineRequest::resume_unfinished`: the pre-flight check accepts the folder
+  (`runPreflight(..., resume_unfinished)`), and the pipeline removes everything in it except `easy_gui.log`, which it
+  continues. Any other file in the folder makes the check fail ("already contains files"), so nothing a user put
+  there is ever deleted. Single mode keeps refusing non-empty folders.
+- The summary is written to `batch_summary.csv.tmp` and renamed, after every recording, so it is never half-written
+  and is current even if the batch never ends normally. On Windows a summary that is open in Excel cannot be
+  replaced; the batch logs a warning and continues.
+
+Summary columns: `recording, output_name, status, duration_s, raw_points, exported_points, output_path, error`.
+`raw_points` counts all point records of the paired files (including no-return records), as the pre-flight check
+does; `exported_points` is the size of `point_cloud.laz`. Statuses: `succeeded`, `failed`, `already_done`,
+`cancelled` (stopped by "stop now"), `not_run` (the batch stopped before it), `excluded` (not selected, or its check
+failed; the error column says which) and `skipped` (not a recording).
+
+### 10.5 Running
+
+- **Stop after current** lets the running recording finish; the rest become `not_run`. **Stop now** cancels the
+  running recording exactly like single mode's cancel (child process killed, `work/` removed, log kept).
+- **Sleep.** The batch thread holds a `SleepBlocker` for its whole run. On macOS this is an IOKit assertion
+  `kIOPMAssertionTypePreventUserIdleSystemSleep` (shows up in `pmset -g assertions` as "Easy Forest HDMapping is
+  processing recordings"; checked, and released when the batch ends); on Windows
+  `SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED)`, which applies to the calling thread, so it is set and cleared on the batch thread. Both
+  prevent idle sleep only: the display may turn off, and closing a laptop lid still sleeps. Other platforms: no-op.
+- **Progress and ETA.** Each recording is weighted by its raw point count. Within a recording, odometry counts for
+  90 % and the export for 10 % (§9: ~21 min against ~2.5 min). The ETA is the processing rate of the recordings that
+  really ran (already-done recordings take no time) applied to the remaining weight.
+- `BatchRunner` drives an abstract `RecordingJob`; the real one wraps `Pipeline`, and the tests inject a fake one.
+
+### 10.6 Tests
+
+Unit tests (`tests/test_batch.cpp`, fake `RecordingJob`): discovery (sorting, nested folders, non-recordings, hidden
+folders, parent that is a recording, with and without a trailing separator), output-name validation and collisions
+(case, invalid characters, foreign / unfinished / finished folders), done-marker round trip and path independence,
+batch disk arithmetic, output root inside a recording, failure-continues with summary and log contents, restart
+skipping finished recordings and retrying an unfinished one, a folder filled after the check, stop after current and
+stop now. `tests/test_preflight.cpp` covers `resume_unfinished` and keeps `holdsUnfinishedOutput` in sync with
+`OutputLayout`.
+
+Integration test (`EASY_GUI_TEST_RECORDING=mini4`): a parent with two copies of the recording (symlinked files), a
+recording that passes the check but on which step 1 fails (one file pair cut to 200 points), and a non-recording
+folder. Both copies succeed with identical point counts (2,566,166), the broken one fails with step 1's message, and a
+restart skips the two copies and retries the broken one. 62 s on an Apple silicon laptop; one `mini4` copy takes
+~30 s.
+
+## 11. Status and next steps
 
 - **M1 (done):** pre-flight check, staging, step 1 as a child process with progress and cancel.
 - **M2 (done):** export (§6).
@@ -405,6 +521,9 @@ always reports the breakdown, warns below 1.5× the estimate and refuses below 1
     gps_time, reported twice: as step 1 does it (no-return points removed by the load filter *before* the ramp) and
     with those points kept, to quantify how much their removal contributes.
   - Near points: counts, range histogram, and sensor-frame density below 1.5 m.
+- **M4 (done, 0.2.0, not released yet):** batch mode (§10). The macOS side was run in the window and with
+  `--batch` on `mini4` copies (stop after current, restart, sleep assertion). The Windows code (`SetThreadExecutionState`,
+  Ctrl+C in `--batch`) has not been compiled yet; the next Windows CI run will.
 - **v2:** gated pose-graph loop closure (§1).
 - **Release builds:** `.github/workflows/easy-forest-{macos,windows}.yml`, on `easy-forest-v*` tags and manual
   dispatch; the packaging steps are scripts in `apps/easy_gui/packaging/` so they run locally the same way.

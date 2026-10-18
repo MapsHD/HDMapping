@@ -4,7 +4,7 @@ project(easy_gui)
 
 # Easy Forest HDMapping's own version: shown next to HDMapping's in the window title, README.txt, easy_gui.log and
 # the LAZ header. Keep it equal to the easy-forest-v* release tag.
-set(EASY_FOREST_VERSION "0.1.0")
+set(EASY_FOREST_VERSION "0.2.0")
 
 # easy_gui_core -- everything except the window: pre-flight check, staging, the
 # step 1 child process and its progress parsing, and the pipeline that ties

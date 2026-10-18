@@ -10,6 +10,7 @@ is nothing to tune.
 - [What your computer needs](#what-your-computer-needs)
 - [Installation](#installation)
 - [How to use it](#how-to-use-it)
+- [Processing many recordings](#processing-many-recordings)
 - [What you get](#what-you-get)
 - [Troubleshooting](#troubleshooting)
 - [Getting help](#getting-help)
@@ -23,7 +24,8 @@ its settings are tuned for forests.
 
 What it does **not** do:
 
-- **One walk at a time.** It processes one recording folder. It does not merge several walks into one cloud.
+- **One point cloud per walk.** Each recording becomes its own point cloud. It can process many recordings in one go
+  (see [Processing many recordings](#processing-many-recordings)), but it does not merge several walks into one cloud.
 - **No real-world coordinates.** It does not use GNSS or ground control points. Coordinates are in metres, starting at
   the spot where you started walking, with the vertical axis (Z) pointing up.
 - **No loop closure yet.** If you return to your starting point, small drift is not corrected. (Planned for a later
@@ -94,7 +96,8 @@ from your desktop next time.
 
 ## How to use it
 
-The window guides you through four steps, top to bottom.
+At the top of the window, choose **One recording** (described here) or **Several recordings** (see
+[Processing many recordings](#processing-many-recordings)). The window guides you through four steps, top to bottom.
 
 **1. Recording.** Click **Choose recording…** and select the folder the scanner wrote, for example
 `continousScanning_0012`. It contains files named `lidar0000.laz`, `imu0000.csv` and so on. You can also drag the
@@ -123,6 +126,64 @@ When it is done, click **Open output folder** to see the results, or **Process a
 - **Place all points by their measurement time (experimental)**: an alternative way of placing the points. Tests showed
   it slightly less sharp than the default, so leave it off unless you are comparing the two.
 - **Keep intermediate files**: keeps extra working files, useful when reporting a problem.
+
+## Processing many recordings
+
+After a field day you often have many recordings, for example one per plot. Easy Forest HDMapping can process all of
+them one after another, unattended, for example overnight.
+
+1. At the top of the window, choose **Several recordings**.
+2. **Folder with recordings.** Click **Choose folder…** and select the folder that *contains* the recording folders,
+   for example a copy of the scanner's USB stick. You can also drag it onto the window. Easy Forest HDMapping looks in
+   the folders directly inside it (not deeper). If the folder you chose is itself a recording, it is included too.
+3. **Output folder.** Easy Forest HDMapping suggests `Documents/Easy Forest HDMapping/<name of the folder>`. Each
+   recording's results go into a folder of its own inside it.
+4. **Recordings.** A table lists every recording found:
+
+   | Column | Meaning |
+   |---|---|
+   | Include | Untick a recording to leave it out. Recordings that fail the check cannot be ticked. |
+   | Recording | The folder name. Point at it to see the full path. |
+   | Length | How long the walk was. |
+   | Check | **[OK]**, **[!]** (worth knowing, you can go on) or **[X]** (cannot be processed). Point at it for the details; problems are also listed in words below the table. **already done** means this recording was finished in an earlier run and will be skipped. |
+   | Output folder name | The name of this recording's results folder. You can change it. Two recordings cannot use the same name (upper and lower case count as the same). |
+
+   Folders that are not recordings are listed under **folders skipped**, with the reason. Below the table, the disk
+   check tells you how much space the whole batch needs: the temporary space of the largest recording (recordings are
+   processed one at a time, and each frees its temporary space when it is done) plus the results of all of them.
+5. **Process.** Click **Start processing**. You see the progress of the whole batch with the time left, which
+   recording is being processed, and the status of each recording in the table. Your computer will not go to sleep
+   while the batch runs (the screen may still turn off). Leave the power adapter connected.
+
+If a recording fails, it is marked **failed** and the batch goes on with the next one. Point at **failed** in the table
+to see why; the recording's own `easy_gui.log` has the details.
+
+**Stopping.** **Stop after this recording** lets the current recording finish and then stops. **Stop now** stops
+immediately and discards the current recording; recordings already finished are kept.
+
+**Continuing a stopped batch.** Choose the same folder with recordings and the same output folder again. Recordings
+that were finished show **already done** and are skipped; the others are processed, including the ones that failed
+before. This also works after a power cut or a crash. (Each finished recording's folder contains a small file,
+`easy_gui_done.txt`, that marks it as finished. Delete that file to process the recording again.)
+
+**What you get.** The output folder contains one folder per recording, each with the files described in
+[What you get](#what-you-get), plus two files about the whole batch:
+
+| File | What it is |
+|---|---|
+| `batch_summary.csv` | One row per recording: recording folder, output folder name, status (`succeeded`, `failed`, `already_done`, `cancelled`, `not_run`, `excluded`, `skipped`), processing time in seconds, number of raw points, number of points in the point cloud, results folder, and the error message if any. Opens in any spreadsheet program. |
+| `batch.log` | What happened in the batch, with times. |
+
+**Without the window.** The batch can also be started from a terminal, for example on a computer without a screen:
+
+```
+easy_gui --batch <folder with recordings> <output folder>
+```
+
+On a Mac the program is `"/Applications/Easy Forest HDMapping.app/Contents/MacOS/easy_gui"`; on Windows,
+`easy_gui.exe` in the folder you extracted. It follows the same rules as the window: every recording that passes the
+check is processed, and finished ones are skipped. Press Ctrl+C once to stop after the current recording, twice to stop
+now. The program ends with exit code 0 if every recording succeeded or was already done, and 1 otherwise.
 
 ## What you get
 
@@ -214,6 +275,10 @@ The check (step 3) explains problems in plain words. Here is what to do about ea
 | "Not enough free disk space …" | Free some space (the message says how much is needed), or choose an output folder on another disk with more space. |
 | "Free disk space is tight." | You can start, but make sure nothing else fills the disk while Easy Forest HDMapping works. |
 | "Could not determine the free disk space." | Usually harmless. Make sure the disk has plenty of space (see the rule of thumb above). |
+| "The output folder holds an unfinished earlier attempt." (several recordings) | Just information: the recording did not finish last time. Its old files are replaced; its log is continued. |
+| "Not enough free disk space for the batch …" (several recordings) | Free some space, choose an output folder on another disk, or untick some recordings and process them later. |
+| "The output folder is inside the recording …" (several recordings) | The folder with recordings is itself a recording, and the output folder is inside it. Choose an output folder somewhere else. |
+| Output folder name shown in red (several recordings) | The name is empty, contains a character a folder name cannot have (such as `/`, `\`, `:`, `*`, `?` or a vertical bar), or another recording uses it. Point at it to see which. |
 
 **Problems during processing**
 

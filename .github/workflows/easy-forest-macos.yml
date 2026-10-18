@@ -31,6 +31,12 @@ jobs:
         run: |
           if [[ "$GITHUB_REF" == refs/tags/easy-forest-v* ]]; then
             echo "VERSION=${GITHUB_REF_NAME#easy-forest-v}" >> "$GITHUB_ENV"
+            # The app shows EASY_FOREST_VERSION from CMake; it must be the tag's version.
+            cmake_version=$(sed -n 's/^set(EASY_FOREST_VERSION "\(.*\)")$/\1/p' apps/easy_gui/CMakeLists.txt)
+            if [[ "$cmake_version" != "${GITHUB_REF_NAME#easy-forest-v}" ]]; then
+              echo "::error::Tag $GITHUB_REF_NAME does not match EASY_FOREST_VERSION $cmake_version in apps/easy_gui/CMakeLists.txt"
+              exit 1
+            fi
           else
             echo "VERSION=$(git describe --tags --always)" >> "$GITHUB_ENV"
           fi
@@ -115,13 +121,17 @@ jobs:
           retention-days: 90
 
       # The macOS and Windows workflows both run on the same tag: whichever gets here first creates the release.
+      # 0.x versions and versions with a suffix (0.2.0-rc1) are pre-releases. Created with GITHUB_TOKEN, so the
+      # release does not trigger other workflows (upstream windows.yml runs on release: published).
       - name: Attach to GitHub release
         if: startsWith(github.ref, 'refs/tags/easy-forest-v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          PRERELEASE=""
+          if [[ "$VERSION" == 0.* || "$VERSION" == *-* ]]; then PRERELEASE="--prerelease"; fi
           gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1 \
-            || gh release create "$GITHUB_REF_NAME" --verify-tag --title "Easy Forest HDMapping $VERSION" \
+            || gh release create "$GITHUB_REF_NAME" --verify-tag --title "Easy Forest HDMapping $VERSION" $PRERELEASE \
                  --notes "Installation and use: [apps/easy_gui/README.md](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/apps/easy_gui/README.md)" \
             || gh release view "$GITHUB_REF_NAME" > /dev/null
           gh release upload "$GITHUB_REF_NAME" dist/EasyForestHDMapping-mac.dmg --clobber

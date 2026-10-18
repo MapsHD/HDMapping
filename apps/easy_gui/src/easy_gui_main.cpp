@@ -13,15 +13,19 @@
 #include <RaylibWidgets/WindowFit.h>
 
 #include <imgui.h>
+#include <misc/cpp/imgui_stdlib.h>
 #include <raylib.h>
 #include <rlImGui.h>
 
 #include <algorithm>
 #include <atomic>
+#include <condition_variable>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
+#include <deque>
 #include <future>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <thread>
@@ -78,8 +82,318 @@ namespace
         ImGui::PopStyleColor();
     }
 
+    std::string folderName(const fs::path& folder)
+    {
+        const fs::path normal = folder.lexically_normal();
+        return normal.filename().empty() ? normal.parent_path().filename().string() : normal.filename().string();
+    }
+
+    //! ~/Documents/Easy Forest HDMapping/<parent folder name>. Unlike single mode, an existing folder from an earlier
+    //! batch is reused (restarting the same batch continues it); _2, _3, ... only when the folder holds something else.
+    fs::path defaultBatchOutputFolder(const fs::path& parent)
+    {
+        const fs::path base = homeFolder() / "Documents" / "Easy Forest HDMapping";
+        const std::string name = folderName(parent);
+        std::error_code ec;
+        fs::path candidate = base / name;
+        for (int i = 2;
+             fs::exists(candidate, ec) && !fs::is_empty(candidate, ec) && !fs::exists(candidate / BatchRunner::kSummaryFileName, ec);
+             i++)
+            candidate = base / (name + "_" + std::to_string(i));
+        return candidate;
+    }
+
+    //! Checks the batch table's rows one at a time on a worker thread: they read the recordings, which may be on a
+    //! slow USB stick, and the window must stay responsive. Each result carries the generation it was requested for,
+    //! so results for a parent folder the user has since replaced are dropped.
+    class RowChecker
+    {
+    public:
+        struct Result
+        {
+            size_t row;
+            int generation;
+            fs::path output_folder; // the check was made against this output folder
+            BatchCheck check;
+        };
+
+        RowChecker()
+        {
+            thread_ = std::thread(&RowChecker::run, this);
+        }
+        ~RowChecker()
+        {
+            {
+                std::lock_guard lock(mutex_);
+                stop_ = true;
+            }
+            cv_.notify_all();
+            thread_.join();
+        }
+
+        void request(size_t row, int generation, const fs::path& recording, const fs::path& output_folder)
+        {
+            std::lock_guard lock(mutex_);
+            std::erase_if(
+                queue_,
+                [&](const Job& j)
+                {
+                    return j.generation != generation || j.row == row;
+                });
+            queue_.push_back({ row, generation, recording, output_folder });
+            cv_.notify_all();
+        }
+
+        std::vector<Result> take()
+        {
+            std::lock_guard lock(mutex_);
+            return std::exchange(results_, {});
+        }
+
+    private:
+        struct Job
+        {
+            size_t row;
+            int generation;
+            fs::path recording;
+            fs::path output_folder;
+        };
+
+        void run()
+        {
+            std::unique_lock lock(mutex_);
+            while (true)
+            {
+                cv_.wait(
+                    lock,
+                    [&]
+                    {
+                        return stop_ || !queue_.empty();
+                    });
+                if (stop_)
+                    return;
+                const Job job = queue_.front();
+                queue_.pop_front();
+                lock.unlock();
+                BatchCheck check = checkBatchRecording(job.recording, job.output_folder);
+                lock.lock();
+                results_.push_back({ job.row, job.generation, job.output_folder, std::move(check) });
+            }
+        }
+
+        std::mutex mutex_;
+        std::condition_variable cv_;
+        std::deque<Job> queue_;
+        std::vector<Result> results_;
+        bool stop_ = false;
+        std::thread thread_; // last: starts after the members above exist
+    };
+
+    struct BatchRow
+    {
+        DiscoveredFolder folder;
+        std::string output_name;
+        bool name_edited = false; // keep the user's name when the output folder changes
+        bool selected = true; // the user's choice; a recording that fails the check is never included
+        std::optional<BatchCheck> check;
+        fs::path checked_output;
+
+        bool checkCurrent(const fs::path& output_root) const
+        {
+            return check && checked_output == output_root / output_name;
+        }
+        bool usable() const
+        {
+            return check && (check->done || check->preflight.ok());
+        }
+        bool included() const
+        {
+            return selected && usable();
+        }
+        //! Will write into its output folder, as far as is known: included, or selected and not checked yet.
+        bool active(const fs::path& output_root) const
+        {
+            return selected && (!checkCurrent(output_root) || usable());
+        }
+    };
+
+    struct BatchUi
+    {
+        fs::path parent;
+        fs::path output_root;
+        bool output_chosen_by_user = false;
+        std::vector<DiscoveredFolder> found;
+        std::vector<BatchRow> rows; // the recordings
+        std::vector<DiscoveredFolder> skipped; // the other folders
+        int generation = 0;
+        RowChecker checker;
+
+        bool disk_known = false;
+        uint64_t available = 0;
+        double disk_checked_at = -1e9;
+
+        BatchRunner runner;
+        bool started = false; // the runner was started; the table shows the status column until "new batch"
+        std::string start_error;
+
+        void setParent(const fs::path& folder)
+        {
+            parent = folder;
+            found = discoverRecordings(folder);
+            rows.clear();
+            skipped.clear();
+            std::vector<DiscoveredFolder> recordings;
+            for (const auto& f : found)
+                (f.is_recording ? recordings : skipped).push_back(f);
+            if (!output_chosen_by_user)
+                output_root = defaultBatchOutputFolder(folder);
+            const auto names = defaultOutputNames(recordings, output_root);
+            for (size_t i = 0; i < recordings.size(); i++)
+                rows.push_back({ recordings[i], names[i] });
+            generation++;
+            checkAll();
+        }
+
+        void setOutputRoot(const fs::path& folder)
+        {
+            output_root = folder;
+            output_chosen_by_user = true;
+            std::vector<DiscoveredFolder> recordings;
+            for (const auto& r : rows)
+                recordings.push_back(r.folder);
+            const auto names = defaultOutputNames(recordings, output_root);
+            for (size_t i = 0; i < rows.size(); i++)
+                if (!rows[i].name_edited)
+                    rows[i].output_name = names[i];
+            checkAll();
+        }
+
+        void checkRow(size_t i)
+        {
+            if (outputNameProblem(rows[i].output_name).empty())
+                checker.request(i, generation, rows[i].folder.path, output_root / rows[i].output_name);
+        }
+
+        void checkAll()
+        {
+            for (size_t i = 0; i < rows.size(); i++)
+                checkRow(i);
+            disk_checked_at = -1e9;
+        }
+
+        void poll()
+        {
+            for (auto& r : checker.take())
+                if (r.generation == generation && r.row < rows.size())
+                {
+                    rows[r.row].check = std::move(r.check);
+                    rows[r.row].checked_output = r.output_folder;
+                    disk_checked_at = -1e9;
+                }
+            // Free space changes while other programs run; refreshed every few seconds before the start.
+            if (!runner.busy() && !started && ImGui::GetTime() - disk_checked_at > 3.0 && !output_root.empty())
+            {
+                fs::path checked;
+                disk_known = availableSpace(output_root, available, checked);
+                disk_checked_at = ImGui::GetTime();
+            }
+        }
+
+        bool checking() const
+        {
+            for (const auto& r : rows)
+                if (!r.checkCurrent(output_root) && outputNameProblem(r.output_name).empty())
+                    return true;
+            return false;
+        }
+
+        //! Why row `i`'s output name cannot be used, or empty.
+        std::string nameProblem(size_t i) const
+        {
+            if (std::string p = outputNameProblem(rows[i].output_name); !p.empty())
+                return p;
+            for (size_t j = 0; j < rows.size(); j++)
+                if (j != i && rows[j].active(output_root) && sameOutputName(rows[i].output_name, rows[j].output_name))
+                    return "Another recording uses the same output folder name.";
+            return {};
+        }
+
+        std::vector<const PreflightResult*> toProcess() const
+        {
+            std::vector<const PreflightResult*> out;
+            for (const auto& r : rows)
+                if (r.included() && r.checkCurrent(output_root) && !r.check->done)
+                    out.push_back(&r.check->preflight);
+            return out;
+        }
+
+        Finding diskFinding() const
+        {
+            return batchDiskFinding(batchDiskNeed(toProcess()), disk_known, available);
+        }
+
+        bool readyToStart() const
+        {
+            if (runner.busy() || started || rows.empty() || checking() || !batchOutputProblem(output_root, found).empty())
+                return false;
+            bool any = false;
+            for (size_t i = 0; i < rows.size(); i++)
+            {
+                if (!rows[i].active(output_root))
+                    continue;
+                if (!nameProblem(i).empty())
+                    return false;
+                any = any || rows[i].included();
+            }
+            return any && diskFinding().severity != Severity::Error;
+        }
+
+        BatchRequest makeRequest(const Settings& settings) const
+        {
+            BatchRequest request;
+            request.output_root = output_root;
+            request.skipped = skipped;
+            request.step1_executable = findStep1Executable();
+            request.settings = settings;
+            for (const auto& r : rows)
+            {
+                BatchItem item{ r.folder.path, r.folder.name, r.output_name, r.included() };
+                item.total_points = r.check ? r.check->preflight.total_points : 0;
+                if (!r.selected)
+                    item.exclude_reason = "Not selected.";
+                else if (!r.usable())
+                    item.exclude_reason = "Check failed: " + firstError(r.check->preflight);
+                request.items.push_back(std::move(item));
+            }
+            return request;
+        }
+
+        void reset()
+        {
+            runner.wait();
+            parent.clear();
+            found.clear();
+            rows.clear();
+            skipped.clear();
+            generation++;
+            if (!output_chosen_by_user)
+                output_root.clear();
+            started = false;
+            start_error.clear();
+        }
+    };
+
+    enum class Mode
+    {
+        Single,
+        Batch
+    };
+
     struct App
     {
+        Mode mode = Mode::Single;
+        BatchUi batch;
+
         fs::path recording;
         fs::path output_folder;
         bool output_chosen_by_user = false;
@@ -400,6 +714,398 @@ namespace
         if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 5.0f) // follow the end unless the user scrolled up
             ImGui::SetScrollHereY(1.0f);
         ImGui::EndChild();
+    }
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // Batch mode ("Several recordings")
+
+    void drawBatchInputs(App& app, bool locked)
+    {
+        BatchUi& b = app.batch;
+        ImGui::BeginDisabled(locked);
+
+        ImGui::SeparatorText("1. Folder with recordings");
+        ImGui::TextWrapped(
+            "A folder that contains several recording folders, for example a copy of the scanner's USB stick. Recordings are looked "
+            "for one folder level down. You can also drag the folder onto this window.");
+        if (ImGui::Button("Choose folder..."))
+        {
+            const std::string folder = mandeye::fd::SelectFolder("Choose the folder that contains the recordings");
+            if (!folder.empty())
+                b.setParent(folder);
+        }
+        ImGui::SameLine();
+        ImGui::TextUnformatted(b.parent.empty() ? "(none chosen)" : b.parent.string().c_str());
+
+        ImGui::SeparatorText("2. Output folder");
+        ImGui::TextWrapped(
+            "Each recording's results go into a folder of its own in here, named in the table below. Choosing the same output folder "
+            "again continues an interrupted batch: finished recordings are skipped.");
+        if (ImGui::Button("Choose output folder..."))
+        {
+            const std::string folder = mandeye::fd::SelectFolder("Choose where to save the results");
+            if (!folder.empty())
+                b.setOutputRoot(folder);
+        }
+        ImGui::SameLine();
+        ImGui::TextUnformatted(b.output_root.empty() ? "(set automatically once a folder is chosen)" : b.output_root.string().c_str());
+
+        drawAdvancedSettings(app.settings);
+        ImGui::EndDisabled();
+    }
+
+    void drawCheckCell(const BatchRow& row, bool current)
+    {
+        if (!current)
+        {
+            ImGui::TextDisabled(outputNameProblem(row.output_name).empty() ? "checking..." : "-");
+            return;
+        }
+        const BatchCheck& c = *row.check;
+        if (c.done)
+        {
+            ImGui::TextColored(kGreen, "already done");
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Finished on %s. It will be skipped.", c.done->finished.c_str());
+            return;
+        }
+        size_t warnings = 0;
+        for (const auto& f : c.preflight.findings)
+            warnings += f.severity == Severity::Warning ? 1 : 0;
+        if (!c.preflight.ok())
+            ImGui::TextColored(kRed, "[X] problem");
+        else if (warnings > 0)
+            ImGui::TextColored(kAmber, "[!] %zu note%s", warnings, warnings > 1 ? "s" : "");
+        else
+            ImGui::TextColored(kGreen, "[OK]");
+        if (ImGui::IsItemHovered())
+        {
+            ImGui::BeginTooltip();
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 40.0f);
+            for (const auto& f : c.preflight.findings)
+            {
+                const char* tag = f.severity == Severity::Error ? "[X]" : f.severity == Severity::Warning ? "[!]" : "[OK]";
+                ImGui::TextWrapped("%s %s", tag, f.message.c_str());
+            }
+            ImGui::PopTextWrapPos();
+            ImGui::EndTooltip();
+        }
+    }
+
+    void drawStatusCell(const BatchItemResult& r, bool current, const BatchStatus& s)
+    {
+        switch (r.state)
+        {
+        case BatchItemState::Excluded:
+            ImGui::TextDisabled("not selected");
+            break;
+        case BatchItemState::Pending:
+            ImGui::TextDisabled("waiting");
+            break;
+        case BatchItemState::Running:
+            ImGui::TextColored(kAmber, "running %d%%", current ? static_cast<int>(pipelineFraction(s.current_status) * 100) : 0);
+            break;
+        case BatchItemState::Succeeded:
+            ImGui::TextColored(kGreen, "done (%s)", formatDuration(r.duration_s).c_str());
+            break;
+        case BatchItemState::AlreadyDone:
+            ImGui::TextColored(kGreen, "already done");
+            break;
+        case BatchItemState::Failed:
+            ImGui::TextColored(kRed, "failed");
+            break;
+        case BatchItemState::Cancelled:
+            ImGui::TextColored(kAmber, "stopped");
+            break;
+        case BatchItemState::NotRun:
+            ImGui::TextDisabled("not run");
+            break;
+        }
+        if (!r.error.empty() && ImGui::IsItemHovered())
+        {
+            ImGui::BeginTooltip();
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 40.0f);
+            ImGui::TextWrapped("%s", r.error.c_str());
+            ImGui::PopTextWrapPos();
+            ImGui::EndTooltip();
+        }
+    }
+
+    void drawBatchTable(App& app, bool locked)
+    {
+        BatchUi& b = app.batch;
+        ImGui::SeparatorText("3. Recordings");
+        if (b.parent.empty())
+        {
+            ImGui::TextDisabled("Choose a folder first.");
+            return;
+        }
+        if (b.rows.empty())
+        {
+            wrappedColored(
+                kRed,
+                "No recordings were found in this folder or in the folders directly inside it. A recording folder contains "
+                "lidar*.laz and imu*.csv files.");
+        }
+
+        const BatchStatus s = b.runner.status();
+        const bool show_status = b.started && s.items.size() == b.rows.size();
+        if (!b.rows.empty())
+        {
+            const int columns = show_status ? 6 : 5;
+            const float row_height = ImGui::GetFrameHeightWithSpacing();
+            const float height = row_height * static_cast<float>(std::min<size_t>(b.rows.size(), 10) + 1) + 6.0f;
+            if (ImGui::BeginTable(
+                    "recordings",
+                    columns,
+                    ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingStretchProp,
+                    ImVec2(0, height)))
+            {
+                ImGui::TableSetupScrollFreeze(0, 1);
+                ImGui::TableSetupColumn("Include", ImGuiTableColumnFlags_WidthFixed);
+                ImGui::TableSetupColumn("Recording", ImGuiTableColumnFlags_WidthStretch, 3.0f);
+                ImGui::TableSetupColumn("Length", ImGuiTableColumnFlags_WidthFixed);
+                ImGui::TableSetupColumn("Check", ImGuiTableColumnFlags_WidthFixed);
+                ImGui::TableSetupColumn("Output folder name", ImGuiTableColumnFlags_WidthStretch, 3.0f);
+                if (show_status)
+                    ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed);
+                ImGui::TableHeadersRow();
+
+                for (size_t i = 0; i < b.rows.size(); i++)
+                {
+                    BatchRow& row = b.rows[i];
+                    const bool current = row.checkCurrent(b.output_root);
+                    ImGui::PushID(static_cast<int>(i));
+                    ImGui::TableNextRow();
+
+                    ImGui::TableNextColumn();
+                    ImGui::BeginDisabled(locked || (current && !row.usable()));
+                    bool include = current ? row.included() : row.selected;
+                    if (ImGui::Checkbox("##include", &include))
+                        row.selected = include;
+                    ImGui::EndDisabled();
+
+                    ImGui::TableNextColumn();
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::TextUnformatted(row.folder.name.c_str());
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("%s", row.folder.path.string().c_str());
+
+                    ImGui::TableNextColumn();
+                    if (row.check)
+                        ImGui::TextUnformatted(formatDuration(row.check->preflight.duration_s).c_str());
+                    else
+                        ImGui::TextDisabled("...");
+
+                    ImGui::TableNextColumn();
+                    drawCheckCell(row, current);
+
+                    ImGui::TableNextColumn();
+                    const std::string problem = row.active(b.output_root) ? b.nameProblem(i) : std::string();
+                    ImGui::BeginDisabled(locked);
+                    if (!problem.empty())
+                        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.45f, 0.12f, 0.12f, 1.0f));
+                    ImGui::SetNextItemWidth(-FLT_MIN);
+                    ImGui::InputText("##output_name", &row.output_name);
+                    if (ImGui::IsItemDeactivatedAfterEdit())
+                    {
+                        row.name_edited = true;
+                        b.checkRow(i);
+                    }
+                    if (!problem.empty())
+                    {
+                        ImGui::PopStyleColor();
+                        if (ImGui::IsItemHovered())
+                            ImGui::SetTooltip("%s", problem.c_str());
+                    }
+                    ImGui::EndDisabled();
+
+                    if (show_status)
+                    {
+                        ImGui::TableNextColumn();
+                        drawStatusCell(s.items[i], s.current == static_cast<int>(i), s);
+                    }
+                    ImGui::PopID();
+                }
+                ImGui::EndTable();
+            }
+        }
+
+        if (!b.started)
+        {
+            // Problems in words, below the table (the table only has room for a mark).
+            for (size_t i = 0; i < b.rows.size(); i++)
+            {
+                const BatchRow& row = b.rows[i];
+                if (const std::string problem = row.active(b.output_root) ? b.nameProblem(i) : std::string(); !problem.empty())
+                    wrappedColored(kRed, row.folder.name + ": output folder name: " + problem);
+                if (!row.checkCurrent(b.output_root) || row.check->done)
+                    continue;
+                for (const auto& f : row.check->preflight.findings)
+                    if (f.severity != Severity::Ok)
+                        wrappedColored(f.severity == Severity::Error ? kRed : kAmber, row.folder.name + ": " + f.message);
+            }
+            if (const std::string problem = batchOutputProblem(b.output_root, b.found); !problem.empty())
+                wrappedColored(kRed, problem);
+            else if (!b.rows.empty() && !b.checking())
+            {
+                const Finding disk = b.diskFinding();
+                wrappedColored(
+                    disk.severity == Severity::Error         ? kRed
+                        : disk.severity == Severity::Warning ? kAmber
+                                                             : kGreen,
+                    disk.message);
+            }
+        }
+
+        if (!b.skipped.empty() &&
+            ImGui::TreeNode("skipped", "%zu folder%s skipped (not recordings)", b.skipped.size(), b.skipped.size() > 1 ? "s" : ""))
+        {
+            for (const auto& f : b.skipped)
+                ImGui::BulletText("%s: %s", f.name.c_str(), f.skip_reason.c_str());
+            ImGui::TreePop();
+        }
+    }
+
+    void drawBatchRun(App& app)
+    {
+        BatchUi& b = app.batch;
+        ImGui::SeparatorText("4. Process");
+        if (!b.started)
+        {
+            size_t selected = 0;
+            for (const auto& r : b.rows)
+                selected += r.included() ? 1 : 0;
+            ImGui::BeginDisabled(!b.readyToStart());
+            const std::string label = "Start processing " + std::to_string(selected) + " recording" + (selected == 1 ? "" : "s");
+            if (ImGui::Button(label.c_str(), ImVec2(260, 0)))
+            {
+                b.start_error.clear();
+                if (b.runner.start(b.makeRequest(app.settings), b.start_error))
+                    b.started = true;
+            }
+            ImGui::EndDisabled();
+            if (!b.start_error.empty())
+                wrappedColored(kRed, b.start_error);
+            return;
+        }
+
+        const BatchStatus s = b.runner.status();
+        const BatchRequest& request = b.runner.request();
+        size_t selected = 0, finished = 0;
+        size_t counts[8] = {};
+        for (size_t i = 0; i < s.items.size(); i++)
+        {
+            counts[static_cast<int>(s.items[i].state)]++;
+            if (!request.items[i].include)
+                continue;
+            selected++;
+            if (s.items[i].state != BatchItemState::Pending && s.items[i].state != BatchItemState::Running)
+                finished++;
+        }
+
+        if (s.running)
+        {
+            std::string overall = std::to_string(finished) + " of " + std::to_string(selected) + " recordings finished, elapsed " +
+                formatDuration(s.elapsed_s);
+            if (s.eta_s >= 0.0)
+                overall += ", about " + formatDuration(s.eta_s) + " left";
+            ImGui::TextUnformatted("All recordings");
+            ImGui::ProgressBar(static_cast<float>(s.fraction), ImVec2(-1, 0), overall.c_str());
+            ImGui::Spacing();
+            if (s.current >= 0)
+            {
+                ImGui::Text(
+                    "Now: %s (%d%% of this recording)",
+                    request.items[s.current].name.c_str(),
+                    static_cast<int>(pipelineFraction(s.current_status) * 100));
+                drawStageProgress(s.current_status);
+            }
+            else
+                ImGui::TextUnformatted("Checking the next recording...");
+
+            ImGui::Spacing();
+            ImGui::BeginDisabled(s.stop_after_current);
+            if (ImGui::Button(s.stop_after_current ? "Stopping after this recording..." : "Stop after this recording", ImVec2(260, 0)))
+                b.runner.stopAfterCurrent();
+            ImGui::EndDisabled();
+            ImGui::SameLine();
+            if (ImGui::Button("Stop now", ImVec2(120, 0)))
+                ImGui::OpenPopup("Stop now?");
+            if (ImGui::BeginPopupModal("Stop now?", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+            {
+                ImGui::TextUnformatted(
+                    "Stop now? The recording being processed is discarded.\nRecordings that are already finished are kept.");
+                if (ImGui::Button("Yes, stop now", ImVec2(140, 0)))
+                {
+                    b.runner.stopNow();
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("No, continue", ImVec2(140, 0)))
+                    ImGui::CloseCurrentPopup();
+                ImGui::EndPopup();
+            }
+            ImGui::TextDisabled("The computer is kept from going to sleep while the batch runs.");
+            return;
+        }
+
+        const size_t failed = counts[static_cast<int>(BatchItemState::Failed)] + counts[static_cast<int>(BatchItemState::Cancelled)];
+        const size_t not_run = counts[static_cast<int>(BatchItemState::NotRun)];
+        std::string summary = std::string(s.stop_after_current ? "Batch stopped" : "Batch finished") + " after " +
+            formatDuration(s.elapsed_s) + ": " + std::to_string(counts[static_cast<int>(BatchItemState::Succeeded)]) + " succeeded";
+        if (counts[static_cast<int>(BatchItemState::AlreadyDone)])
+            summary += ", " + std::to_string(counts[static_cast<int>(BatchItemState::AlreadyDone)]) + " already done before";
+        if (failed)
+            summary += ", " + std::to_string(failed) + " failed or stopped";
+        if (not_run)
+            summary += ", " + std::to_string(not_run) + " not run";
+        summary += ".";
+        wrappedColored(failed || not_run ? kAmber : kGreen, summary);
+        if (failed)
+            ImGui::TextWrapped(
+                "Point at 'failed' in the table to see why. Each recording's own easy_gui.log has the details. Start the same batch "
+                "again to retry the recordings that did not finish.");
+        ImGui::TextDisabled("batch_summary.csv and batch.log are in %s", request.output_root.string().c_str());
+
+        if (ImGui::Button("Open output folder"))
+            OpenURL(request.output_root.string().c_str());
+        ImGui::SameLine();
+        if (ImGui::Button("Process another batch"))
+            b.reset();
+    }
+
+    void drawLogLines(const char* id, const std::vector<std::string>& lines)
+    {
+        ImGui::BeginChild(id, ImVec2(0, 200), ImGuiChildFlags_Borders, ImGuiWindowFlags_HorizontalScrollbar);
+        for (const auto& line : lines)
+            ImGui::TextUnformatted(line.c_str());
+        if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 5.0f) // follow the end unless the user scrolled up
+            ImGui::SetScrollHereY(1.0f);
+        ImGui::EndChild();
+    }
+
+    void drawBatchLog(App& app)
+    {
+        ImGui::Spacing();
+        if (!ImGui::CollapsingHeader("Details (processing log)"))
+            return;
+        ImGui::TextUnformatted("Batch (batch.log)");
+        drawLogLines("batch_log", app.batch.runner.logTail());
+        ImGui::TextUnformatted("Current recording (its easy_gui.log)");
+        drawLogLines("recording_log", app.batch.runner.currentLogTail());
+    }
+
+    void drawModeSwitch(App& app, bool locked)
+    {
+        ImGui::BeginDisabled(locked);
+        int mode = static_cast<int>(app.mode);
+        ImGui::RadioButton("One recording", &mode, static_cast<int>(Mode::Single));
+        ImGui::SameLine();
+        ImGui::RadioButton("Several recordings", &mode, static_cast<int>(Mode::Batch));
+        app.mode = static_cast<Mode>(mode);
+        ImGui::EndDisabled();
+        ImGui::Spacing();
     }
 } // namespace
 
@@ -752,8 +1458,8 @@ int main(int argc, char* argv[])
         return 2;
     }
 
-    // Dev aid: `--screenshot <file.png> [recording]` renders ~2 s, saves the window and exits (layout checks without
-    // capturing the whole desktop).
+    // Dev aid: `--screenshot <file.png> [recording | --batch <parent folder>]` renders ~2 s, saves the window and exits (layout checks
+    // without capturing the whole desktop).
     std::string screenshot_file;
     int first_positional = 1;
     if (argc > 2 && std::string(argv[1]) == "--screenshot")
@@ -763,7 +1469,12 @@ int main(int argc, char* argv[])
     }
 
     App app;
-    if (argc > first_positional && fs::is_directory(argv[first_positional]))
+    if (argc > first_positional + 1 && std::string(argv[first_positional]) == "--batch" && fs::is_directory(argv[first_positional + 1]))
+    {
+        app.mode = Mode::Batch;
+        app.batch.setParent(argv[first_positional + 1]);
+    }
+    else if (argc > first_positional && fs::is_directory(argv[first_positional]))
         app.setRecording(argv[first_positional]);
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
@@ -778,7 +1489,10 @@ int main(int argc, char* argv[])
     while (!WindowShouldClose())
     {
         app.poll();
-        const bool locked = app.pipeline.busy() || app.pipeline.status().state != PipelineState::Idle;
+        app.batch.poll();
+        const bool single_locked = app.pipeline.busy() || app.pipeline.status().state != PipelineState::Idle;
+        const bool batch_locked = app.batch.runner.busy() || app.batch.started;
+        const bool locked = app.mode == Mode::Single ? single_locked : batch_locked;
 
         if (IsFileDropped())
         {
@@ -787,7 +1501,11 @@ int main(int argc, char* argv[])
             {
                 fs::path p(dropped.paths[0]);
                 std::error_code ec;
-                app.setRecording(fs::is_directory(p, ec) ? p : p.parent_path());
+                const fs::path folder = fs::is_directory(p, ec) ? p : p.parent_path();
+                if (app.mode == Mode::Single)
+                    app.setRecording(folder);
+                else
+                    app.batch.setParent(folder);
             }
             UnloadDroppedFiles(dropped);
         }
@@ -800,22 +1518,47 @@ int main(int argc, char* argv[])
         ImGui::SetNextWindowPos(viewport->WorkPos);
         ImGui::SetNextWindowSize(viewport->WorkSize);
         ImGui::Begin(
-            "Easy Forest HDMapping", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
+            "Easy Forest HDMapping",
+            nullptr,
+            // A scrollbar appears when the content is taller than the window (batch table, open log).
+            ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove |
+                ImGuiWindowFlags_NoSavedSettings);
 
         ImGui::TextUnformatted("Easy Forest HDMapping");
         ImGui::TextDisabled("Mandeye recording -> lidar odometry (precision forestry settings) -> point cloud and trajectory");
         ImGui::Spacing();
+        drawModeSwitch(app, single_locked || batch_locked);
 
-        drawInputs(app, locked);
-        drawPreflight(app);
-        drawRun(app);
-        drawLog(app);
+        if (app.mode == Mode::Single)
+        {
+            drawInputs(app, locked);
+            drawPreflight(app);
+            drawRun(app);
+            drawLog(app);
+        }
+        else
+        {
+            drawBatchInputs(app, locked);
+            drawBatchTable(app, locked);
+            drawBatchRun(app);
+            drawBatchLog(app);
+        }
 
         ImGui::End();
         rlImGuiEnd();
         EndDrawing();
 
-        if (!screenshot_file.empty() && ++frame == 60)
+        // Dev aid for documentation screenshots of a running batch: EASY_GUI_SCREENSHOT_START=1 starts it once ready,
+        // EASY_GUI_SCREENSHOT_FRAME=<n> takes the screenshot at frame n (30 frames per second) instead of 60.
+        static const bool auto_start = !screenshot_file.empty() && std::getenv("EASY_GUI_SCREENSHOT_START");
+        if (auto_start && app.mode == Mode::Batch && app.batch.readyToStart())
+        {
+            if (app.batch.runner.start(app.batch.makeRequest(app.settings), app.batch.start_error))
+                app.batch.started = true;
+        }
+        static const int screenshot_frame =
+            std::getenv("EASY_GUI_SCREENSHOT_FRAME") ? std::max(1, std::atoi(std::getenv("EASY_GUI_SCREENSHOT_FRAME"))) : 60;
+        if (!screenshot_file.empty() && ++frame == screenshot_frame)
         {
             TakeScreenshot(screenshot_file.c_str());
             break;
@@ -824,6 +1567,7 @@ int main(int argc, char* argv[])
 
     // Closing the window while processing stops the child process (Pipeline's destructor cancels and joins).
     app.pipeline.cancel();
+    app.batch.runner.stopNow();
     rlImGuiShutdown();
     CloseWindow();
     return 0;

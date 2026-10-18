@@ -84,7 +84,9 @@ if(MSVC)
 endif()
 
 # The window. raylib + rlImGui like step 2; core_pfd for the native folder picker.
-add_executable(easy_gui src/easy_gui_main.cpp)
+# imgui_stdlib (std::string InputText, for the batch table's output names) is compiled here: imgui_raylib does not
+# include it, and it must come from the same vendored ImGui.
+add_executable(easy_gui src/easy_gui_main.cpp ${THIRDPARTY_DIRECTORY}/imgui/misc/cpp/imgui_stdlib.cpp)
 
 target_link_libraries(easy_gui PRIVATE
     easy_gui_core

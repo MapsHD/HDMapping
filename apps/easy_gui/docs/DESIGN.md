@@ -64,7 +64,7 @@ Code in `apps/easy_gui`:
 | `easy_gui_core` (static library, no raylib) | Everything except the window, so the doctest suite can link it. |
 | `src/preflight.*` | Classifies files exactly like step 1's `load_data` does and checks them (see §3). |
 | `src/staging.*` | Builds the staging folder of symlinks (see §5.6). |
-| `src/child_process.*` | Runs step 1: POSIX `posix_spawn` with its own process group; Windows `CreateProcess` with a job object (written, not yet compiled on Windows). |
+| `src/child_process.*` | Runs step 1: POSIX `posix_spawn` with its own process group; Windows `CreateProcess` with a job object (built and tested on the Windows CI runner). |
 | `src/progress_parser.*` | Turns step 1's log lines into phases and a progress fraction. |
 | `src/forestry_preset.*` | Writes the step 1 parameter file with step 1's own `TomlIO`. |
 | `src/export.*`, `src/las14_writer.*` | The export (§6) and a streaming LAS 1.4 point format 6 LAZ writer with a hand-written extra-bytes VLR. |
@@ -411,13 +411,15 @@ always reports the breakdown, warns below 1.5× the estimate and refuses below 1
     `liblaszip`, `libtbb`, `libglut` in `Contents/Frameworks`, rpaths rewritten), re-signs it ad hoc and fails unless
     every bundled binary has minos <= 13.0 and references nothing outside the bundle, `/usr/lib` and `/System`. The
     build also fails on the linker's "built for newer macOS version" warning, which a static library would only show
-    there. `make_dmg.sh` adds the Applications shortcut. Local run: app 7.9 MB, DMG 3.5 MB; the bundled app processed
-    `mini4` headless.
+    there. `make_dmg.sh` adds the Applications shortcut. Local and CI run: app 7.9 MB, DMG 3.6 MB; locally the bundled app
+    processed `mini4` headless.
   - Windows (`windows-latest`, x64): `easy_gui.exe` is a WIN32-subsystem program (`/ENTRY:mainCRTStartup`, so `main`
     stays), `--headless`/`--export-only` attach to the parent console. A manifest sets UTF-8 as the process code page,
     because the file dialog, drag and drop and `ChildProcess` all use UTF-8. `HD_CPU_OPTIMIZATION=GENERIC`: `AUTO`
     adds `/arch:AVX2` from the runner's CPU. `make_zip.py` collects the DLLs with `dumpbin /dependents`, copies the
     MSVC runtime app-locally from VS's redist folder and fails on any DLL that is neither bundled nor part of Windows.
+    First CI run: folder 7.1 MB (two exes, `laszip3`, `freeglut`, `tbb12` and the MSVC runtime DLLs), zip 3.3 MB.
+    PROJ's DLL is not needed: nothing Easy GUI calls references it, so the linker drops the import.
   - `easy_gui_tests` cover `ChildProcess` on Windows too (cmd.exe; argument quoting through `--echo-args`).
   - No app icon yet (none exists for Easy GUI); no code signing or notarization (README explains the warnings).
 

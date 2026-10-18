@@ -210,9 +210,9 @@ namespace easy_gui
             std::snprintf(near_min, sizeof(near_min), "%.2f m", request.near_min_range_m);
             std::snprintf(output_filter, sizeof(output_filter), "%.2f m", stats.threshould_output_filter);
 
-            out << "HDMapping Easy GUI results\n"
+            out << "HDMapping Easy Forestry results\n"
                 << "==========================\n\n"
-                << "Made by HDMapping Easy GUI " << HDMAPPING_CONFIGURE_PROJECT_VERSION << " from the recording\n"
+                << "Made by HDMapping Easy Forestry " << HDMAPPING_CONFIGURE_PROJECT_VERSION << " from the recording\n"
                 << "  " << request.recording.laz_files.front().parent_path().string() << "\n"
                 << "with lidar odometry (precision forestry settings). No loop closure and no georeferencing: coordinates\n"
                 << "are in metres in a local frame that starts at the scanner's first position (z up, from the IMU).\n\n"
@@ -248,7 +248,7 @@ namespace easy_gui
                 << "  point_origin     extra bytes, uint8: where the point comes from (see below)\n"
                 << (request.place_by_raw_time ? "                   0 = inside lidar odometry's distance limits, placed by raw time\n"
                                               : "                   0 = lidar odometry's own point\n")
-                << "                   1 = near point, 2 = gap point (both added by Easy GUI)\n"
+                << "                   1 = near point, 2 = gap point (both added by Easy Forestry)\n"
                 << (stats.check_band_points ? "                   3 = TEST MODE alignment-check point (duplicate of an odometry point)\n"
                                             : "")
                 << "\n"
@@ -257,7 +257,7 @@ namespace easy_gui
                 << "frame) is between " << inner << " and " << outer << " and whose 3D distance is above " << output_filter
                 << ", and it works in\n"
                 << "0.1 s pieces: it skips the raw points measured after the last pose of a piece and before the first pose\n"
-                << "of the next one (about 5 % of the recording time). Easy GUI adds both kinds of missing points back from\n"
+                << "of the next one (about 5 % of the recording time). Easy Forestry adds both kinds of missing points back from\n"
                 << "the raw recording, so the cloud has no hole around the walking path and nothing is missing between the\n"
                 << "pieces.\n\n"
                 << "point_origin = 0 (" << formatCount(stats.odometry_points) << " points): "

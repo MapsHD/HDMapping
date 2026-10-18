@@ -89,7 +89,7 @@ namespace easy_gui
         header->global_encoding = (1 << 4); // bit 0 = 0: not adjusted GPS time; bit 4: WKT (required for PF6)
         header->version_major = 1;
         header->version_minor = 4;
-        copyField(header->system_identifier, sizeof(header->system_identifier), "HDMapping Easy GUI");
+        copyField(header->system_identifier, sizeof(header->system_identifier), "HDMapping Easy Forestry");
         copyField(header->generating_software, sizeof(header->generating_software), generating_software);
         {
             const std::time_t now = std::time(nullptr);

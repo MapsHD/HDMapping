@@ -358,7 +358,7 @@ namespace easy_gui
                 ids += (ids.empty() ? "" : ", ") + std::to_string(id);
             add(Severity::Error,
                 "This recording contains data from more than one lidar (ids " + ids +
-                    "). Easy GUI supports single-lidar recordings only; use the standard HDMapping apps for this one.");
+                    "). Easy Forestry supports single-lidar recordings only; use the standard HDMapping apps for this one.");
         }
         else if (lidar_ids.size() == 1)
             r.lidar_id = *lidar_ids.begin();
@@ -375,7 +375,7 @@ namespace easy_gui
             else if (calibration.size() > 1)
                 add(Severity::Error,
                     "The calibration file '" + f.calibration_file.filename().string() +
-                        "' describes more than one lidar. Easy GUI supports single-lidar recordings only.");
+                        "' describes more than one lidar. Easy Forestry supports single-lidar recordings only.");
             else
             {
                 for (const auto& [id, sn] : id_to_sn)
@@ -391,7 +391,7 @@ namespace easy_gui
         }
         if (id_to_sn.size() > 1)
             add(Severity::Error,
-                "The scanner serial-number file lists more than one lidar. Easy GUI supports single-lidar recordings only.");
+                "The scanner serial-number file lists more than one lidar. Easy Forestry supports single-lidar recordings only.");
 
         // --- IMU vs lidar clocks
         double imu_first = 0.0, imu_last = 0.0;
@@ -426,7 +426,8 @@ namespace easy_gui
             add(Severity::Error, "Choose an output folder.");
         else if (isSameOrInside(output_folder, recording))
             add(Severity::Error,
-                "The output folder is inside the recording folder. Choose a folder elsewhere: Easy GUI never writes into the recording "
+                "The output folder is inside the recording folder. Choose a folder elsewhere: Easy Forestry never writes into the "
+                "recording "
                 "(it may be on the scanner's USB stick).");
         else
         {

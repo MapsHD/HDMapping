@@ -1,5 +1,11 @@
 cmake_minimum_required(VERSION 4.0.0)
 
+# Easy Forestry release builds (HDMAPPING_EASY_GUI_ONLY) must run on older macOS versions than the build machine's,
+# which is the default minimum. Must be set before project(). Pass -DCMAKE_OSX_DEPLOYMENT_TARGET to override.
+if(HDMAPPING_EASY_GUI_ONLY AND CMAKE_HOST_APPLE AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0" CACHE STRING "Minimum macOS version" FORCE)
+endif()
+
 project(hd-mapping VERSION 0.105.0)
 
 # Common settings

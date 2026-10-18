@@ -44,11 +44,11 @@ namespace
         return home ? fs::path(home) : fs::current_path();
     }
 
-    //! ~/Documents/HDMapping Easy/<recording name>, with _2, _3, ... appended if that already exists. Never next to
+    //! ~/Documents/HDMapping Easy Forestry/<recording name>, with _2, _3, ... appended if that already exists. Never next to
     //! the recording: that may be the scanner's USB stick.
     fs::path defaultOutputFolder(const fs::path& recording)
     {
-        const fs::path base = homeFolder() / "Documents" / "HDMapping Easy";
+        const fs::path base = homeFolder() / "Documents" / "HDMapping Easy Forestry";
         const std::string name = recording.filename().empty() ? recording.parent_path().filename().string() : recording.filename().string();
         std::error_code ec;
         fs::path candidate = base / name;
@@ -572,7 +572,7 @@ int main(int argc, char* argv[])
         app.setRecording(argv[first_positional]);
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
-    InitWindow(900, 780, ("HDMapping Easy GUI " + std::string(HDMAPPING_CONFIGURE_PROJECT_VERSION)).c_str());
+    InitWindow(900, 780, ("HDMapping Easy Forestry " + std::string(HDMAPPING_CONFIGURE_PROJECT_VERSION)).c_str());
     raylib_widgets::fitWindowToScreen();
     // raylib's default exit key (Esc) would close the window mid-run.
     SetExitKey(KEY_NULL);
@@ -605,9 +605,9 @@ int main(int argc, char* argv[])
         ImGui::SetNextWindowPos(viewport->WorkPos);
         ImGui::SetNextWindowSize(viewport->WorkSize);
         ImGui::Begin(
-            "HDMapping Easy GUI", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
+            "HDMapping Easy Forestry", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
 
-        ImGui::TextUnformatted("HDMapping Easy GUI");
+        ImGui::TextUnformatted("HDMapping Easy Forestry");
         ImGui::TextDisabled("Mandeye recording -> lidar odometry (precision forestry settings) -> point cloud and trajectory");
         ImGui::Spacing();
 

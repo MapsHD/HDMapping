@@ -1,10 +1,10 @@
-# HDMapping Easy Forestry
+# Easy Forest HDMapping
 
-Easy Forestry is a single window that turns the folder a Mandeye scanner records into a 3D point cloud (a `.laz` file)
+Easy Forest HDMapping is a single window that turns the folder a Mandeye scanner records into a 3D point cloud (a `.laz` file)
 and the path you walked (a `.csv` file). It uses the processing settings that HDMapping recommends for forests, so there
 is nothing to tune.
 
-![The Easy Forestry window after choosing a recording](docs/images/easy_gui_window.png)
+![The Easy Forest HDMapping window after choosing a recording](docs/images/easy_gui_window.png)
 
 - [Who it is for](#who-it-is-for)
 - [What your computer needs](#what-your-computer-needs)
@@ -17,7 +17,7 @@ is nothing to tune.
 
 ## Who it is for
 
-Easy Forestry is for anyone who walks a forest plot with a Mandeye scanner and wants a point cloud without learning the
+Easy Forest HDMapping is for anyone who walks a forest plot with a Mandeye scanner and wants a point cloud without learning the
 full HDMapping toolchain: forestry partners, students, field crews. It is designed for forests; it works elsewhere, but
 its settings are tuned for forests.
 
@@ -31,7 +31,7 @@ What it does **not** do:
 - **One lidar only.** Scanners with two or more lidars are refused by the check.
 
 For any of these, use the full HDMapping apps (see the
-[HDMapping wiki](https://github.com/MapsHD/HDMapping/wiki)). Easy Forestry keeps its intermediate results so that you
+[HDMapping wiki](https://github.com/MapsHD/HDMapping/wiki)). Easy Forest HDMapping keeps its intermediate results so that you
 can continue there.
 
 ## What your computer needs
@@ -43,9 +43,9 @@ can continue there.
 | Memory (RAM) | 16 GB recommended | 16 GB recommended |
 
 **Memory:** a 10-minute walk needs about 9 GB of memory while it is being processed. Longer walks need more. Close
-other large programs while Easy Forestry is working.
+other large programs while Easy Forest HDMapping is working.
 
-**Disk space, rule of thumb:** while processing, Easy Forestry needs free space of about **20 times the size of the
+**Disk space, rule of thumb:** while processing, Easy Forest HDMapping needs free space of about **20 times the size of the
 recording's lidar files**, which is roughly **1.5 GB per minute of walking**. About a tenth of that stays as results;
 the rest is freed when processing ends. You do not have to work this out yourself: the check (step 3 below) tells you
 exactly how much is needed and how much is free.
@@ -55,34 +55,34 @@ exactly how much is needed and how much is free.
 
 ## Installation
 
-Easy Forestry is free and needs no account. Your computer will warn you the first time you open it, because the program
+Easy Forest HDMapping is free and needs no account. Your computer will warn you the first time you open it, because the program
 is not signed by a company that Apple or Microsoft knows. The steps below show how to get past the warning; you only
 need to do this once.
 
 ### Mac
 
-1. Download **`HDMapping-EasyForestry-mac.dmg`** from *[download link — coming with the first release]*.
-2. Double-click the `.dmg` file. In the window that opens, drag **HDMapping Easy Forestry** onto the **Applications**
+1. Download **`EasyForestHDMapping-mac.dmg`** from *[download link — coming with the first release]*.
+2. Double-click the `.dmg` file. In the window that opens, drag **Easy Forest HDMapping** onto the **Applications**
    folder.
-3. Open your **Applications** folder and double-click **HDMapping Easy Forestry**.
-4. macOS says **"“HDMapping Easy Forestry” Not Opened"** (Apple could not verify it is free of malware). Click
+3. Open your **Applications** folder and double-click **Easy Forest HDMapping**.
+4. macOS says **"“Easy Forest HDMapping” Not Opened"** (Apple could not verify it is free of malware). Click
    **Done**.
 5. Open **System Settings** → **Privacy & Security**. Scroll down to the **Security** section. Next to the line
-   **"“HDMapping Easy Forestry” was blocked to protect your Mac."** click **Open Anyway**.
+   **"“Easy Forest HDMapping” was blocked to protect your Mac."** click **Open Anyway**.
 6. Enter your Mac password (or use Touch ID), then click **Open Anyway** once more in the dialog that appears.
 
-From now on Easy Forestry opens normally. If macOS ever says the app **"is damaged and can't be opened"**, see
+From now on Easy Forest HDMapping opens normally. If macOS ever says the app **"is damaged and can't be opened"**, see
 [Troubleshooting](#troubleshooting).
 
 ### Windows (coming soon, not yet tested)
 
 The Windows version has not been built and tested yet. These steps are what installation will look like:
 
-1. Download **`HDMapping-EasyForestry-windows.zip`** from *[download link — coming with the first release]*.
+1. Download **`EasyForestHDMapping-windows.zip`** from *[download link — coming with the first release]*.
 2. Before unpacking: right-click the downloaded `.zip` file → **Properties** → on the **General** tab, tick
    **Unblock** at the bottom → **OK**. (If there is no Unblock box, skip this step.)
-3. Right-click the `.zip` file → **Extract All…** → choose a folder, for example `Documents\HDMapping Easy Forestry`
-   → **Extract**. Keep all files in that folder together: Easy Forestry needs the other files next to it.
+3. Right-click the `.zip` file → **Extract All…** → choose a folder, for example `Documents\Easy Forest HDMapping`
+   → **Extract**. Keep all files in that folder together: Easy Forest HDMapping needs the other files next to it.
 4. Open the folder and double-click **`easy_gui.exe`**.
 5. If a blue window says **"Windows protected your PC"**: click **More info**, then **Run anyway**.
 
@@ -95,19 +95,19 @@ The window guides you through four steps, top to bottom.
 
 **1. Recording.** Click **Choose recording…** and select the folder the scanner wrote, for example
 `continousScanning_0012`. It contains files named `lidar0000.laz`, `imu0000.csv` and so on. You can also drag the
-folder onto the window. You can work straight from the scanner's USB stick: Easy Forestry never changes or adds
+folder onto the window. You can work straight from the scanner's USB stick: Easy Forest HDMapping never changes or adds
 anything in the recording folder. Copying the folder to your computer first makes processing a little faster.
 
-**2. Output folder.** Easy Forestry suggests `Documents/HDMapping Easy Forestry/<name of the recording>`. To use a
+**2. Output folder.** Easy Forest HDMapping suggests `Documents/Easy Forest HDMapping/<name of the recording>`. To use a
 different place, click **Choose output folder…**. The folder must be new or empty.
 
-**3. Check.** Easy Forestry checks the recording and the free disk space automatically. Each line is marked:
+**3. Check.** Easy Forest HDMapping checks the recording and the free disk space automatically. Each line is marked:
 
 - **[OK]** (green): all good.
 - **[!]** (amber): worth knowing, but you can go on.
 - **[X]** (red): this must be fixed before you can start. See [Troubleshooting](#troubleshooting).
 
-**4. Process.** Click **Start processing**. Easy Forestry shows which stage it is in, a progress bar and the time left.
+**4. Process.** Click **Start processing**. Easy Forest HDMapping shows which stage it is in, a progress bar and the time left.
 You can keep using your computer, but it will be busy. **Cancel** stops processing and deletes the unfinished results.
 Closing the window also stops processing.
 
@@ -143,12 +143,12 @@ Every point has these values:
 | intensity | How strongly the surface reflected the laser. Bright, smooth surfaces give high values. |
 | gps_time | When the point was measured, in seconds since 1 January 1970 (UTC). Despite the name, this is not GPS time. |
 | point_source_id | Which roughly 5-second piece of the walk the point belongs to. |
-| user_data | Which lidar measured the point (always the same, since Easy Forestry handles one lidar). |
+| user_data | Which lidar measured the point (always the same, since Easy Forest HDMapping handles one lidar). |
 | **range_m** | **Distance from the scanner to the point when it was measured, in metres.** Far points are less precise than near ones, so this is useful for keeping only points measured from close by, for example only points closer than 15 m for measuring stem diameters. |
 | **point_origin** | **Where the point comes from:** |
 | | **0** — the main points, placed by HDMapping's motion tracking (lidar odometry). Most of the cloud. |
-| | **1** — close-range points. HDMapping's motion tracking ignores everything within 1 m of the scanner; Easy Forestry adds these points back afterwards (from the "Closest points kept" distance outwards), so the ground and stems right next to your path are not missing. |
-| | **2** — filled-in points. HDMapping's motion tracking works in tenth-of-a-second pieces and skips a few milliseconds between them; Easy Forestry adds the points measured in those short gaps. |
+| | **1** — close-range points. HDMapping's motion tracking ignores everything within 1 m of the scanner; Easy Forest HDMapping adds these points back afterwards (from the "Closest points kept" distance outwards), so the ground and stems right next to your path are not missing. |
+| | **2** — filled-in points. HDMapping's motion tracking works in tenth-of-a-second pieces and skips a few milliseconds between them; Easy Forest HDMapping adds the points measured in those short gaps. |
 
 Points 1 and 2 line up with the main points typically within a millimetre, and in 99 % of cases within about 1 cm.
 You can switch them off by filtering on `point_origin`, for example to see exactly what HDMapping alone would have
@@ -194,7 +194,7 @@ The check (step 3) explains problems in plain words. Here is what to do about ea
 | "There are N point cloud files but M IMU files. The unmatched file(s) at the end will not be processed." | Just information. Usually the scanner stopped between two files; the last few seconds are left out. |
 | "Some file numbers do not match." | A file is probably missing in the middle of the recording (for example after an incomplete copy). Copy the recording from the scanner again. If that does not help, the result may have a gap at that point. |
 | "These point cloud files cannot be read (damaged, or not fully copied from the scanner)." | Copy the recording again. If the damaged files are the last ones, you can also delete them from your copy. |
-| "This recording contains data from more than one lidar." / "…describes more than one lidar." / "…lists more than one lidar." | Easy Forestry handles single-lidar scanners only. Use the full HDMapping apps. |
+| "This recording contains data from more than one lidar." / "…describes more than one lidar." / "…lists more than one lidar." | Easy Forest HDMapping handles single-lidar scanners only. Use the full HDMapping apps. |
 | "The calibration file … could not be read and will be ignored." | Just information, processing continues without it. If your scanner needs a calibration file, ask whoever set up the scanner for a correct one. |
 | "The calibration file … belongs to a different scanner." / "… does not name a valid IMU." | The calibration file in the folder does not match the scanner. Remove it from your copy of the recording, or replace it with the right one. |
 | "The IMU files could not be read." | The motion-sensor files (`imu….csv`) are damaged or empty. Copy the recording again. |
@@ -206,25 +206,25 @@ The check (step 3) explains problems in plain words. Here is what to do about ea
 | Message (shortened) | What to do |
 |---|---|
 | "Choose an output folder." | Click **Choose output folder…**. |
-| "The output folder is inside the recording folder." | Choose a folder somewhere else. Easy Forestry never writes into the recording. |
+| "The output folder is inside the recording folder." | Choose a folder somewhere else. Easy Forest HDMapping never writes into the recording. |
 | "The output folder … already contains files." | Choose a new or empty folder, or empty this one first. |
 | "Not enough free disk space …" | Free some space (the message says how much is needed), or choose an output folder on another disk with more space. |
-| "Free disk space is tight." | You can start, but make sure nothing else fills the disk while Easy Forestry works. |
+| "Free disk space is tight." | You can start, but make sure nothing else fills the disk while Easy Forest HDMapping works. |
 | "Could not determine the free disk space." | Usually harmless. Make sure the disk has plenty of space (see the rule of thumb above). |
 
 **Problems during processing**
 
 | Message | What to do |
 |---|---|
-| "Easy Forestry could not find the lidar odometry program …" | Some files of the installation are missing. Install Easy Forestry again and keep all its files together. |
+| "Easy Forest HDMapping could not find the lidar odometry program …" | Some files of the installation are missing. Install Easy Forest HDMapping again and keep all its files together. |
 | "Lidar odometry stopped unexpectedly." | Most often the computer ran out of memory. Close other programs and try again. If it happens again, see [Getting help](#getting-help). |
 | "Could not create the output folder …" / "Could not write …" | The disk may be full, or you may not be allowed to write there. Choose another output folder. |
 
-**Mac: "“HDMapping Easy Forestry” is damaged and can't be opened."** This sometimes happens with downloaded apps that
-are not signed. Open the **Terminal** app, paste the following line and press Enter, then open Easy Forestry again:
+**Mac: "“Easy Forest HDMapping” is damaged and can't be opened."** This sometimes happens with downloaded apps that
+are not signed. Open the **Terminal** app, paste the following line and press Enter, then open Easy Forest HDMapping again:
 
 ```
-xattr -dr com.apple.quarantine "/Applications/HDMapping Easy Forestry.app"
+xattr -dr com.apple.quarantine "/Applications/Easy Forest HDMapping.app"
 ```
 
 ## Getting help
@@ -234,9 +234,9 @@ output folder. Describe what you did and which message you saw.
 
 ## Credits and license
 
-Easy Forestry is built on [HDMapping](https://github.com/MapsHD/HDMapping) by Janusz Będkowski and the MapsHD
-contributors. All the processing (motion tracking and point placement) is HDMapping's; Easy Forestry adds the window,
-the checks and the export. Easy Forestry and HDMapping are released under the [MIT License](../../LICENSE).
+Easy Forest HDMapping is built on [HDMapping](https://github.com/MapsHD/HDMapping) by Janusz Będkowski and the MapsHD
+contributors. All the processing (motion tracking and point placement) is HDMapping's; Easy Forest HDMapping adds the window,
+the checks and the export. Easy Forest HDMapping and HDMapping are released under the [MIT License](../../LICENSE).
 
 If you use the results in your work, please cite HDMapping:
 
@@ -254,4 +254,4 @@ If you use the results in your work, please cite HDMapping:
 }
 ```
 
-How Easy Forestry works and how its results were checked is described in [docs/DESIGN.md](docs/DESIGN.md).
+How Easy Forest HDMapping works and how its results were checked is described in [docs/DESIGN.md](docs/DESIGN.md).

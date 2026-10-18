@@ -1,4 +1,4 @@
-> **New: HDMapping Easy Forestry.** One window that turns a raw Mandeye recording folder into a point cloud (LAZ) and a
+> **New: Easy Forest HDMapping.** One window that turns a raw Mandeye recording folder into a point cloud (LAZ) and a
 > trajectory (CSV) with the precision forestry settings, no other steps needed. See
 > [apps/easy_gui/README.md](apps/easy_gui/README.md).
 

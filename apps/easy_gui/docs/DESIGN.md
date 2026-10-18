@@ -3,7 +3,7 @@
 This document explains how Easy GUI works, why it is built the way it is, and how its output was validated. It is for
 collaborators and reviewers who know HDMapping. The user guide is [../README.md](../README.md).
 
-Naming: the user-facing name is **HDMapping Easy Forestry** (window title, user guide, release packages). Internally,
+Naming: the user-facing name is **Easy Forest HDMapping** (window title, user guide, release packages). Internally,
 the code keeps the name Easy GUI (`apps/easy_gui`, the `easy_gui` binary and targets), and so does this document.
 
 Contents:
@@ -404,10 +404,10 @@ always reports the breakdown, warns below 1.5× the estimate and refuses below 1
   yet.
 - **v2:** gated pose-graph loop closure (§1).
 - **Packaging (macOS, not done yet):**
-  - Bundle `easy_gui` and `lidar_odometry_step_1` in one `HDMapping Easy Forestry.app` (step 1 must stay next to
+  - Bundle `easy_gui` and `lidar_odometry_step_1` in one `Easy Forest HDMapping.app` (step 1 must stay next to
     `easy_gui`), with their dylibs, and rewrite the library paths.
   - Then re-sign the whole bundle ad hoc, because rewriting library paths invalidates the signatures and Apple silicon
-    refuses to run unsigned code: `codesign --force --deep -s - "HDMapping Easy Forestry.app"`. This must include the
+    refuses to run unsigned code: `codesign --force --deep -s - "Easy Forest HDMapping.app"`. This must include the
     bundled step 1 binary and every bundled dylib.
   - Every bundled dylib must be built for macOS 13 too, or the app's real minimum is higher than the README says. A
     build against Homebrew links `libproj` (into both programs) and `libhwloc` (through TBB), both built for the build

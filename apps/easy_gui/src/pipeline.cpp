@@ -209,7 +209,7 @@ namespace easy_gui
         }
         log_file_.open(out.log_file, std::ios::out | std::ios::app);
 
-        log("[easy_gui] HDMapping Easy Forestry " + std::string(HDMAPPING_CONFIGURE_PROJECT_VERSION) + ", started " + timestamp());
+        log("[easy_gui] Easy Forest HDMapping " + std::string(HDMAPPING_CONFIGURE_PROJECT_VERSION) + ", started " + timestamp());
         log("[easy_gui] recording: " + request_.recording.string());
         log("[easy_gui] output: " + out.root.string());
         log("[easy_gui] step 1 program: " + request_.step1_executable.string());
@@ -249,8 +249,8 @@ namespace easy_gui
             cleanupWork(false);
             finish(
                 PipelineState::Failed,
-                "Easy Forestry could not find the lidar odometry program (lidar_odometry_step_1) next to itself. Please reinstall "
-                "HDMapping Easy Forestry.",
+                "Easy Forest HDMapping could not find the lidar odometry program (lidar_odometry_step_1) next to itself. Please reinstall "
+                "Easy Forest HDMapping.",
                 "looked for: " + request_.step1_executable.string());
             busy_ = false;
             return;

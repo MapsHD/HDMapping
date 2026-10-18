@@ -32,6 +32,7 @@ option(BUILD_WITH_BUNDLED_LIBLASZIP "Build with bundled Lib LASZIP" ON)
 option(BUILD_WITH_BUNDLED_ONETBB "Build with bundled oneTBB" ON)
 option(BUILD_WITH_PYBIND "Enable pybind11 bindings" OFF)
 option(HDMAPPING_ASSERT_ALWAYS_ABORT "Make HDMAPPING_ASSERT() abort on failure even in release (NDEBUG) builds" OFF)
+option(HDMAPPING_EASY_GUI_ONLY "Build only easy_gui, lidar_odometry_step_1 and their dependencies (plus easy_gui_tests with BUILD_TESTING)" OFF)
 
 add_definitions(-D_USE_MATH_DEFINES)
 
@@ -107,18 +108,34 @@ include(cmake/dependencies.cmake)
 # unconditionally: apps/multi_view_tls_registration (step2) is raylib-based.
 include(cmake/raylib.cmake)
 
+# HDMAPPING_EASY_GUI_ONLY: the library directories are still added (easy_gui and
+# step 1 link some of their targets), but EXCLUDE_FROM_ALL, so a target in them
+# is only built when easy_gui or lidar_odometry_step_1 needs it. All other apps,
+# tests and optional tool sets are skipped. Off by default: nothing changes.
+if(HDMAPPING_EASY_GUI_ONLY)
+    set(HDMAPPING_EASY_GUI_ONLY_EXCLUDE EXCLUDE_FROM_ALL)
+    foreach(_hd_skipped BUILD_WITH_CLI_TOOLS BUILD_WITH_HD_MAPPER_APPLICATION BUILD_WITH_UTILITY_APPLICATION)
+        if(${_hd_skipped})
+            message(STATUS "HDMAPPING_EASY_GUI_ONLY: ignoring ${_hd_skipped}")
+        endif()
+    endforeach()
+endif()
+
 # ============================================================================
 # Core Library
 # ============================================================================
-add_subdirectory(core)
-add_subdirectory(calib_core)
-add_subdirectory(raylib_widgets)
+add_subdirectory(core ${HDMAPPING_EASY_GUI_ONLY_EXCLUDE})
+add_subdirectory(calib_core ${HDMAPPING_EASY_GUI_ONLY_EXCLUDE})
+add_subdirectory(raylib_widgets ${HDMAPPING_EASY_GUI_ONLY_EXCLUDE})
 
 # ============================================================================
 # Unit tests (opt-in: cmake -DBUILD_TESTING=ON)
 # ============================================================================
 option(BUILD_TESTING "Build HDMapping unit tests" OFF)
-if(BUILD_TESTING)
+if(BUILD_TESTING AND HDMAPPING_EASY_GUI_ONLY)
+    enable_testing()
+    add_subdirectory(apps/easy_gui/tests)
+elseif(BUILD_TESTING)
     enable_testing()
     add_subdirectory(shared/tests)
     add_subdirectory(calib_core/tests)
@@ -130,15 +147,26 @@ endif()
 set(CORE_LIBRARIES core)
 set(GUI_LIBRARIES imgui imguizmo implot)
 
-if(BUILD_WITH_CLI_TOOLS)
+if(HDMAPPING_EASY_GUI_ONLY)
+    # The step 1 directory also defines the drag-and-drop precision forestry app.
+    # EXCLUDE_FROM_ALL skips it, together with the directory's install rules, so
+    # lidar_odometry_step_1 is put back into "all" and installed from here.
+    add_subdirectory(apps/lidar_odometry_step_1 EXCLUDE_FROM_ALL)
+    set_target_properties(lidar_odometry_step_1 PROPERTIES EXCLUDE_FROM_ALL OFF)
+    hdmapping_install_app(lidar_odometry_step_1)
+    add_subdirectory(apps/easy_gui)
+endif()
+
+if(BUILD_WITH_CLI_TOOLS AND NOT HDMAPPING_EASY_GUI_ONLY)
     add_subdirectory(apps/console_tools)
 endif()
 
-if(BUILD_WITH_HD_MAPPER_APPLICATION)
+if(BUILD_WITH_HD_MAPPER_APPLICATION AND NOT HDMAPPING_EASY_GUI_ONLY)
     add_subdirectory(apps/hd_mapper)
 endif()
 
 # Applications for typical workflow - see images/workflow.png
+if(NOT HDMAPPING_EASY_GUI_ONLY)
 add_subdirectory(apps/mandeye_raw_data_viewer)
 add_subdirectory(apps/lidar_odometry_step_1)
 add_subdirectory(apps/mandeye_single_session_viewer)
@@ -149,8 +177,9 @@ add_subdirectory(apps/multi_session_registration_legacy)
 add_subdirectory(apps/session_uncertainty_calculation)
 add_subdirectory(apps/session_to_session_rigid_registration)
 add_subdirectory(apps/easy_gui)
+endif()
 
-if(BUILD_WITH_UTILITY_APPLICATION)
+if(BUILD_WITH_UTILITY_APPLICATION AND NOT HDMAPPING_EASY_GUI_ONLY)
     add_subdirectory(apps/split_multi_livox)
     add_subdirectory(apps/precision_forestry_tools)
     add_subdirectory(apps/compare_trajectories)

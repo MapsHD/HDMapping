@@ -48,6 +48,7 @@ namespace easy_gui
         , point_cloud(root_ / "point_cloud.laz")
         , trajectory(root_ / "trajectory.csv")
         , readme(root_ / "README.txt")
+        , done_marker(root_ / "easy_gui_done.txt")
     {
     }
 
@@ -185,7 +186,8 @@ namespace easy_gui
 
         // --- 1. re-check: the recording or the disk may have changed since the user pressed "Check"
         setStage(PipelineStage::Checking);
-        const PreflightResult check = runPreflight(request_.recording, request_.output_folder);
+        const PreflightResult check = runPreflight(request_.recording, request_.output_folder, request_.resume_unfinished);
+        const bool replace_unfinished = request_.resume_unfinished && holdsUnfinishedOutput(out.root);
         if (!check.ok())
         {
             std::string first_error;
@@ -220,6 +222,18 @@ namespace easy_gui
         }
         for (const auto& f : check.findings)
             log(std::string("[easy_gui] check ") + severityTag(f.severity) + ": " + f.message);
+        if (replace_unfinished)
+        {
+            // Only Easy GUI's own files are here (holdsUnfinishedOutput); a half-written result must not survive into
+            // this run, and step 1 needs a fresh staging folder.
+            std::vector<fs::path> leftovers;
+            for (const auto& entry : fs::directory_iterator(out.root, ec))
+                if (entry.path().filename() != out.log_file.filename())
+                    leftovers.push_back(entry.path());
+            for (const auto& p : leftovers)
+                fs::remove_all(p, ec);
+            log("[easy_gui] removed the files of an unfinished earlier attempt");
+        }
 
         // --- 2. staging folder + parameter file
         setStage(PipelineStage::Staging);

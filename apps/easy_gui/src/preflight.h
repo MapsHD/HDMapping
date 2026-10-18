@@ -59,7 +59,22 @@ namespace easy_gui
     //! Checks the recording and the output folder before anything is started. Catches, with a plain message, the
     //! cases where step 1 would otherwise abort() (unreadable LAZ), exit() (calibration mismatch) or silently produce
     //! something incomplete (unpaired files, non-overlapping clocks).
-    PreflightResult runPreflight(const std::filesystem::path& recording, const std::filesystem::path& output_folder);
+    //! `resume_unfinished` (batch mode): an output folder that holds only an unfinished earlier attempt
+    //! (holdsUnfinishedOutput) is accepted too; the pipeline clears it before the run.
+    PreflightResult runPreflight(
+        const std::filesystem::path& recording, const std::filesystem::path& output_folder, bool resume_unfinished = false);
+
+    //! True if `folder` exists, is not empty and holds nothing but what an Easy GUI run writes (see OutputLayout):
+    //! easy_gui.log, work/, point_cloud.laz, trajectory.csv, README.txt. A finished batch result also holds the done
+    //! marker, so it is not "unfinished".
+    bool holdsUnfinishedOutput(const std::filesystem::path& folder);
+
+    //! Free bytes on the disk that holds `path`, or of its nearest existing parent (the output folder usually does
+    //! not exist yet). False if it cannot be determined; `checked` is the folder that was asked.
+    bool availableSpace(const std::filesystem::path& path, uint64_t& available, std::filesystem::path& checked);
+
+    //! "1.2 GB"
+    std::string formatBytes(uint64_t bytes);
 
     //! Temporary disk space of a run: step 1's caches (original + decimated + concatenated chunk points, ~45 B/point
     //! each with decimation 0.01). Measured peak on a 117 M-point forest walk: ~108 B per raw point; 120 B leaves

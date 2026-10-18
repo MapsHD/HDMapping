@@ -27,6 +27,9 @@ namespace easy_gui
         Settings settings;
         //! Dev/test only (ExportRequest::check_band_outer_m): > 0 adds alignment-check points to the export.
         double check_band_outer_m = 0.0;
+        //! Batch mode: the output folder may hold an unfinished earlier attempt (holdsUnfinishedOutput); everything in
+        //! it except easy_gui.log is removed before the run, and the log is continued.
+        bool resume_unfinished = false;
     };
 
     enum class PipelineState
@@ -74,6 +77,7 @@ namespace easy_gui
         std::filesystem::path point_cloud; // point_cloud.laz: the exported point cloud
         std::filesystem::path trajectory; // trajectory.csv
         std::filesystem::path readme; // README.txt: describes the two files above
+        std::filesystem::path done_marker; // easy_gui_done.txt: written by batch mode once the result is complete
     };
 
     //! Locates lidar_odometry_step_1 next to the Easy GUI executable (plain build name or the installed,

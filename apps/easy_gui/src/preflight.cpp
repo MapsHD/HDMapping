@@ -31,14 +31,6 @@ namespace easy_gui
             return s;
         }
 
-        std::string formatBytes(uint64_t bytes)
-        {
-            std::ostringstream out;
-            out.precision(1);
-            out << std::fixed << static_cast<double>(bytes) / 1e9 << " GB";
-            return out.str();
-        }
-
         std::string names(const std::vector<std::string>& list, size_t max_shown = 5)
         {
             std::string out;
@@ -236,6 +228,45 @@ namespace easy_gui
         return true;
     }
 
+    std::string formatBytes(uint64_t bytes)
+    {
+        std::ostringstream out;
+        out.precision(1);
+        out << std::fixed << static_cast<double>(bytes) / 1e9 << " GB";
+        return out.str();
+    }
+
+    bool availableSpace(const fs::path& path, uint64_t& available, fs::path& checked)
+    {
+        std::error_code ec;
+        checked = fs::absolute(path, ec);
+        while (!checked.empty() && !fs::exists(checked, ec) && checked != checked.parent_path())
+            checked = checked.parent_path();
+        const auto space = fs::space(checked, ec);
+        if (ec)
+            return false;
+        available = space.available;
+        return true;
+    }
+
+    bool holdsUnfinishedOutput(const fs::path& folder)
+    {
+        // NOTE: the names of OutputLayout (pipeline.h), which this library level cannot include; a test keeps the two
+        // in sync.
+        static const std::set<std::string> kRunEntries = { "easy_gui.log", "work", "point_cloud.laz", "trajectory.csv", "README.txt" };
+        std::error_code ec;
+        if (!fs::is_directory(folder, ec))
+            return false;
+        bool any = false;
+        for (const auto& entry : fs::directory_iterator(folder, ec))
+        {
+            if (!kRunEntries.contains(entry.path().filename().string()))
+                return false;
+            any = true;
+        }
+        return any && !ec;
+    }
+
     uint64_t estimateWorkBytes(uint64_t total_points)
     {
         return total_points * 120;
@@ -280,7 +311,7 @@ namespace easy_gui
         return files;
     }
 
-    PreflightResult runPreflight(const fs::path& recording, const fs::path& output_folder)
+    PreflightResult runPreflight(const fs::path& recording, const fs::path& output_folder, bool resume_unfinished)
     {
         PreflightResult r;
         auto add = [&r](Severity s, std::string m)
@@ -431,24 +462,25 @@ namespace easy_gui
                 "(it may be on the scanner's USB stick).");
         else
         {
-            if (fs::exists(output_folder, ec) && !fs::is_empty(output_folder, ec))
+            if (resume_unfinished && holdsUnfinishedOutput(output_folder))
+                add(Severity::Ok,
+                    "The output folder holds an unfinished earlier attempt. It will be replaced; its log is kept and continued.");
+            else if (fs::exists(output_folder, ec) && !fs::is_empty(output_folder, ec))
                 add(Severity::Error,
                     "The output folder '" + output_folder.string() + "' already contains files. Choose an empty or new folder.");
 
-            fs::path existing = fs::absolute(output_folder, ec);
-            while (!existing.empty() && !fs::exists(existing, ec) && existing != existing.parent_path())
-                existing = existing.parent_path();
-            const auto space = fs::space(existing, ec);
-            if (ec)
+            uint64_t available = 0;
+            fs::path existing;
+            if (!availableSpace(output_folder, available, existing))
                 add(Severity::Warning, "Could not determine the free disk space at '" + existing.string() + "'.");
-            else if (space.available < r.estimated_disk_bytes)
+            else if (available < r.estimated_disk_bytes)
                 add(Severity::Error,
-                    "Not enough free disk space for the output folder: " + need + " needed, " + formatBytes(space.available) +
+                    "Not enough free disk space for the output folder: " + need + " needed, " + formatBytes(available) +
                         " free. Free some space or choose a folder on another disk.");
-            else if (space.available < r.estimated_disk_bytes + r.estimated_disk_bytes / 2)
-                add(Severity::Warning, "Free disk space is tight: " + need + " needed, " + formatBytes(space.available) + " free.");
+            else if (available < r.estimated_disk_bytes + r.estimated_disk_bytes / 2)
+                add(Severity::Warning, "Free disk space is tight: " + need + " needed, " + formatBytes(available) + " free.");
             else
-                disk_summary = "Disk space: " + need + " needed, " + formatBytes(space.available) + " free.";
+                disk_summary = "Disk space: " + need + " needed, " + formatBytes(available) + " free.";
         }
         if (!disk_summary.empty() && r.ok())
             r.findings.push_back({ Severity::Ok, disk_summary });

@@ -1,5 +1,6 @@
 #include <doctest.h>
 
+#include "pipeline.h"
 #include "preflight.h"
 #include "test_helpers.h"
 
@@ -134,4 +135,51 @@ TEST_CASE("isSameOrInside")
     CHECK(isSameOrInside("/a/b/", "/a/b"));
     CHECK_FALSE(isSameOrInside("/a/bc", "/a/b"));
     CHECK_FALSE(isSameOrInside("/a", "/a/b"));
+}
+
+TEST_CASE("resume_unfinished accepts an output folder that holds only an earlier attempt's own files")
+{
+    TempDir tmp;
+    easy_gui_test::writeRecording(tmp.path / "rec");
+    const fs::path out = tmp.path / "out";
+    fs::create_directories(out / "work" / "lio_session");
+    easy_gui_test::writeText(out / "easy_gui.log", "earlier attempt\n");
+    easy_gui_test::writeText(out / "point_cloud.laz", "half written");
+    CHECK(holdsUnfinishedOutput(out));
+
+    CHECK_FALSE(runPreflight(tmp.path / "rec", out).ok()); // single mode: still refused
+    const auto r = runPreflight(tmp.path / "rec", out, true);
+    CHECK(r.ok());
+    CHECK(hasFinding(r, Severity::Ok, "unfinished earlier attempt"));
+
+    SUBCASE("a finished batch result (done marker) is not unfinished")
+    {
+        easy_gui_test::writeText(out / "easy_gui_done.txt", "done");
+        CHECK_FALSE(holdsUnfinishedOutput(out));
+        CHECK_FALSE(runPreflight(tmp.path / "rec", out, true).ok());
+    }
+    SUBCASE("anything else in the folder is not ours")
+    {
+        easy_gui_test::writeText(out / "notes.txt", "mine");
+        CHECK_FALSE(holdsUnfinishedOutput(out));
+        CHECK_FALSE(runPreflight(tmp.path / "rec", out, true).ok());
+    }
+    SUBCASE("missing and empty folders are not unfinished attempts")
+    {
+        CHECK_FALSE(holdsUnfinishedOutput(tmp.path / "missing"));
+        fs::create_directories(tmp.path / "empty");
+        CHECK_FALSE(holdsUnfinishedOutput(tmp.path / "empty"));
+    }
+}
+
+TEST_CASE("holdsUnfinishedOutput knows every file of OutputLayout except the done marker")
+{
+    TempDir tmp;
+    const OutputLayout out(tmp.path / "out");
+    fs::create_directories(out.session);
+    for (const auto& file : { out.log_file, out.point_cloud, out.trajectory, out.readme, out.step1_parameters })
+        easy_gui_test::writeText(file, "x");
+    CHECK(holdsUnfinishedOutput(out.root));
+    easy_gui_test::writeText(out.done_marker, "x");
+    CHECK_FALSE(holdsUnfinishedOutput(out.root));
 }

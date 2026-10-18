@@ -148,28 +148,9 @@ namespace
         };
     };
 
-    //! What the GUI and --batch do before starting: discover, name, check, select the recordings that passed.
     BatchRequest prepareBatch(const fs::path& parent, const fs::path& output_root)
     {
-        BatchRequest request;
-        request.output_root = output_root;
-        std::vector<DiscoveredFolder> recordings;
-        for (const auto& f : discoverRecordings(parent))
-            (f.is_recording ? recordings : request.skipped).push_back(f);
-        const auto names = defaultOutputNames(recordings, output_root);
-        for (size_t i = 0; i < recordings.size(); i++)
-        {
-            const BatchCheck check = checkBatchRecording(recordings[i].path, output_root / names[i]);
-            BatchItem item{ recordings[i].path, recordings[i].name, names[i] };
-            item.total_points = check.preflight.total_points;
-            if (!check.done && !check.preflight.ok())
-            {
-                item.include = false;
-                item.exclude_reason = firstError(check.preflight);
-            }
-            request.items.push_back(item);
-        }
-        return request;
+        return planBatch(parent, output_root).request;
     }
 
     BatchStatus runToEnd(BatchRunner& runner, const BatchRequest& request)

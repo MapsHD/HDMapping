@@ -1,6 +1,7 @@
 // HDMapping Easy GUI: raw Mandeye recording -> lidar odometry (precision forestry preset) -> point cloud + trajectory.
 // See apps/easy_gui/docs/DESIGN.md for the decisions behind the pipeline.
 
+#include "batch.h"
 #include "child_process.h"
 #include "export.h"
 #include "pipeline.h"
@@ -17,6 +18,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <csignal>
 #include <cstdio>
 #include <cstdlib>
 #include <future>
@@ -107,7 +109,7 @@ namespace
             preflight.reset();
             preflight_for_recording = recording;
             preflight_for_output = output_folder;
-            preflight_future = std::async(std::launch::async, runPreflight, recording, output_folder);
+            preflight_future = std::async(std::launch::async, runPreflight, recording, output_folder, false);
         }
 
         bool checking() const
@@ -127,6 +129,42 @@ namespace
                 !pipeline.busy();
         }
     };
+
+    void drawAdvancedSettings(Settings& settings)
+    {
+        if (ImGui::CollapsingHeader("Advanced settings"))
+        {
+            ImGui::Indent();
+            float near = static_cast<float>(settings.near_min_range_m);
+            ImGui::SetNextItemWidth(220);
+            if (ImGui::SliderFloat(
+                    "Closest points kept [m]",
+                    &near,
+                    static_cast<float>(Settings::kNearMinRangeLowest),
+                    static_cast<float>(Settings::kNearMinRangeHighest),
+                    "%.2f m"))
+            {
+                settings.near_min_range_m = near;
+                settings.clamp();
+            }
+            ImGui::SameLine();
+            ImGui::TextDisabled("(?)");
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip(
+                    "Points closer to the scanner than this are left out of the point cloud.\n"
+                    "0.4 m (default) removes the operator's body and the handle.\n"
+                    "Lower values keep more of the close surroundings but may include the operator.");
+            ImGui::Checkbox("Place all points by their measurement time (experimental)", &settings.place_by_raw_time);
+            ImGui::SameLine();
+            ImGui::TextDisabled("(?)");
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip(
+                    "Off (default): the point cloud uses lidar odometry's own points.\n"
+                    "On: every point is taken from the raw recording and placed at its exact measurement time.");
+            ImGui::Checkbox("Keep intermediate files (for troubleshooting)", &settings.keep_work_files);
+            ImGui::Unindent();
+        }
+    }
 
     void drawInputs(App& app, bool locked)
     {
@@ -160,38 +198,7 @@ namespace
         ImGui::TextUnformatted(
             app.output_folder.empty() ? "(set automatically once a recording is chosen)" : app.output_folder.string().c_str());
 
-        if (ImGui::CollapsingHeader("Advanced settings"))
-        {
-            ImGui::Indent();
-            float near = static_cast<float>(app.settings.near_min_range_m);
-            ImGui::SetNextItemWidth(220);
-            if (ImGui::SliderFloat(
-                    "Closest points kept [m]",
-                    &near,
-                    static_cast<float>(Settings::kNearMinRangeLowest),
-                    static_cast<float>(Settings::kNearMinRangeHighest),
-                    "%.2f m"))
-            {
-                app.settings.near_min_range_m = near;
-                app.settings.clamp();
-            }
-            ImGui::SameLine();
-            ImGui::TextDisabled("(?)");
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip(
-                    "Points closer to the scanner than this are left out of the point cloud.\n"
-                    "0.4 m (default) removes the operator's body and the handle.\n"
-                    "Lower values keep more of the close surroundings but may include the operator.");
-            ImGui::Checkbox("Place all points by their measurement time (experimental)", &app.settings.place_by_raw_time);
-            ImGui::SameLine();
-            ImGui::TextDisabled("(?)");
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip(
-                    "Off (default): the point cloud uses lidar odometry's own points.\n"
-                    "On: every point is taken from the raw recording and placed at its exact measurement time.");
-            ImGui::Checkbox("Keep intermediate files (for troubleshooting)", &app.settings.keep_work_files);
-            ImGui::Unindent();
-        }
+        drawAdvancedSettings(app.settings);
 
         ImGui::EndDisabled();
     }
@@ -245,6 +252,33 @@ namespace
         ImGui::TextUnformatted(label);
     }
 
+    //! What the running pipeline is doing right now: a label and a progress bar.
+    void drawStageProgress(const PipelineStatus& s)
+    {
+        if (s.stage == PipelineStage::Odometry)
+        {
+            const double phase = s.step1.phaseFraction();
+            std::string label = phaseLabel(s.step1.phase);
+            if (s.step1.phase == Step1Phase::Odometry && s.step1.chunks_total > 0)
+                label += " (" + std::to_string(s.step1.chunks_done) + " / " + std::to_string(s.step1.chunks_total) + ")";
+            ImGui::TextUnformatted(label.c_str());
+            if (phase >= 0.0)
+                ImGui::ProgressBar(static_cast<float>(phase), ImVec2(-1, 0));
+            else
+                ImGui::ProgressBar(-1.0f * static_cast<float>(ImGui::GetTime()), ImVec2(-1, 0), "working...");
+        }
+        else if (s.stage == PipelineStage::Export)
+        {
+            ImGui::TextUnformatted(s.export_step.empty() ? "Exporting..." : s.export_step.c_str());
+            ImGui::ProgressBar(static_cast<float>(s.export_fraction), ImVec2(-1, 0));
+        }
+        else
+        {
+            ImGui::TextUnformatted(s.stage == PipelineStage::Cleanup ? "Cleaning up..." : "Preparing...");
+            ImGui::ProgressBar(-1.0f * static_cast<float>(ImGui::GetTime()), ImVec2(-1, 0), "working...");
+        }
+    }
+
     void drawRun(App& app)
     {
         const PipelineStatus s = app.pipeline.status();
@@ -281,18 +315,9 @@ namespace
         if (s.state == PipelineState::Running)
         {
             ImGui::Spacing();
+            drawStageProgress(s);
             if (s.stage == PipelineStage::Odometry)
             {
-                const double phase = s.step1.phaseFraction();
-                std::string label = phaseLabel(s.step1.phase);
-                if (s.step1.phase == Step1Phase::Odometry && s.step1.chunks_total > 0)
-                    label += " (" + std::to_string(s.step1.chunks_done) + " / " + std::to_string(s.step1.chunks_total) + ")";
-                ImGui::TextUnformatted(label.c_str());
-                if (phase >= 0.0)
-                    ImGui::ProgressBar(static_cast<float>(phase), ImVec2(-1, 0));
-                else
-                    ImGui::ProgressBar(-1.0f * static_cast<float>(ImGui::GetTime()), ImVec2(-1, 0), "working...");
-
                 const double overall = s.step1.overallFraction();
                 std::string eta = "Elapsed " + formatDuration(s.elapsed_s);
                 if (overall > 0.05)
@@ -301,16 +326,7 @@ namespace
                 ImGui::ProgressBar(static_cast<float>(overall), ImVec2(-1, 0), eta.c_str());
             }
             else if (s.stage == PipelineStage::Export)
-            {
-                ImGui::TextUnformatted(s.export_step.empty() ? "Exporting..." : s.export_step.c_str());
-                ImGui::ProgressBar(static_cast<float>(s.export_fraction), ImVec2(-1, 0));
                 ImGui::TextUnformatted(("Elapsed " + formatDuration(s.elapsed_s)).c_str());
-            }
-            else
-            {
-                ImGui::TextUnformatted(s.stage == PipelineStage::Cleanup ? "Cleaning up..." : "Preparing...");
-                ImGui::ProgressBar(-1.0f * static_cast<float>(ImGui::GetTime()), ImVec2(-1, 0), "working...");
-            }
 
             ImGui::Spacing();
             if (ImGui::Button("Cancel", ImVec2(120, 0)))
@@ -443,6 +459,176 @@ namespace
         return s.state == PipelineState::Succeeded ? 0 : 1;
     }
 
+    std::atomic<int> g_interrupts{ 0 };
+
+    extern "C" void onInterrupt(int)
+    {
+        g_interrupts++;
+        std::signal(SIGINT, onInterrupt); // some C libraries reset the handler after each signal
+    }
+
+    std::string pointsText(uint64_t points)
+    {
+        char buffer[32];
+        std::snprintf(buffer, sizeof(buffer), "%.1f M", points / 1e6);
+        return buffer;
+    }
+
+    //! `easy_gui --batch <parent folder> <output folder>`: batch mode without a window, with the GUI's rules: every
+    //! recording that passes the check is processed, finished ones are skipped. Ctrl+C once stops after the current
+    //! recording, twice stops now. Exit code 0 = every selected recording succeeded (or was already done), 1 = some
+    //! failed, were not run or the batch was refused, 2 = usage.
+    int runBatchHeadless(const fs::path& parent, const fs::path& output_root, const Settings& settings, double check_band_outer_m)
+    {
+        std::setvbuf(stdout, nullptr, _IONBF, 0);
+        std::error_code ec;
+        if (!fs::is_directory(parent, ec))
+        {
+            std::printf("[X] The folder '%s' does not exist or is not a folder.\n", parent.string().c_str());
+            return 1;
+        }
+        std::printf("Looking for recordings in '%s' and checking them...\n", parent.string().c_str());
+        BatchPlan plan = planBatch(parent, output_root);
+        BatchRequest& request = plan.request;
+        request.step1_executable = findStep1Executable();
+        request.settings = settings;
+        request.check_band_outer_m = check_band_outer_m;
+        for (const auto& f : request.skipped)
+            std::printf("[skipped] %s: %s\n", f.name.c_str(), f.skip_reason.c_str());
+        if (request.items.empty())
+        {
+            std::printf("[X] No recordings found in '%s' or its subfolders.\n", parent.string().c_str());
+            return 1;
+        }
+        if (const std::string problem = batchOutputProblem(output_root, plan.found); !problem.empty())
+        {
+            std::printf("[X] %s\n", problem.c_str());
+            return 1;
+        }
+
+        for (size_t i = 0; i < request.items.size(); i++)
+        {
+            const BatchItem& item = request.items[i];
+            const BatchCheck& c = plan.checks[i];
+            const std::string label = item.name + (item.output_name == item.name ? "" : " -> " + item.output_name);
+            if (c.done)
+                std::printf("[done] %s: already processed (finished %s)\n", label.c_str(), c.done->finished.c_str());
+            else if (!item.include)
+                std::printf("[X] %s: %s\n", label.c_str(), firstError(c.preflight).c_str());
+            else
+            {
+                std::printf(
+                    "[OK] %s: %s, %s points\n",
+                    label.c_str(),
+                    formatDuration(c.preflight.duration_s).c_str(),
+                    pointsText(c.preflight.total_points).c_str());
+                for (const auto& f : c.preflight.findings)
+                    if (f.severity == Severity::Warning)
+                        std::printf("     [!] %s\n", f.message.c_str());
+            }
+        }
+        if (std::none_of(
+                request.items.begin(),
+                request.items.end(),
+                [](const BatchItem& item)
+                {
+                    return item.include;
+                }))
+        {
+            std::printf("[X] None of the recordings passed the check; nothing to process.\n");
+            return 1;
+        }
+
+        uint64_t available = 0;
+        fs::path checked;
+        const bool known = availableSpace(output_root, available, checked);
+        const Finding disk = batchDiskFinding(batchDiskNeed(plan.toProcess()), known, available);
+        std::printf(
+            "%s %s\n",
+            disk.severity == Severity::Error         ? "[X]"
+                : disk.severity == Severity::Warning ? "[!]"
+                                                     : "[OK]",
+            disk.message.c_str());
+        if (disk.severity == Severity::Error)
+            return 1;
+
+        BatchRunner runner;
+        std::string error;
+        if (!runner.start(request, error))
+        {
+            std::printf("[X] %s\n", error.c_str());
+            return 1;
+        }
+        std::signal(SIGINT, onInterrupt);
+        int interrupts_seen = 0;
+        std::string last;
+        auto last_print = std::chrono::steady_clock::now() - std::chrono::seconds(5);
+        while (runner.busy())
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            if (const int n = g_interrupts.load(); n != interrupts_seen)
+            {
+                interrupts_seen = n;
+                if (n == 1)
+                {
+                    runner.stopAfterCurrent();
+                    std::printf("Stopping after the current recording. Press Ctrl+C again to stop now.\n");
+                }
+                else
+                {
+                    runner.stopNow();
+                    std::printf("Stopping now.\n");
+                }
+            }
+            const BatchStatus s = runner.status();
+            std::string line = "overall " + std::to_string(static_cast<int>(s.fraction * 100)) + "%";
+            if (s.eta_s >= 0.0)
+                line += ", about " + formatDuration(s.eta_s) + " left";
+            if (s.current >= 0)
+            {
+                const PipelineStatus& p = s.current_status;
+                std::string stage = p.stage == PipelineStage::Odometry ? phaseLabel(p.step1.phase)
+                    : p.stage == PipelineStage::Export                 ? "Export"
+                                                                       : "Preparing";
+                line += " | " + std::to_string(s.current + 1) + "/" + std::to_string(request.items.size()) + " " +
+                    request.items[s.current].name + ": " + stage + " " + std::to_string(static_cast<int>(pipelineFraction(p) * 100)) + "%";
+            }
+            const auto now = std::chrono::steady_clock::now();
+            if (line != last && now - last_print >= std::chrono::seconds(5))
+            {
+                std::printf("[%s] %s\n", formatDuration(s.elapsed_s).c_str(), line.c_str());
+                last = line;
+                last_print = now;
+            }
+        }
+        std::signal(SIGINT, SIG_DFL);
+
+        const BatchStatus s = runner.status();
+        bool all_good = true;
+        for (size_t i = 0; i < request.items.size(); i++)
+        {
+            const BatchItemResult& r = s.items[i];
+            const bool good = r.state == BatchItemState::Succeeded || r.state == BatchItemState::AlreadyDone;
+            if (request.items[i].include && !good)
+                all_good = false;
+            std::printf(
+                "%s %s: %s%s%s\n",
+                good                                      ? "[OK]"
+                    : r.state == BatchItemState::Excluded ? "[--]"
+                                                          : "[X]",
+                request.items[i].name.c_str(),
+                batchStateToken(r.state),
+                r.error.empty() ? "" : ": ",
+                r.error.c_str());
+        }
+        std::printf(
+            "Batch %s after %s. Summary: %s\n",
+            s.stop_after_current ? "stopped" : "finished",
+            formatDuration(s.elapsed_s).c_str(),
+            (output_root / BatchRunner::kSummaryFileName).string().c_str());
+        return all_good ? 0 : 1;
+    }
+
     //! Dev aid: `easy_gui --export-only <recording> <session.mjs> <output folder> [--check-band <m>]` runs only the
     //! export, on an existing step 1 session of that recording (step 1 takes ~20 min on a 10-min walk; the export
     //! about a minute). The output folder may exist; the three result files in it are overwritten.
@@ -538,7 +724,7 @@ namespace
 int main(int argc, char* argv[])
 {
     std::vector<std::string> args(argv + 1, argv + argc);
-    if (!args.empty() && (args[0] == "--headless" || args[0] == "--export-only"))
+    if (!args.empty() && (args[0] == "--headless" || args[0] == "--export-only" || args[0] == "--batch"))
     {
         attachToParentConsole();
         const double check_band = takeCheckBand(args);
@@ -548,12 +734,19 @@ int main(int argc, char* argv[])
             return runHeadless(args[1], args[2], settings, check_band);
         if (args[0] == "--export-only" && args.size() == 4)
             return runExportOnly(args[1], args[2], args[3], settings, check_band);
+        if (args[0] == "--batch" && args.size() == 3)
+            return runBatchHeadless(args[1], args[2], settings, check_band);
         std::printf(
             "usage: %s --headless <recording folder> <output folder> [--check-band <m>] [--place-by-raw-time]\n"
+            "       %s --batch <parent folder> <output folder> [--check-band <m>] [--place-by-raw-time]\n"
             "       %s --export-only <recording folder> <session.mjs> <output folder> [--check-band <m>] [--place-by-raw-time]\n"
+            "--batch: processes every recording in <parent folder> (one folder level down; the parent itself too, if it is a\n"
+            "         recording) into <output folder>/<recording name>/. Recordings finished in an earlier run are skipped.\n"
+            "         Ctrl+C stops after the current recording, a second Ctrl+C stops now.\n"
             "--check-band <m> (testing): also export the raw points between the 1.0 m load filter and <m>, flagged\n"
             "                 point_origin = 3, to check that near points line up with the odometry points.\n"
             "--place-by-raw-time: place all points from the raw files at their real time (export option, default off).\n",
+            argv[0],
             argv[0],
             argv[0]);
         return 2;

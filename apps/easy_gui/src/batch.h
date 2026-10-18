@@ -192,6 +192,21 @@ namespace easy_gui
     //! batch goes on. Each finished recording gets a done marker; recordings with a matching marker are skipped, so
     //! restarting the same batch continues where it stopped. batch_summary.csv is rewritten after every recording,
     //! so it is current even if the batch never ends normally. System sleep is prevented while it runs.
+    //! What happens before "Start", done synchronously (for --batch and tests; the GUI checks row by row in the
+    //! background): discover, name, check. Recordings that fail the check are not selected (exclude_reason says
+    //! why); finished ones stay selected, so the summary lists them as already done.
+    struct BatchPlan
+    {
+        std::vector<DiscoveredFolder> found; // everything discoverRecordings() returned
+        BatchRequest request; // items + skipped filled; the caller sets step1_executable and the settings
+        std::vector<BatchCheck> checks; // parallel to request.items
+
+        //! Pre-flight results of the recordings that will really be processed (selected, not yet done).
+        std::vector<const PreflightResult*> toProcess() const;
+    };
+
+    BatchPlan planBatch(const std::filesystem::path& parent, const std::filesystem::path& output_root);
+
     class BatchRunner
     {
     public:

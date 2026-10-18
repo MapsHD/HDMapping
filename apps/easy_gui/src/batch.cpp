@@ -348,6 +348,40 @@ namespace easy_gui
         return {};
     }
 
+    std::vector<const PreflightResult*> BatchPlan::toProcess() const
+    {
+        std::vector<const PreflightResult*> out;
+        for (size_t i = 0; i < checks.size(); i++)
+            if (request.items[i].include && !checks[i].done)
+                out.push_back(&checks[i].preflight);
+        return out;
+    }
+
+    BatchPlan planBatch(const fs::path& parent, const fs::path& output_root)
+    {
+        BatchPlan plan;
+        plan.found = discoverRecordings(parent);
+        plan.request.output_root = output_root;
+        std::vector<DiscoveredFolder> recordings;
+        for (const auto& f : plan.found)
+            (f.is_recording ? recordings : plan.request.skipped).push_back(f);
+        const auto names = defaultOutputNames(recordings, output_root);
+        for (size_t i = 0; i < recordings.size(); i++)
+        {
+            plan.checks.push_back(checkBatchRecording(recordings[i].path, output_root / names[i]));
+            const BatchCheck& check = plan.checks.back();
+            BatchItem item{ recordings[i].path, recordings[i].name, names[i] };
+            item.total_points = check.preflight.total_points;
+            if (!check.done && !check.preflight.ok())
+            {
+                item.include = false;
+                item.exclude_reason = "Check failed: " + firstError(check.preflight);
+            }
+            plan.request.items.push_back(std::move(item));
+        }
+        return plan;
+    }
+
     const char* batchStateToken(BatchItemState state)
     {
         switch (state)

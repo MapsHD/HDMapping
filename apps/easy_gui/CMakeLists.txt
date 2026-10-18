@@ -25,6 +25,7 @@ set(EASY_FOREST_VERSION "0.1.0")
 # WITH_GUI=0 is PUBLIC because LidarOdometryParams changes layout under
 # WITH_GUI (clear_color), so every TU that sees it must agree.
 add_library(easy_gui_core STATIC
+    src/batch.cpp src/batch.h
     src/child_process.cpp src/child_process.h
     src/export.cpp src/export.h
     src/forestry_preset.cpp src/forestry_preset.h
@@ -33,6 +34,7 @@ add_library(easy_gui_core STATIC
     src/preflight.cpp src/preflight.h
     src/progress_parser.cpp src/progress_parser.h
     src/settings.h
+    src/sleep_blocker.cpp src/sleep_blocker.h
     src/staging.cpp src/staging.h
     src/version.h
     ../lidar_odometry_step_1/lidar_odometry_utils.cpp
@@ -70,6 +72,11 @@ target_link_libraries(easy_gui_core PUBLIC
     UTL::include
     ${PLATFORM_LASZIP_LIB}
     ${PLATFORM_MISCELLANEOUS_LIBS})
+
+# Batch mode keeps the computer awake (src/sleep_blocker.cpp): IOKit power assertions on macOS.
+if(APPLE)
+    target_link_libraries(easy_gui_core PUBLIC "-framework IOKit" "-framework CoreFoundation")
+endif()
 
 if(MSVC)
     target_compile_definitions(easy_gui_core PUBLIC _USE_MATH_DEFINES NOMINMAX)

@@ -9,6 +9,7 @@ project(easy_gui_tests)
 # replays an excerpt of a real lidar_odometry_step_1 log.
 add_executable(easy_gui_tests
     test_main.cpp
+    test_batch.cpp
     test_child_process.cpp
     test_export.cpp
     test_pipeline_integration.cpp

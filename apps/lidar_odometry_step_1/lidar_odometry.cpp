@@ -955,6 +955,7 @@ void save_result(std::vector<WorkerData>& worker_data, LidarOdometryParams& para
         std::vector<Eigen::Vector3d> global_pointcloud;
         std::vector<unsigned short> intensity;
         std::vector<double> timestamps;
+        std::vector<std::array<uint8_t, 3>> colors;
 
         std::vector<Point3Di> original_points_to_save; // = worker_data[i].load_points(worker_data[i].original_points_cache_file_name);
         if (!load_vector_data(worker_data_concatenated[i].original_points_to_save_cache_file_name.string(), original_points_to_save))
@@ -973,8 +974,18 @@ void save_result(std::vector<WorkerData>& worker_data, LidarOdometryParams& para
             intensity,
             timestamps,
             true,
-            params.save_index_pose);
-        exportLaz(path.string(), global_pointcloud, intensity, timestamps);
+            params.save_index_pose,
+            &colors);
+
+        // write rgb only when the input carried colour (all-zero means a colourless source)
+        const bool has_colors = std::any_of(
+            colors.begin(),
+            colors.end(),
+            [](const auto& c)
+            {
+                return c[0] != 0 || c[1] != 0 || c[2] != 0;
+            });
+        exportLaz(path.string(), global_pointcloud, intensity, timestamps, 0.0, 0.0, 0.0, nullptr, has_colors ? &colors : nullptr);
 
         if (params.save_index_pose)
         {

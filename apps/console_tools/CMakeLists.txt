@@ -115,6 +115,28 @@ if (MSVC)
     target_compile_options(mcap_to_laz PRIVATE /bigobj)
 endif()
 
+# ouster_pcap_to_laz: Ouster pcap + metadata JSON -> mandeye session directory.
+# Same writer as mcap_to_laz; the pcap/packet decoding is rosbags/OusterPcapReader,
+# so laszip + nlohmann json + spdlog is the whole dependency set.
+add_executable(
+        ouster_pcap_to_laz ouster_pcap_to_laz.cpp
+        ${REPOSITORY_DIRECTORY}/rosbags/OusterPcapReader.h ${REPOSITORY_DIRECTORY}/rosbags/OusterPcapReader.cpp
+        ${REPOSITORY_DIRECTORY}/rosbags/MandeyeSessionWriter.h ${REPOSITORY_DIRECTORY}/rosbags/MandeyeSessionWriter.cpp
+)
+
+target_include_directories(
+        ouster_pcap_to_laz
+        PRIVATE ${REPOSITORY_DIRECTORY}/rosbags
+        ${THIRDPARTY_DIRECTORY}/json/include
+        ${LASZIP_INCLUDE_DIR}/LASzip/include)
+
+target_link_libraries(
+        ouster_pcap_to_laz
+        PRIVATE
+        spdlog::spdlog
+        ${PLATFORM_LASZIP_LIB}
+        ${PLATFORM_MISCELLANEOUS_LIBS})
+
 if (MSVC)
     target_compile_options(laz_to_mcap PRIVATE /bigobj)
 endif()
@@ -179,4 +201,5 @@ hdmapping_install_app(
   laz_to_txt
   laz_to_mcap
   mcap_to_laz
+  ouster_pcap_to_laz
   session_to_mcap)

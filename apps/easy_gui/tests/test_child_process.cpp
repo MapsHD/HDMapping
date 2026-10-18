@@ -122,7 +122,8 @@ TEST_CASE("stdout and stderr are merged line by line and the exit code is return
 {
     ChildProcess child;
     std::string error;
-    REQUIRE(child.start(cmdExe(), { "/c", "echo one& echo two 1>&2& exit /b 3" }, error));
+    // Redirection first: in "echo two 1>&2" cmd would print the space before the redirection too.
+    REQUIRE(child.start(cmdExe(), { "/c", "echo one& 1>&2 echo two& exit /b 3" }, error));
     const auto lines = readAll(child);
     CHECK(child.wait() == 3);
     REQUIRE(lines.size() == 2);

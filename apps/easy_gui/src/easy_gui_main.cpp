@@ -1,5 +1,5 @@
 // HDMapping Easy GUI: raw Mandeye recording -> lidar odometry (precision forestry preset) -> point cloud + trajectory.
-// See CLAUDE.md ("Easy GUI") for the decisions behind the pipeline.
+// See apps/easy_gui/docs/DESIGN.md for the decisions behind the pipeline.
 
 #include "export.h"
 #include "pipeline.h"

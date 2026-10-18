@@ -17,7 +17,7 @@ namespace easy_gui
 
     //! Easy GUI's only deviation from the preset: threshould_output_filter (output-only) is lowered to
     //! filter_threshold_xy_inner, so step 1 exports every point the load filter kept, and the near-point export picks
-    //! up exactly the points the load filter removed. The trajectory is unaffected (see CLAUDE.md).
+    //! up exactly the points the load filter removed. The trajectory is unaffected (see docs/DESIGN.md).
     void applyEasyGuiOutputSettings(LidarOdometryParams& params);
 
     //! Writes the parameter file the step 1 child process runs with (value-initialised params + preset + Easy GUI

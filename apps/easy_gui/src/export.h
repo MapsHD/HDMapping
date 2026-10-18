@@ -33,7 +33,7 @@ namespace easy_gui
         //! taking step 1's points (scan_lio_N.laz, placed at step 1's ramp time). Same distance filters, near-point and
         //! gap-point rules; raw gps_time is written. point_origin = 0 then means "inside step 1's distance limits, and
         //! not in a gap". check_band_outer_m is ignored (those points are all included). Measured slightly less sharp
-        //! than the default (see CLAUDE.md), hence off.
+        //! than the default (see docs/DESIGN.md), hence off.
         bool place_by_raw_time = false;
         std::filesystem::path laz_file;
         std::filesystem::path trajectory_file;

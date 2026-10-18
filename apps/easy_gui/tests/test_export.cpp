@@ -252,6 +252,7 @@ TEST_CASE("Las14Writer writes LAS 1.4 point format 6 with named, unscaled extra 
         { { ExtraBytesAttribute::Type::F32, "range_m", "range" }, { ExtraBytesAttribute::Type::U8, "point_origin", "flag" } },
         Eigen::Vector3d(100.0, 200.0, 0.0),
         0.0001,
+        "test system",
         "test",
         error));
 #pragma pack(push, 1)

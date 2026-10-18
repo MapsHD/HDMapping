@@ -6,9 +6,9 @@
 #include "pipeline.h"
 #include "preflight.h"
 #include "settings.h"
+#include "version.h"
 
 #include <Core/pfd_wrapper.hpp>
-#include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
 #include <RaylibWidgets/WindowFit.h>
 
 #include <imgui.h>
@@ -574,7 +574,7 @@ int main(int argc, char* argv[])
         app.setRecording(argv[first_positional]);
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
-    InitWindow(900, 780, ("Easy Forest HDMapping " + std::string(HDMAPPING_CONFIGURE_PROJECT_VERSION)).c_str());
+    InitWindow(900, 780, versionString().c_str());
     raylib_widgets::fitWindowToScreen();
     // raylib's default exit key (Esc) would close the window mid-run.
     SetExitKey(KEY_NULL);

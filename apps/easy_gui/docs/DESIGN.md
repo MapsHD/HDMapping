@@ -6,6 +6,11 @@ collaborators and reviewers who know HDMapping. The user guide is [../README.md]
 Naming: the user-facing name is **Easy Forest HDMapping** (window title, user guide, release packages). Internally,
 the code keeps the name Easy GUI (`apps/easy_gui`, the `easy_gui` binary and targets), and so does this document.
 
+Version: Easy Forest HDMapping has its own version (`EASY_FOREST_VERSION` in `apps/easy_gui/CMakeLists.txt`,
+equal to the `easy-forest-v*` tag). Window title, README.txt and easy_gui.log show both, e.g. "Easy Forest HDMapping
+0.1.0 (HDMapping 0.105.0)". The LAZ header's 32-character fields cannot hold that: generating software is
+"Easy Forest HDMapping 0.1.0", system identifier "HDMapping 0.105.0".
+
 Contents:
 
 1. [Goal and scope](#1-goal-and-scope)

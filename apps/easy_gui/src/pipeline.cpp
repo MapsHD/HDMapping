@@ -2,8 +2,7 @@
 
 #include "forestry_preset.h"
 #include "staging.h"
-
-#include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
+#include "version.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -209,7 +208,7 @@ namespace easy_gui
         }
         log_file_.open(out.log_file, std::ios::out | std::ios::app);
 
-        log("[easy_gui] Easy Forest HDMapping " + std::string(HDMAPPING_CONFIGURE_PROJECT_VERSION) + ", started " + timestamp());
+        log("[easy_gui] " + versionString() + ", started " + timestamp());
         log("[easy_gui] recording: " + request_.recording.string());
         log("[easy_gui] output: " + out.root.string());
         log("[easy_gui] step 1 program: " + request_.step1_executable.string());

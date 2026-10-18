@@ -50,6 +50,7 @@ namespace easy_gui
             const std::vector<ExtraBytesAttribute>& attributes,
             const Eigen::Vector3d& offset,
             double scale,
+            const std::string& system_identifier,
             const std::string& generating_software,
             std::string& error);
         bool write(const Las14Point& point, std::string& error);

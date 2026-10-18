@@ -64,6 +64,7 @@ namespace easy_gui
         const std::vector<ExtraBytesAttribute>& attributes,
         const Eigen::Vector3d& offset,
         double scale,
+        const std::string& system_identifier,
         const std::string& generating_software,
         std::string& error)
     {
@@ -89,7 +90,7 @@ namespace easy_gui
         header->global_encoding = (1 << 4); // bit 0 = 0: not adjusted GPS time; bit 4: WKT (required for PF6)
         header->version_major = 1;
         header->version_minor = 4;
-        copyField(header->system_identifier, sizeof(header->system_identifier), "Easy Forest HDMapping");
+        copyField(header->system_identifier, sizeof(header->system_identifier), system_identifier);
         copyField(header->generating_software, sizeof(header->generating_software), generating_software);
         {
             const std::time_t now = std::time(nullptr);

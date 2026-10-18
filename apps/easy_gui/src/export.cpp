@@ -5,8 +5,10 @@
 #include <lidar_odometry_utils.h>
 #include <toml_io.h>
 
+#include "version.h"
 #include <Core/session.h>
 #include <Core/transformations.h>
+
 #include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
 
 #include <laszip/laszip_api.h>
@@ -212,7 +214,7 @@ namespace easy_gui
 
             out << "Easy Forest HDMapping results\n"
                 << "==========================\n\n"
-                << "Made by Easy Forest HDMapping " << HDMAPPING_CONFIGURE_PROJECT_VERSION << " from the recording\n"
+                << "Made by " << versionString() << " from the recording\n"
                 << "  " << request.recording.laz_files.front().parent_path().string() << "\n"
                 << "with lidar odometry (precision forestry settings). No loop closure and no georeferencing: coordinates\n"
                 << "are in metres in a local frame that starts at the scanner's first position (z up, from the IMU).\n\n"
@@ -421,7 +423,9 @@ namespace easy_gui
                 kAttributes,
                 offset,
                 kCoordinateScale,
+                // Both header fields hold 32 characters, too few for versionString(): one name each.
                 std::string("HDMapping ") + HDMAPPING_CONFIGURE_PROJECT_VERSION,
+                std::string("Easy Forest HDMapping ") + kEasyForestVersion,
                 error))
         {
             error = "Could not create the point cloud file '" + request.laz_file.string() + "' (" + error + ").";

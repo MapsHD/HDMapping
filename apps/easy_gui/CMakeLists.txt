@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 4.0.0)
 
 project(easy_gui)
 
+# Easy Forest HDMapping's own version: shown next to HDMapping's in the window title, README.txt, easy_gui.log and
+# the LAZ header. Keep it equal to the easy-forest-v* release tag.
+set(EASY_FOREST_VERSION "0.1.0")
+
 # easy_gui_core -- everything except the window: pre-flight check, staging, the
 # step 1 child process and its progress parsing, and the pipeline that ties
 # them together. A separate static library so the doctest suite in tests/ can
@@ -30,12 +34,13 @@ add_library(easy_gui_core STATIC
     src/progress_parser.cpp src/progress_parser.h
     src/settings.h
     src/staging.cpp src/staging.h
+    src/version.h
     ../lidar_odometry_step_1/lidar_odometry_utils.cpp
     ../lidar_odometry_step_1/toml_io.cpp
 )
 
 target_compile_definitions(easy_gui_core
-    PUBLIC WITH_GUI=0
+    PUBLIC WITH_GUI=0 EASY_FOREST_VERSION="${EASY_FOREST_VERSION}"
     PRIVATE HDMAPPING_BINARY_PREFIX="${HDMAPPING_BINARY_PREFIX}" UTL_PROFILER_DISABLE)
 
 target_include_directories(easy_gui_core

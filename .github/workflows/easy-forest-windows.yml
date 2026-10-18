@@ -1,0 +1,102 @@
+# Easy Forest HDMapping release build for Windows (x64).
+# Separate from the upstream windows.yml: builds only easy_gui + lidar_odometry_step_1 (HDMAPPING_EASY_GUI_ONLY) and
+# packages them with every DLL they need, the MSVC runtime included, as one zip (apps/easy_gui/packaging/windows).
+name: Easy Forest HDMapping Windows
+
+on:
+  push:
+    tags: ["easy-forest-v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write # attach the zip to the release on a tag
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/easy-forest-v* ]]; then
+            echo "VERSION=${GITHUB_REF_NAME#easy-forest-v}" >> "$GITHUB_ENV"
+          else
+            echo "VERSION=$(git describe --tags --always)" >> "$GITHUB_ENV"
+          fi
+
+      - uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: "~4.0.0"
+
+      # HD_CPU_OPTIMIZATION=GENERIC: AUTO adds /arch:AVX2 when the runner's CPU has it, and the release must also run
+      # on PCs without AVX2.
+      - name: Configure
+        run: |
+          cmake -B build -G "Visual Studio 17 2022" -A x64 \
+            -DHDMAPPING_EASY_GUI_ONLY=ON \
+            -DBUILD_TESTING=ON \
+            -DHD_CPU_OPTIMIZATION=GENERIC \
+            -DTBB_DISABLE_HWLOC_AUTOMATIC_SEARCH=ON
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Test
+        working-directory: build
+        run: ctest -C Release --output-on-failure
+
+      - name: Create folder and zip
+        run: |
+          python apps/easy_gui/packaging/windows/make_zip.py build/bin/Release \
+            "dist/Easy Forest HDMapping" dist/EasyForestHDMapping-windows.zip \
+            --search-dir build/3rd_binary/PROJ/install_proj/bin
+
+      - name: Smoke test the folder
+        run: |
+          # easy_gui.exe is a windowed program, so check from its own folder that it and lidar_odometry_step_1.exe
+          # load all their DLLs: run with bad arguments and expect the usage exit code 2.
+          set +e
+          "dist/Easy Forest HDMapping/easy_gui.exe" --headless
+          rc=$?
+          set -e
+          echo "easy_gui.exe exit code: $rc"
+          test "$rc" -eq 2
+
+      - name: Sizes
+        run: |
+          {
+            echo "### Easy Forest HDMapping Windows $VERSION"
+            echo '```'
+            ls -l dist/EasyForestHDMapping-windows.zip
+            du -sh "dist/Easy Forest HDMapping"
+            ls -l "dist/Easy Forest HDMapping"
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EasyForestHDMapping-windows-${{ env.VERSION }}
+          path: dist/EasyForestHDMapping-windows.zip
+          compression-level: 0 # already compressed
+          retention-days: 90
+
+      # The macOS and Windows workflows both run on the same tag: whichever gets here first creates the release.
+      - name: Attach to GitHub release
+        if: startsWith(github.ref, 'refs/tags/easy-forest-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1 \
+            || gh release create "$GITHUB_REF_NAME" --verify-tag --title "Easy Forest HDMapping $VERSION" \
+                 --notes "Installation and use: [apps/easy_gui/README.md](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/apps/easy_gui/README.md)" \
+            || gh release view "$GITHUB_REF_NAME" > /dev/null
+          gh release upload "$GITHUB_REF_NAME" dist/EasyForestHDMapping-windows.zip --clobber

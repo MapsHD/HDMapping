@@ -400,19 +400,26 @@ always reports the breakdown, warns below 1.5× the estimate and refuses below 1
     gps_time, reported twice: as step 1 does it (no-return points removed by the load filter *before* the ramp) and
     with those points kept, to quantify how much their removal contributes.
   - Near points: counts, range histogram, and sensor-frame density below 1.5 m.
-- **Windows:** `child_process.cpp` has a Windows implementation (CreateProcess + job object) that has not been compiled
-  yet.
 - **v2:** gated pose-graph loop closure (§1).
-- **Packaging (macOS, not done yet):**
-  - Bundle `easy_gui` and `lidar_odometry_step_1` in one `Easy Forest HDMapping.app` (step 1 must stay next to
-    `easy_gui`), with their dylibs, and rewrite the library paths.
-  - Then re-sign the whole bundle ad hoc, because rewriting library paths invalidates the signatures and Apple silicon
-    refuses to run unsigned code: `codesign --force --deep -s - "Easy Forest HDMapping.app"`. This must include the
-    bundled step 1 binary and every bundled dylib.
-  - Every bundled dylib must be built for macOS 13 too, or the app's real minimum is higher than the README says. A
-    build against Homebrew links `libproj` (into both programs) and `libhwloc` (through TBB), both built for the build
-    machine's macOS (26 here; the linker warns). Build them from source with `MACOSX_DEPLOYMENT_TARGET=13.0`, or drop
-    them from Easy GUI's link, and check every file with `vtool -show-build` (`minos`).
+- **Release builds:** `.github/workflows/easy-forest-{macos,windows}.yml`, on `easy-forest-v*` tags and manual
+  dispatch; the packaging steps are scripts in `apps/easy_gui/packaging/` so they run locally the same way.
+  - macOS (`macos-15` runner, Apple silicon, minimum 13.0): PROJ is built from source as a static library for 13.0
+    (`build_proj.sh`; core_math links it for GNSS, which Easy GUI never calls; Homebrew's is built for the runner's
+    macOS and drags in libtiff/curl). oneTBB without hwloc (`TBB_DISABLE_HWLOC_AUTOMATIC_SEARCH=ON`). OpenCV is not
+    configured at all in `HDMAPPING_EASY_GUI_ONLY` builds (only the camera apps link it). `make_app.py` builds
+    `Easy Forest HDMapping.app` (`easy_gui` main executable, `lidar_odometry_step_1` next to it in `Contents/MacOS`,
+    `liblaszip`, `libtbb`, `libglut` in `Contents/Frameworks`, rpaths rewritten), re-signs it ad hoc and fails unless
+    every bundled binary has minos <= 13.0 and references nothing outside the bundle, `/usr/lib` and `/System`. The
+    build also fails on the linker's "built for newer macOS version" warning, which a static library would only show
+    there. `make_dmg.sh` adds the Applications shortcut. Local run: app 7.9 MB, DMG 3.5 MB; the bundled app processed
+    `mini4` headless.
+  - Windows (`windows-latest`, x64): `easy_gui.exe` is a WIN32-subsystem program (`/ENTRY:mainCRTStartup`, so `main`
+    stays), `--headless`/`--export-only` attach to the parent console. A manifest sets UTF-8 as the process code page,
+    because the file dialog, drag and drop and `ChildProcess` all use UTF-8. `HD_CPU_OPTIMIZATION=GENERIC`: `AUTO`
+    adds `/arch:AVX2` from the runner's CPU. `make_zip.py` collects the DLLs with `dumpbin /dependents`, copies the
+    MSVC runtime app-locally from VS's redist folder and fails on any DLL that is neither bundled nor part of Windows.
+  - `easy_gui_tests` cover `ChildProcess` on Windows too (cmd.exe; argument quoting through `--echo-args`).
+  - No app icon yet (none exists for Easy GUI); no code signing or notarization (README explains the warnings).
 
 Tests: `easy_gui_tests` (doctest, synthetic recordings and sessions). The integration tests against the real step 1
 binary run only when `EASY_GUI_TEST_RECORDING=<recording folder>` is set; a folder of symlinks to the first 4 file

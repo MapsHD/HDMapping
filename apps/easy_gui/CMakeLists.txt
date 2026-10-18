@@ -87,6 +87,15 @@ target_link_libraries(easy_gui PRIVATE
 add_dependencies(easy_gui lidar_odometry_step_1)
 
 if(WIN32)
+    # A windowed program: no console window behind the GUI. main() stays the entry point (the WIN32 subsystem would
+    # otherwise expect WinMain); --headless/--export-only print into the console they were started from
+    # (attachToParentConsole). The manifest makes UTF-8 the process code page, see src/easy_gui.manifest.
+    set_target_properties(easy_gui PROPERTIES WIN32_EXECUTABLE ON)
+    if(MSVC)
+        target_link_options(easy_gui PRIVATE /ENTRY:mainCRTStartup)
+    endif()
+    target_sources(easy_gui PRIVATE src/easy_gui.manifest)
+
     add_custom_command(
         TARGET easy_gui
         POST_BUILD

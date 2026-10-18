@@ -1,6 +1,7 @@
 // HDMapping Easy GUI: raw Mandeye recording -> lidar odometry (precision forestry preset) -> point cloud + trajectory.
 // See apps/easy_gui/docs/DESIGN.md for the decisions behind the pipeline.
 
+#include "child_process.h"
 #include "export.h"
 #include "pipeline.h"
 #include "preflight.h"
@@ -539,6 +540,7 @@ int main(int argc, char* argv[])
     std::vector<std::string> args(argv + 1, argv + argc);
     if (!args.empty() && (args[0] == "--headless" || args[0] == "--export-only"))
     {
+        attachToParentConsole();
         const double check_band = takeCheckBand(args);
         Settings settings;
         settings.place_by_raw_time = takeFlag(args, "--place-by-raw-time");

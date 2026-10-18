@@ -1,6 +1,7 @@
 #include "child_process.h"
 
 #include <cerrno>
+#include <cstdio>
 #include <cstring>
 
 #ifdef _WIN32
@@ -240,6 +241,15 @@ namespace easy_gui
         return fs::path(buffer).parent_path();
     }
 
+    void attachToParentConsole()
+    {
+        if (!AttachConsole(ATTACH_PARENT_PROCESS))
+            return;
+        FILE* stream = nullptr;
+        freopen_s(&stream, "CONOUT$", "w", stdout);
+        freopen_s(&stream, "CONOUT$", "w", stderr);
+    }
+
 #else // POSIX
 
     struct ChildProcess::Impl
@@ -395,6 +405,10 @@ namespace easy_gui
         const fs::path exe = fs::read_symlink("/proc/self/exe", ec);
         return ec ? fs::path() : exe.parent_path();
 #endif
+    }
+
+    void attachToParentConsole()
+    {
     }
 #endif
 } // namespace easy_gui

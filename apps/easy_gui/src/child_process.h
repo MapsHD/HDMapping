@@ -55,4 +55,9 @@ namespace easy_gui
 
     //! Directory of the running executable (empty if it cannot be determined).
     std::filesystem::path currentExecutableDirectory();
+
+    //! Windows: easy_gui.exe is a windowed program, so it has no console and printf goes nowhere. The command-line
+    //! modes (--headless, --export-only) call this to print into the console they were started from, if any.
+    //! No-op elsewhere.
+    void attachToParentConsole();
 } // namespace easy_gui

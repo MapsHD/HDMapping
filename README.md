@@ -1,3 +1,7 @@
+> **New: HDMapping Easy Forestry.** One window that turns a raw Mandeye recording folder into a point cloud (LAZ) and a
+> trajectory (CSV) with the precision forestry settings, no other steps needed. See
+> [apps/easy_gui/README.md](apps/easy_gui/README.md).
+
 # Open-source (Windows, Linux and macOS), open hardware hand-held/wearable/mountable mobile mapping system for large-scale surveys:
 This is open-source software for large-scale 3D mapping using an open-hardware hand-held/wearable/mountable measurement device available at https://github.com/JanuszBedkowski/mandeye_controller. 
 We provide an end-to-end mobile mapping framework that does not require any installation, including:

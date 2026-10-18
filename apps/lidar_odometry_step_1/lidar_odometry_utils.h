@@ -279,6 +279,19 @@ struct LookupStats
     size_t outdoor_lookups = 0;
 };
 
+// The indoor/outdoor buckets one point of the chunk falls in at the current poses (null: none, or out of range).
+// Looked up again in each optimization iteration only when the bucket key changed: the maps do not change while a
+// chunk is optimized.
+struct PointBuckets
+{
+    const NDT::Bucket* indoor = nullptr;
+    const NDT::Bucket* outdoor = nullptr;
+    uint64_t key_indoor = ~0ull; // keys of the last lookup (~0: none)
+    uint64_t key_outdoor = ~0ull;
+    int nv_bin_indoor = -1; // normal-vector histogram bins of those buckets (-1: none)
+    int nv_bin_outdoor = -1;
+};
+
 // hierarchical version: updates both indoor and outdoor, then links buckets
 void update_rgd_hierarchy(
     const NDT::GridParameters& rgd_params_indoor,
@@ -346,14 +359,10 @@ fs::path get_next_result_path(const std::string& working_directory);
 // this function performs main LiDAR odometry calculations
 void optimize_lidar_odometry(
     std::vector<Point3Di>& intermediate_points,
+    const std::vector<PointBuckets>& point_buckets,
     std::vector<Eigen::Affine3d>& intermediate_trajectory,
     std::vector<Eigen::Affine3d>& intermediate_trajectory_motion_model,
-    NDT::GridParameters& rgd_params_indoor,
-    NDTBucketMapType& buckets_indoor,
-    NDT::GridParameters& rgd_params_outdoor,
-    NDTBucketMapType& buckets_outdoor,
     bool useMultithread,
-    double max_distance,
     double& delta,
     double lm_factor,
     TaitBryanPose motion_model_correction,
@@ -371,12 +380,13 @@ void optimize_lidar_odometry(
     double lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg,
     bool ablation_study_use_planarity,
     bool ablation_study_use_norm,
-    bool ablation_study_use_hierarchical_rgd,
     bool ablation_study_use_view_point_and_normal_vectors,
-    LookupStats& lookup_stats,
+    bool ablation_study_use_anisotropic_weighting,
     const bool& ablation_study_use_threshold_outer_rgd,
     const double& convergence_result,
-    const double& convergence_delta_threshold_outer_rgd);
+    const double& convergence_delta_threshold_outer_rgd,
+    const std::vector<double>& table_buckets_nv_indoor,
+    const std::vector<double>& table_buckets_nv_outdoor);
 
 void optimize_sf2(
     std::vector<Point3Di>& intermediate_points,

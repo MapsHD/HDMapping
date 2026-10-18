@@ -980,23 +980,18 @@ static void add_outdoor_hessian_contribution(
     out_AtPB += AtPB;
 }
 
-// Unified hessian function that handles indoor and optionally outdoor contributions
+// Unified hessian function that handles indoor and optionally outdoor contributions. The point's buckets come from
+// lookup_point_buckets(): null when out of range, not found, or (outdoor) not used.
 static void compute_hessian(
     const Point3Di& point,
+    const PointBuckets& buckets,
     const std::vector<Eigen::Affine3d>& trajectory,
     const std::vector<TaitBryanPoseWithTrig>& tait_bryan_poses,
-    const NDTBucketMapType& buckets_indoor,
-    const Eigen::Vector3d& bucket_size_indoor,
-    const NDTBucketMapType& buckets_outdoor,
-    const Eigen::Vector3d& bucket_size_outdoor,
-    const double max_distance,
-    const bool ablation_study_use_hierarchical_rgd,
     const bool ablation_study_use_view_point_and_normal_vectors,
     const bool ablation_study_use_planarity,
     const bool ablation_study_use_norm,
     Eigen::Matrix<double, 6, 6, Eigen::RowMajor>& out_AtPA,
     Eigen::Matrix<double, 6, 1>& out_AtPB,
-    LookupStats& stats,
     const bool& ablation_study_use_threshold_outer_rgd,
     const double& convergence_result,
     const double& convergence_delta_threshold_outer_rgd,
@@ -1004,31 +999,20 @@ static void compute_hessian(
     const std::vector<double>& table_buckets_nv_outdoor,
     bool ablation_study_use_anisotropic_weighting)
 {
-    const double range_squared = point.point.squaredNorm();
-
-    // Indoor range check: 0.1 to max_distance (using squared values to avoid sqrt)
-    constexpr double min_range_squared = 0.1 * 0.1; // 0.01
-    constexpr double outdoor_range_squared = 5.0 * 5.0; // 25.0
-    const double max_distance_squared = max_distance * max_distance;
-    if (range_squared < min_range_squared || range_squared > max_distance_squared)
+    if (!buckets.indoor && !buckets.outdoor)
         return;
 
-    const Eigen::Vector3d point_global = trajectory[point.index_pose] * point.point;
     const Eigen::Vector3d& point_source = point.point;
     const TaitBryanPoseWithTrig& pose_trig = tait_bryan_poses[point.index_pose];
     const Eigen::Vector3d viewport = trajectory[point.index_pose].translation();
 
     // Indoor contribution
-    const auto indoor_key = get_rgd_index_3d(point_global, bucket_size_indoor);
-    const auto indoor_it = buckets_indoor.find(indoor_key);
-    ++stats.indoor_lookups;
-
-    if (indoor_it != buckets_indoor.end())
+    if (const NDT::Bucket* indoor = buckets.indoor)
     {
-        if (indoor_it->second.number_of_points != -1 && indoor_it->second.number_of_hits < 20)
+        if (indoor->number_of_points != -1 && indoor->number_of_hits < 20)
         {
             add_indoor_hessian_contribution(
-                indoor_it->second,
+                *indoor,
                 point_source,
                 pose_trig,
                 viewport,
@@ -1059,42 +1043,31 @@ static void compute_hessian(
         }
     }
 
-    if (ablation_study_use_hierarchical_rgd && range_squared >= outdoor_range_squared && check_threshold_outdoor_rgd)
+    if (const NDT::Bucket* outdoor = buckets.outdoor; outdoor && check_threshold_outdoor_rgd)
     {
-        const auto outdoor_key = get_rgd_index_3d(point_global, bucket_size_outdoor);
-        const auto outdoor_it = buckets_outdoor.find(outdoor_key);
-        ++stats.outdoor_lookups;
-
-        if (outdoor_it != buckets_outdoor.end())
+        if (outdoor->number_of_points != -1 && outdoor->number_of_hits < 20)
         {
-            if (outdoor_it->second.number_of_points != -1 && outdoor_it->second.number_of_hits < 20)
-            {
-                add_outdoor_hessian_contribution(
-                    outdoor_it->second,
-                    point_source,
-                    pose_trig,
-                    viewport,
-                    ablation_study_use_view_point_and_normal_vectors,
-                    ablation_study_use_planarity,
-                    out_AtPA,
-                    out_AtPB,
-                    table_buckets_nv_outdoor,
-                    ablation_study_use_anisotropic_weighting);
-            }
+            add_outdoor_hessian_contribution(
+                *outdoor,
+                point_source,
+                pose_trig,
+                viewport,
+                ablation_study_use_view_point_and_normal_vectors,
+                ablation_study_use_planarity,
+                out_AtPA,
+                out_AtPB,
+                table_buckets_nv_outdoor,
+                ablation_study_use_anisotropic_weighting);
         }
     }
 }
 
 void optimize_lidar_odometry(
     std::vector<Point3Di>& intermediate_points,
+    const std::vector<PointBuckets>& point_buckets,
     std::vector<Eigen::Affine3d>& intermediate_trajectory,
     std::vector<Eigen::Affine3d>& intermediate_trajectory_motion_model,
-    NDT::GridParameters& rgd_params_indoor,
-    NDTBucketMapType& buckets_indoor,
-    NDT::GridParameters& rgd_params_outdoor,
-    NDTBucketMapType& buckets_outdoor,
     bool multithread,
-    double max_distance,
     double& delta,
     double lm_factor,
     TaitBryanPose motion_model_correction,
@@ -1112,15 +1085,13 @@ void optimize_lidar_odometry(
     double lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg,
     bool ablation_study_use_planarity,
     bool ablation_study_use_norm,
-    bool ablation_study_use_hierarchical_rgd,
     bool ablation_study_use_view_point_and_normal_vectors,
     bool ablation_study_use_anisotropic_weighting,
-    LookupStats& lookup_stats,
     const bool& ablation_study_use_threshold_outer_rgd,
     const double& convergence_result,
     const double& convergence_delta_threshold_outer_rgd,
-    std::vector<double>& table_buckets_nv_indoor,
-    std::vector<double>& table_buckets_nv_outdoor)
+    const std::vector<double>& table_buckets_nv_indoor,
+    const std::vector<double>& table_buckets_nv_outdoor)
 {
     HDMAP_ZONE_SCOPE("optimize_lidar_odometry");
     HDMAP_ZONE_BEGIN(pre_hessian, "pre_hessian");
@@ -1148,10 +1119,6 @@ void optimize_lidar_odometry(
     AtPAndt.setZero();
     Eigen::MatrixXd AtPBndt(intermediate_trajectory.size() * 6, 1);
     AtPBndt.setZero();
-    const Eigen::Vector3d bucket_size_indoor(
-        rgd_params_indoor.resolution_X, rgd_params_indoor.resolution_Y, rgd_params_indoor.resolution_Z);
-    const Eigen::Vector3d bucket_size_outdoor(
-        rgd_params_outdoor.resolution_X, rgd_params_outdoor.resolution_Y, rgd_params_outdoor.resolution_Z);
 
     // Pre-compute TaitBryanPose conversions with sin/cos for all trajectory poses
     std::vector<TaitBryanPoseWithTrig> tait_bryan_poses;
@@ -1183,7 +1150,6 @@ void optimize_lidar_odometry(
         chunk_AtPA[c].resize(num_poses);
         chunk_AtPB[c].resize(num_poses);
     }
-    tbb::combinable<LookupStats> thread_local_stats;
     HDMAP_ZONE_END(hessian_alloc);
 
     // table_buckets_nv.resize(256 * 256 * 256, 0.0);
@@ -1211,7 +1177,6 @@ void optimize_lidar_odometry(
     {
         const size_t begin = chunk * chunk_size;
         const size_t end = std::min(begin + chunk_size, num_points);
-        auto& stats = thread_local_stats.local();
 
         for (size_t p = 0; p < num_poses; ++p)
         {
@@ -1224,20 +1189,14 @@ void optimize_lidar_odometry(
             const int pose = intermediate_points[i].index_pose;
             compute_hessian(
                 intermediate_points[i],
+                point_buckets[i],
                 intermediate_trajectory,
                 tait_bryan_poses,
-                buckets_indoor,
-                bucket_size_indoor,
-                buckets_outdoor,
-                bucket_size_outdoor,
-                max_distance,
-                ablation_study_use_hierarchical_rgd,
                 ablation_study_use_view_point_and_normal_vectors,
                 ablation_study_use_planarity,
                 ablation_study_use_norm,
                 chunk_AtPA[chunk][pose],
                 chunk_AtPB[chunk][pose],
-                stats,
                 ablation_study_use_threshold_outer_rgd,
                 convergence_result,
                 convergence_delta_threshold_outer_rgd,
@@ -1265,13 +1224,6 @@ void optimize_lidar_odometry(
         }
     }
     HDMAP_ZONE_END(hessian_sum);
-
-    thread_local_stats.combine_each(
-        [&](const LookupStats& s)
-        {
-            lookup_stats.indoor_lookups += s.indoor_lookups;
-            lookup_stats.outdoor_lookups += s.outdoor_lookups;
-        });
     HDMAP_ZONE_END(hessian_compute);
 
     HDMAP_ZONE_BEGIN(post_hessian, "post_hessian");
@@ -2096,34 +2048,48 @@ bool process_worker_step_lidar_odometry_core(
         }
     }*/
 
-    static std::vector<ankerl::unordered_dense::map<int, uint32_t>> chunk_hist_indoor;
-    static std::vector<ankerl::unordered_dense::map<int, uint32_t>> chunk_hist_outdoor;
-
-    constexpr size_t hist_table_size = 101 * 101 * 101;
-    const size_t num_points = intermediate_points.size();
-    const size_t num_hist_chunks =
-        std::max<size_t>(1, std::min<size_t>(std::max(1u, std::thread::hardware_concurrency()), std::max<size_t>(num_points, 1)));
-    const size_t hist_chunk_size = (num_points + num_hist_chunks - 1) / num_hist_chunks;
-
-    chunk_hist_indoor.resize(num_hist_chunks);
-    chunk_hist_outdoor.resize(num_hist_chunks);
-
     constexpr double min_range_squared = 0.1 * 0.1; // 0.01
     constexpr double outdoor_range_squared = 5.0 * 5.0; // 25.0
     const double max_distance_squared = params.max_distance_lidar * params.max_distance_lidar;
+    const Eigen::Vector3d bucket_size_indoor(
+        params.in_out_params_indoor.resolution_X, params.in_out_params_indoor.resolution_Y, params.in_out_params_indoor.resolution_Z);
+    const Eigen::Vector3d bucket_size_outdoor(
+        params.in_out_params_outdoor.resolution_X, params.in_out_params_outdoor.resolution_Y, params.in_out_params_outdoor.resolution_Z);
 
-    std::vector<int> touched_bins_indoor, touched_bins_outdoor;
-    const auto build_normal_vector_histograms = [&]()
+    const size_t num_points = intermediate_points.size();
+    const size_t num_lookup_chunks =
+        std::max<size_t>(1, std::min<size_t>(std::max(1u, std::thread::hardware_concurrency()), std::max<size_t>(num_points, 1)));
+    const size_t lookup_chunk_size = (num_points + num_lookup_chunks - 1) / num_lookup_chunks;
+
+    const auto nv_bin_of = [](const NDT::Bucket* b)
+    {
+        if (!b)
+            return -1;
+        const double x = b->normal_vector.x();
+        const double y = b->normal_vector.y();
+        const double z = b->normal_vector.z();
+        return fabs(x) < 1.0 && fabs(y) < 1.0 && fabs(z) < 1.0 ? normal_vector_bucket_index(x, y, z) : -1;
+    };
+
+    // Each point's indoor/outdoor bucket at the current poses, and the normal-vector histograms of those buckets
+    // (anisotropic weighting). The buckets were looked up twice per iteration (histogram, then Hessian); now once, and
+    // after the first iteration only for points whose bucket key changed - few, as the poses move little - with the
+    // histograms adjusted for just those points (exact: integer counts). The result is the same as a full rebuild.
+    std::vector<PointBuckets> point_buckets(num_points);
+    std::vector<std::vector<std::pair<int, int>>> nv_changes_indoor(num_lookup_chunks), nv_changes_outdoor(num_lookup_chunks);
+    std::vector<LookupStats> chunk_lookup_stats(num_lookup_chunks);
+    const auto lookup_point_buckets = [&](bool again)
     {
         auto process_chunk = [&](size_t chunk)
         {
-            auto& local_indoor = chunk_hist_indoor[chunk];
-            auto& local_outdoor = chunk_hist_outdoor[chunk];
-            local_indoor.clear();
-            local_outdoor.clear();
+            auto& changes_indoor = nv_changes_indoor[chunk];
+            auto& changes_outdoor = nv_changes_outdoor[chunk];
+            auto& stats = chunk_lookup_stats[chunk];
+            changes_indoor.clear();
+            changes_outdoor.clear();
 
-            const size_t begin = chunk * hist_chunk_size;
-            const size_t end = std::min(begin + hist_chunk_size, num_points);
+            const size_t begin = chunk * lookup_chunk_size;
+            const size_t end = std::min(begin + lookup_chunk_size, num_points);
             for (size_t i = begin; i < end; ++i)
             {
                 const double range_squared = intermediate_points[i].point.squaredNorm();
@@ -2132,43 +2098,34 @@ bool process_worker_step_lidar_odometry_core(
 
                 const int pose = intermediate_points[i].index_pose;
                 const Eigen::Vector3d point_global = worker_data.intermediate_trajectory[pose] * intermediate_points[i].point;
+                PointBuckets& pb = point_buckets[i];
 
-                const auto indoor_key = get_rgd_index_3d(
-                    point_global,
-                    { params.in_out_params_indoor.resolution_X,
-                      params.in_out_params_indoor.resolution_Y,
-                      params.in_out_params_indoor.resolution_Z });
-                const auto indoor_it = params.buckets_indoor.find(indoor_key);
-                if (indoor_it != params.buckets_indoor.end())
+                const auto indoor_key = get_rgd_index_3d(point_global, bucket_size_indoor);
+                if (!again || indoor_key != pb.key_indoor)
                 {
-                    const double x = indoor_it->second.normal_vector.x();
-                    const double y = indoor_it->second.normal_vector.y();
-                    const double z = indoor_it->second.normal_vector.z();
-                    if (fabs(x) < 1.0 && fabs(y) < 1.0 && fabs(z) < 1.0)
-                    {
-                        const int index_bucket_indoor = normal_vector_bucket_index(x, y, z);
-                        ++local_indoor[index_bucket_indoor];
-                    }
+                    const auto indoor_it = params.buckets_indoor.find(indoor_key);
+                    ++stats.indoor_lookups;
+                    pb.key_indoor = indoor_key;
+                    pb.indoor = indoor_it != params.buckets_indoor.end() ? &indoor_it->second : nullptr;
+                    const int bin = nv_bin_of(pb.indoor);
+                    if (bin != pb.nv_bin_indoor)
+                        changes_indoor.emplace_back(pb.nv_bin_indoor, bin);
+                    pb.nv_bin_indoor = bin;
                 }
 
                 if (params.ablation_study_use_hierarchical_rgd && range_squared >= outdoor_range_squared)
                 {
-                    const auto outdoor_key = get_rgd_index_3d(
-                        point_global,
-                        { params.in_out_params_outdoor.resolution_X,
-                          params.in_out_params_outdoor.resolution_Y,
-                          params.in_out_params_outdoor.resolution_Z });
-                    const auto outdoor_it = params.buckets_outdoor.find(outdoor_key);
-                    if (outdoor_it != params.buckets_outdoor.end())
+                    const auto outdoor_key = get_rgd_index_3d(point_global, bucket_size_outdoor);
+                    if (!again || outdoor_key != pb.key_outdoor)
                     {
-                        const double x = outdoor_it->second.normal_vector.x();
-                        const double y = outdoor_it->second.normal_vector.y();
-                        const double z = outdoor_it->second.normal_vector.z();
-                        if (fabs(x) < 1.0 && fabs(y) < 1.0 && fabs(z) < 1.0)
-                        {
-                            const int index_bucket_outdoor = normal_vector_bucket_index(x, y, z);
-                            ++local_outdoor[index_bucket_outdoor];
-                        }
+                        const auto outdoor_it = params.buckets_outdoor.find(outdoor_key);
+                        ++stats.outdoor_lookups;
+                        pb.key_outdoor = outdoor_key;
+                        pb.outdoor = outdoor_it != params.buckets_outdoor.end() ? &outdoor_it->second : nullptr;
+                        const int bin = nv_bin_of(pb.outdoor);
+                        if (bin != pb.nv_bin_outdoor)
+                            changes_outdoor.emplace_back(pb.nv_bin_outdoor, bin);
+                        pb.nv_bin_outdoor = bin;
                     }
                 }
             }
@@ -2176,59 +2133,52 @@ bool process_worker_step_lidar_odometry_core(
 
         if (params.useMultithread)
         {
-            tbb::parallel_for(size_t(0), num_hist_chunks, process_chunk);
+            tbb::parallel_for(size_t(0), num_lookup_chunks, process_chunk);
         }
         else
         {
-            for (size_t c = 0; c < num_hist_chunks; ++c)
+            for (size_t c = 0; c < num_lookup_chunks; ++c)
                 process_chunk(c);
         }
 
-        // Zero only the bins the previous build wrote (the tables are this frame's, zero-initialised) instead of all
-        // 2 x 101^3 doubles every iteration: the same table contents (integer counts summed exactly), ~16 MB of
-        // memory writes per iteration fewer.
-        for (const int b : touched_bins_indoor)
-            table_buckets_nv_indoor[b] = 0.0;
-        for (const int b : touched_bins_outdoor)
-            table_buckets_nv_outdoor[b] = 0.0;
-        touched_bins_indoor.clear();
-        touched_bins_outdoor.clear();
-        for (size_t c = 0; c < num_hist_chunks; ++c)
+        if (!params.ablation_study_use_anisotropic_weighting)
+            return;
+        // the tables start at zero (this chunk's): the first lookup's changes (-1 -> bin) build them
+        for (size_t c = 0; c < num_lookup_chunks; ++c)
         {
-            for (const auto& [bin, count] : chunk_hist_indoor[c])
+            for (const auto& [old_bin, new_bin] : nv_changes_indoor[c])
             {
-                table_buckets_nv_indoor[bin] += static_cast<double>(count);
-                touched_bins_indoor.push_back(bin);
+                if (old_bin >= 0)
+                    table_buckets_nv_indoor[old_bin] -= 1.0;
+                if (new_bin >= 0)
+                    table_buckets_nv_indoor[new_bin] += 1.0;
             }
-            for (const auto& [bin, count] : chunk_hist_outdoor[c])
+            for (const auto& [old_bin, new_bin] : nv_changes_outdoor[c])
             {
-                table_buckets_nv_outdoor[bin] += static_cast<double>(count);
-                touched_bins_outdoor.push_back(bin);
+                if (old_bin >= 0)
+                    table_buckets_nv_outdoor[old_bin] -= 1.0;
+                if (new_bin >= 0)
+                    table_buckets_nv_outdoor[new_bin] += 1.0;
             }
         }
     };
 
     for (int iter = 0; iter < params.nr_iter; iter++)
     {
+        // the bucket maps are only modified between chunks (update_rgd after the optimization, on this thread), so the
+        // bucket pointers kept from the previous iteration stay valid
         std::scoped_lock lock(params.mutex_buckets_indoor, params.mutex_buckets_outdoor);
 
-        if (params.ablation_study_use_anisotropic_weighting)
-        {
-            build_normal_vector_histograms();
-        }
+        lookup_point_buckets(iter > 0);
 
         iter_end = iter;
         delta = 100000.0;
         optimize_lidar_odometry(
             intermediate_points,
+            point_buckets,
             worker_data.intermediate_trajectory,
             worker_data.intermediate_trajectory_motion_model,
-            params.in_out_params_indoor,
-            params.buckets_indoor,
-            params.in_out_params_outdoor,
-            params.buckets_outdoor,
             params.useMultithread,
-            params.max_distance_lidar,
             delta, /*add_pitch_roll_constraint, worker_data[i].imu_roll_pitch,*/
             lm_factor,
             params.motion_model_correction,
@@ -2246,10 +2196,8 @@ bool process_worker_step_lidar_odometry_core(
             params.lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg,
             params.ablation_study_use_planarity,
             params.ablation_study_use_norm,
-            params.ablation_study_use_hierarchical_rgd,
             params.ablation_study_use_view_point_and_normal_vectors,
             params.ablation_study_use_anisotropic_weighting,
-            lookup_stats,
             params.ablation_study_use_threshold_outer_rgd,
             delta,
             params.convergence_delta_threshold_outer_rgd,
@@ -2275,6 +2223,12 @@ bool process_worker_step_lidar_odometry_core(
             std::cout << "params.real_time_threshold_seconds " << params.real_time_threshold_seconds << "s" << std::endl;
             break;
         }
+    }
+
+    for (const LookupStats& s : chunk_lookup_stats)
+    {
+        lookup_stats.indoor_lookups += s.indoor_lookups;
+        lookup_stats.outdoor_lookups += s.outdoor_lookups;
     }
 
     return true;

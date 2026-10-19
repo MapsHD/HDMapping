@@ -521,9 +521,9 @@ restart skips the two copies and retries the broken one. 62 s on an Apple silico
     gps_time, reported twice: as step 1 does it (no-return points removed by the load filter *before* the ramp) and
     with those points kept, to quantify how much their removal contributes.
   - Near points: counts, range histogram, and sensor-frame density below 1.5 m.
-- **M4 (done, 0.2.0, not released yet):** batch mode (§10). The macOS side was run in the window and with
+- **M4 (done, released as 0.2.0):** batch mode (§10). The macOS side was run in the window and with
   `--batch` on `mini4` copies (stop after current, restart, sleep assertion). The Windows code (`SetThreadExecutionState`,
-  Ctrl+C in `--batch`) has not been compiled yet; the next Windows CI run will.
+  Ctrl+C in `--batch`) compiles and its unit tests pass in CI (run 39163046329); not yet run on a real Windows PC.
 - **v2:** gated pose-graph loop closure (§1).
 - **Release builds:** `.github/workflows/easy-forest-{macos,windows}.yml`, on `easy-forest-v*` tags and manual
   dispatch; the packaging steps are scripts in `apps/easy_gui/packaging/` so they run locally the same way.

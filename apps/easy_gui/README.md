@@ -132,6 +132,8 @@ When it is done, click **Open output folder** to see the results, or **Process a
 After a field day you often have many recordings, for example one per plot. Easy Forest HDMapping can process all of
 them one after another, unattended, for example overnight.
 
+![Several recordings: three recordings found, all ready to process](docs/images/easy_gui_batch.png)
+
 1. At the top of the window, choose **Several recordings**.
 2. **Folder with recordings.** Click **Choose folder…** and select the folder that *contains* the recording folders,
    for example a copy of the scanner's USB stick. You can also drag it onto the window. Easy Forest HDMapping looks in
@@ -154,6 +156,8 @@ them one after another, unattended, for example overnight.
 5. **Process.** Click **Start processing**. You see the progress of the whole batch with the time left, which
    recording is being processed, and the status of each recording in the table. Your computer will not go to sleep
    while the batch runs (the screen may still turn off). Leave the power adapter connected.
+
+   ![A batch in progress: two recordings done, the third running](docs/images/easy_gui_batch_running.png)
 
 If a recording fails, it is marked **failed** and the batch goes on with the next one. Point at **failed** in the table
 to see why; the recording's own `easy_gui.log` has the details.

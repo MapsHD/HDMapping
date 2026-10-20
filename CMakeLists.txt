@@ -38,6 +38,7 @@ add_definitions(-D_USE_MATH_DEFINES)
 if (MSVC)
     add_definitions(-DNOMINMAX)
     add_definitions(-DWIN32_LEAN_AND_MEAN)
+    add_compile_definitions(_ENABLE_EXTENDED_ALIGNED_STORAGE)
     # HDMAPPING_ASSERT's __VA_OPT__ needs the conforming preprocessor;
     add_compile_options(/Zc:preprocessor)
 endif()

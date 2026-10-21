@@ -243,6 +243,36 @@ bool load_data(
         for (auto& chunk : imuChunks)
             imu_data.insert(imu_data.end(), std::make_move_iterator(chunk.begin()), std::make_move_iterator(chunk.end()));
 
+        // Units with an external IMU (e.g. Murata) leave 'imu****.csv' header-only and log the IMU
+        // into a subfolder, in files not aligned with the LiDAR chunks
+        const fs::path murataImuDir = fs::path(working_directory) / "MURATA_IMU";
+        if (imu_data.empty() && fs::is_directory(murataImuDir))
+        {
+            std::vector<std::string> murataFiles;
+            for (const auto& entry : fs::directory_iterator(murataImuDir))
+            {
+                std::string ext = entry.path().extension().string();
+                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+                if (entry.is_regular_file() && ext == ".csv" && entry.file_size() > 0)
+                    murataFiles.push_back(entry.path().string());
+            }
+            std::sort(murataFiles.begin(), murataFiles.end());
+            std::cout << "no IMU data in 'imu****.csv', loading " << murataFiles.size() << " file(s) from '" << murataImuDir.string()
+                      << "' ..\n";
+
+            std::vector<Imu> murataChunks(murataFiles.size());
+            tbb::parallel_for(
+                size_t(0),
+                murataFiles.size(),
+                [&](size_t i)
+                {
+                    murataChunks[i] = load_imu(murataFiles[i], imuNumberToUse);
+                });
+            for (auto& chunk : murataChunks)
+                imu_data.insert(imu_data.end(), std::make_move_iterator(chunk.begin()), std::make_move_iterator(chunk.end()));
+
+        }
+
         // Sort once after merging
         std::sort(
             imu_data.begin(),

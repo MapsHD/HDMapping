@@ -46,6 +46,7 @@ public:
         uint64_t index_end = 0;
 
         char number_of_hits = 0;
+        float intensity = 0.0f; // running mean of the points' intensity, for display only; sits in the padding after number_of_hits
     };
 
     struct BucketCoef

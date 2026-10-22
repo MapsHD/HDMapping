@@ -103,7 +103,8 @@ void setNewRotationCenter(const Eigen::Vector3d& center);
 bool checkClHelp(int argc, char** argv);
 
 //! Replaces glutMainLoop(): polls raylib input into the mouse()/motion()/wheel() callbacks, calls display() per frame.
-void mainLoop();
+//! @param close_requested called when the window is asked to close; returning false keeps it open. Null = always close.
+void mainLoop(bool (*close_requested)() = nullptr);
 //! Releases GPU buffers and closes the window (replaces the ImGui GLUT/OpenGL2 backend shutdown).
 void shutdownGL();
 

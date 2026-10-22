@@ -18,6 +18,12 @@
 #include <filesystem>
 #include <iostream>
 
+// raylib (static, desktop GLFW platform) links its own GLFW but has no API to cancel a window close.
+// Not GetWindowHandle(): that is the native window (NSWindow* / HWND), not the GLFWwindow*, except on Linux.
+struct GLFWwindow;
+extern "C" GLFWwindow* glfwGetCurrentContext(void);
+extern "C" void glfwSetWindowShouldClose(GLFWwindow* window, int value);
+
 raylib_widgets::OrbitCamera camera;
 
 // GLUT apps used 1000 (every point was a glVertex call); GPU buffers draw full density, as in step 2.
@@ -257,13 +263,21 @@ bool initGL(int*, char**, const std::string& winTitle, void (*display)(), void (
     return true;
 }
 
-void mainLoop()
+void mainLoop(bool (*close_requested)())
 {
     const int buttons[][2] = { { MOUSE_BUTTON_LEFT, GLUT_LEFT_BUTTON },
                                { MOUSE_BUTTON_MIDDLE, GLUT_MIDDLE_BUTTON },
                                { MOUSE_BUTTON_RIGHT, GLUT_RIGHT_BUTTON } };
-    while (!WindowShouldClose())
+    for (;;)
     {
+        if (WindowShouldClose())
+        {
+            if (!close_requested || close_requested())
+                break;
+            // raylib re-reads GLFW's close flag on every input poll, so clearing it there cancels the close.
+            glfwSetWindowShouldClose(glfwGetCurrentContext(), 0); // raylib's window, current on this thread
+        }
+
         int x = GetMouseX();
         int y = GetMouseY();
         for (const auto& b : buttons)

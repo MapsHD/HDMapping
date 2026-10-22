@@ -1,4 +1,4 @@
-﻿#include <imgui.h>
+#include <imgui.h>
 #include <imgui_internal.h>
 #include <rlImGui.h>
 
@@ -21,13 +21,14 @@
 #include <Core/export_laz.h>
 #include <Core/hash_utils.h>
 #include <Core/pfd_wrapper.hpp>
-#include <Core/registration_plane_feature.h>
 #include <Core/raylib_utils.hpp>
+#include <Core/registration_plane_feature.h>
 #include <Core/session.h>
 
 #include "toml_io.h"
 #include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
 #include <chrono>
+#include <cstdlib>
 #include <ctime>
 #include <mutex>
 #include <spdlog/cfg/env.h>
@@ -141,7 +142,7 @@ namespace fs = std::filesystem;
 bool is_settings_gui = false;
 bool full_debug_messages = false;
 NDT ndt;
-bool show_reference_buckets_indoor = false;
+bool show_reference_buckets_indoor = true;
 bool show_reference_buckets_outdoor = false;
 bool show_reference_points = false;
 int dec_reference_points = 100;
@@ -191,6 +192,10 @@ Trajectory trajectory;
 std::atomic<bool> loRunning{ false };
 std::atomic<float> loProgress{ 0.0 };
 std::atomic<bool> loPause{ false };
+std::atomic<bool> loParked{ false }; //!< step 2 is waiting on loPause and touches no file (see compute_step_2)
+bool loQuitting = false; //!< quit confirmed mid-run: the run is paused, display() exits once it is parked or done
+std::string pendingLoadFolder; //!< openData() picked it; display() loads it once the "Loading data" modal is on screen
+int pendingLoadFrames = 0; //!< frames left before that load; 0 = none pending
 std::chrono::time_point<std::chrono::system_clock> loStartTime;
 std::atomic<double> loElapsedSeconds{ 0.0 };
 std::atomic<double> loEstimatedTimeRemaining{ 0.0 };
@@ -669,7 +674,7 @@ void step1(const std::string& input_folder_name, const std::atomic<bool>& loPaus
 void step2(const std::atomic<bool>& loPause)
 {
     double ts_failure = 0.0;
-    if (compute_step_2(worker_data, params, ts_failure, loProgress, loPause, full_debug_messages))
+    if (compute_step_2(worker_data, params, ts_failure, loProgress, loPause, full_debug_messages, loParked))
         step_2_done = true;
     else
     {
@@ -1742,7 +1747,9 @@ void progress_window()
 
     ImGui::NewLine();
 
-    if (!loPause)
+    if (loQuitting)
+        ImGui::TextColored(ImVec4(1.f, 0.6f, 0.2f, 1.f), "Quitting: waiting for the current worker to finish...");
+    else if (!loPause)
     {
         if (ImGui::Button("Pause"))
             loPause.store(true);
@@ -1781,10 +1788,19 @@ void progress_window()
 }
 
 //! folder: Mandeye data folder to process; empty asks for one with a folder dialog.
+//! Loading (step 1) blocks the UI thread, so display() first presents a "Loading data" modal and only
+//! then calls loadData(): one frame for the auto-resized modal to measure itself, one to show it.
 void openData(const std::string& folder = "")
 {
     const std::string input_folder_name = folder.empty() ? mandeye::fd::SelectFolder("Select Mandeye data folder") : folder;
+    if (input_folder_name.empty())
+        return;
+    pendingLoadFolder = input_folder_name;
+    pendingLoadFrames = 3;
+}
 
+void loadData(const std::string& input_folder_name)
+{
     is_settings_gui = false;
     info_gui = false;
 
@@ -1873,7 +1889,8 @@ bool step2(std::vector<WorkerData>& worker_data, LidarOdometryParams& params, co
 {
     double ts_failure = 0.0;
     std::atomic<float> loProgress;
-    return compute_step_2(worker_data, params, ts_failure, loProgress, loPause, full_debug_messages);
+    std::atomic<bool> parked{ false };
+    return compute_step_2(worker_data, params, ts_failure, loProgress, loPause, full_debug_messages, parked);
 }
 
 void save_results(
@@ -1887,8 +1904,55 @@ void save_results(
     save_result(worker_data, params, outwd, elapsed_seconds);
 }
 
+//! Window close: while odometry runs, ask first. A confirmed quit pauses the run and keeps the
+//! window open until display() sees the run parked or finished (quit_abandoned_run()).
+bool confirm_close()
+{
+    if (!loRunning)
+        return true;
+    if (loQuitting)
+        return false;
+    pfd::message message(
+        "Lidar odometry is running",
+        "Quit anyway? The run is abandoned: nothing is saved and the cache is deleted.",
+        pfd::choice::yes_no,
+        pfd::icon::warning);
+    if (message.result() != pfd::button::yes)
+        return false;
+    loQuitting = true;
+    loPause.store(true);
+    return false;
+}
+
+//! The detached run thread can't be joined and still uses the globals, so the process ends
+//! without destructors, after removing the cache the parked (or finished) run no longer reads.
+static void quit_abandoned_run()
+{
+    remove_cache(params);
+    std::_Exit(0);
+}
+
+//! intensityRange() over the buckets' mean intensities; ray-marked buckets (number_of_points == -1) carry none.
+static IntensityRange bucketIntensityRange(const NDTBucketMapType& buckets)
+{
+    IntensityRange range;
+    bool first = true;
+    for (const auto& b : buckets)
+    {
+        if (b.second.number_of_points == -1)
+            continue;
+        range.min = first ? b.second.intensity : std::min(range.min, b.second.intensity);
+        range.max = first ? b.second.intensity : std::max(range.max, b.second.intensity);
+        first = false;
+    }
+    return range;
+}
+
 void display()
 {
+    if (loQuitting && (loParked || !loRunning))
+        quit_abandoned_run();
+
     ImGuiIO& io = ImGui::GetIO();
     rlViewport(0, 0, GetRenderWidth(), GetRenderHeight());
 
@@ -2093,6 +2157,7 @@ void display()
     if (show_reference_buckets_indoor)
     {
         std::scoped_lock lock(params.mutex_buckets_indoor);
+        const IntensityRange range = bucketIntensityRange(params.buckets_indoor);
         color3f(1, 0, 0);
         beginPoints(1);
         for (const auto& b : params.buckets_indoor)
@@ -2100,6 +2165,10 @@ void display()
             if (b.second.number_of_points == -1)
             {
                 color3f(0, 1, 1);
+            }
+            else if (intensity_shading)
+            {
+                color3fIntensityShaded(1, 0, 0, b.second.intensity, range);
             }
             else
             {
@@ -2123,6 +2192,7 @@ void display()
     if (show_reference_buckets_outdoor)
     {
         std::scoped_lock lock2(params.mutex_buckets_outdoor);
+        const IntensityRange range = bucketIntensityRange(params.buckets_outdoor);
         color3f(0, 0, 1);
         beginPoints(1);
         for (const auto& b : params.buckets_outdoor)
@@ -2130,6 +2200,10 @@ void display()
             if (b.second.number_of_points == -1)
             {
                 color3f(1, 0, 1);
+            }
+            else if (intensity_shading)
+            {
+                color3fIntensityShaded(0, 0, 1, b.second.intensity, range);
             }
             else
             {
@@ -2249,7 +2323,7 @@ void display()
 
     // Drag and drop: a Mandeye data folder, or any file in one, is processed like "Load & process scanning".
     const auto dropped = takeDroppedFiles();
-    if (!dropped.empty() && !loRunning)
+    if (!dropped.empty() && !loRunning && pendingLoadFrames == 0)
     {
         fs::path folder(dropped[0]);
         if (!fs::is_directory(folder))
@@ -2257,7 +2331,28 @@ void display()
         openData(folder.string());
     }
 
-    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_O, false))
+    // The previous frame presented the "Loading data" modal, so it stays on screen while loading blocks.
+    if (pendingLoadFrames == 1)
+    {
+        pendingLoadFrames = 0;
+        loadData(pendingLoadFolder);
+    }
+    else if (pendingLoadFrames > 1)
+        --pendingLoadFrames;
+
+    if (pendingLoadFrames > 0 && !ImGui::IsPopupOpen("Loading data"))
+        ImGui::OpenPopup("Loading data");
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    if (ImGui::BeginPopupModal("Loading data", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        ImGui::Text("Loading data and running step 1 from folder:\n'%s'", pendingLoadFolder.c_str());
+        ImGui::TextDisabled("The window does not respond until this finishes, see console for progress.");
+        if (pendingLoadFrames == 0)
+            ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+    }
+
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_O, false) && !loRunning && pendingLoadFrames == 0)
     {
         openData();
 
@@ -2811,7 +2906,7 @@ int main(int argc, char* argv[])
             InitTaskbarProgress();
 #endif
 
-            mainLoop();
+            mainLoop(confirm_close);
 
             shutdownGL();
             on_exit();

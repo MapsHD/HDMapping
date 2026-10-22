@@ -2390,7 +2390,8 @@ static bool compute_step_2_impl(
     double& ts_failure,
     std::atomic<float>& loProgress,
     const std::atomic<bool>& pause,
-    bool debugMsg);
+    bool debugMsg,
+    std::atomic<bool>& parked);
 
 bool compute_step_2(
     std::vector<WorkerData>& worker_data,
@@ -2398,11 +2399,12 @@ bool compute_step_2(
     double& ts_failure,
     std::atomic<float>& loProgress,
     const std::atomic<bool>& pause,
-    bool debugMsg)
+    bool debugMsg,
+    std::atomic<bool>& parked)
 {
     try
     {
-        return compute_step_2_impl(worker_data, params, ts_failure, loProgress, pause, debugMsg);
+        return compute_step_2_impl(worker_data, params, ts_failure, loProgress, pause, debugMsg, parked);
     } catch (const std::runtime_error& e) // a points_global spill I/O failure; its files are already removed
     {
         spdlog::error("{}", e.what());
@@ -2416,7 +2418,8 @@ static bool compute_step_2_impl(
     double& ts_failure,
     std::atomic<float>& loProgress,
     const std::atomic<bool>& pause,
-    bool debugMsg)
+    bool debugMsg,
+    std::atomic<bool>& parked)
 {
     // exit(1);
     bool debug = false;
@@ -2448,11 +2451,13 @@ static bool compute_step_2_impl(
 
             if (pause)
             {
+                parked.store(true);
                 while (pause)
                 {
                     spdlog::info("pause");
                     std::this_thread::sleep_for(std::chrono::seconds(1));
                 }
+                parked.store(false);
             }
 
             spdlog::stopwatch stopwatch_worker_process_worker_step_1;

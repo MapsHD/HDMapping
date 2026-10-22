@@ -664,7 +664,8 @@ void step1(const std::atomic<bool>& loPause)
 void step2(const std::atomic<bool>& loPause)
 {
     double ts_failure = 0.0;
-    if (compute_step_2(worker_data, params, ts_failure, loProgress, loPause, full_debug_messages))
+    std::atomic<bool> parked{ false };
+    if (compute_step_2(worker_data, params, ts_failure, loProgress, loPause, full_debug_messages, parked))
         step_2_done = true;
     else
     {
@@ -1864,7 +1865,8 @@ bool step2(std::vector<WorkerData>& worker_data, LidarOdometryParams& params, co
 {
     double ts_failure = 0.0;
     std::atomic<float> loProgress;
-    return compute_step_2(worker_data, params, ts_failure, loProgress, loPause, full_debug_messages);
+    std::atomic<bool> parked{ false };
+    return compute_step_2(worker_data, params, ts_failure, loProgress, loPause, full_debug_messages, parked);
 }
 
 void save_results(

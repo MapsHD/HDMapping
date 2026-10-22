@@ -1,13 +1,7 @@
-// clang-format off
-#include <GL/glew.h>
-#include <GL/freeglut.h>
-// clang-format on
-
 #include <imgui.h>
-#include <imgui_impl_glut.h>
-#include <imgui_impl_opengl2.h>
 #include <imgui_internal.h>
 #include <implot/implot.h>
+#include <rlImGui.h>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -17,8 +11,8 @@
 #include <Core/export_laz.h>
 #include <Core/hash_utils.h>
 #include <Core/pfd_wrapper.hpp>
+#include <Core/raylib_utils.hpp>
 #include <Core/transformations.h>
-#include <Core/utils.hpp>
 
 #include <Eigen/Eigen>
 
@@ -37,8 +31,6 @@
 
 #ifdef _WIN32
 #include "resource.h"
-#include <shellapi.h> // <-- Required for ShellExecuteA
-#include <windows.h>
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////////
@@ -131,13 +123,14 @@ bool show_imu_data = false;
 bool show_cameras_data = true;
 bool is_settings_gui = false;
 bool color_by_intensity = false;
+bool intensity_shading = true;
 float intensity_gamma = 1.0f;
 
 namespace photos
 {
     cv::Mat imgToShow;
     std::string imgToShowFn;
-    GLuint photo_texture_cam0 = 0;
+    unsigned int photo_texture_cam0 = 0;
     double nearestTs = 0;
     int photo_width_cam0 = 0;
     int photo_height_cam0 = 0;
@@ -197,19 +190,12 @@ void render_nearest_photo(double ts)
     imgToShow = img_rgb;
     imgToShowFn = photo_file;
     photos::nearestTs = double(it->first) / 1e9;
-    // upload to OpenGL texture
+    // upload to OpenGL texture (rlLoadTexture() sets linear filtering and 1-byte unpack alignment for RGB)
     photo_width_cam0 = imgToShow.cols;
     photo_height_cam0 = imgToShow.rows;
-    if (photo_texture_cam0 == 0)
-    {
-        glGenTextures(1, &photo_texture_cam0);
-    }
-    glBindTexture(GL_TEXTURE_2D, photo_texture_cam0);
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, photo_width_cam0, photo_height_cam0, 0, GL_RGB, GL_UNSIGNED_BYTE, imgToShow.data);
-    glBindTexture(GL_TEXTURE_2D, 0);
+    if (photo_texture_cam0 != 0)
+        rlUnloadTexture(photo_texture_cam0);
+    photo_texture_cam0 = rlLoadTexture(imgToShow.data, photo_width_cam0, photo_height_cam0, PIXELFORMAT_UNCOMPRESSED_R8G8B8, 1);
 }
 
 void optimize()
@@ -1202,14 +1188,9 @@ void loadFiles(std::vector<std::string> input_file_names)
     }
 }
 
-void openFolder()
+//! Appends the files of a Mandeye data folder (and its CAMERA_0 photos) to input_file_names.
+void collectFolderFiles(const std::string& input_folder_name, std::vector<std::string>& input_file_names)
 {
-    std::string input_folder_name;
-    std::vector<std::string> input_file_names;
-    input_folder_name = mandeye::fd::SelectFolder("Select Mandeye data folder");
-
-    spdlog::info("Selected folder: '{}'", input_folder_name);
-
     const std::vector<std::filesystem::path> subDirs{ "", "CAMERA_0" };
     for (const auto& subdir : subDirs)
     {
@@ -1221,8 +1202,35 @@ void openFolder()
                     input_file_names.push_back(entry.path().string());
         }
     }
+}
+
+void openFolder()
+{
+    std::string input_folder_name;
+    std::vector<std::string> input_file_names;
+    input_folder_name = mandeye::fd::SelectFolder("Select Mandeye data folder");
+
+    spdlog::info("Selected folder: '{}'", input_folder_name);
+
+    collectFolderFiles(input_folder_name, input_file_names);
 
     loadFiles(input_file_names);
+}
+
+//! Drag and drop: dropped folders load like "Open folder", dropped files like "Open files".
+void openDropped(const std::vector<std::string>& paths)
+{
+    std::vector<std::string> input_file_names;
+    for (const auto& path : paths)
+    {
+        if (fs::is_directory(path))
+            collectFolderFiles(path, input_file_names);
+        else
+            input_file_names.push_back(path);
+    }
+
+    if (!input_file_names.empty())
+        loadFiles(input_file_names);
 }
 
 void openFiles()
@@ -1524,14 +1532,13 @@ void settings_gui()
 void display()
 {
     ImGuiIO& io = ImGui::GetIO();
-    glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
+    rlViewport(0, 0, GetRenderWidth(), GetRenderHeight());
 
-    glClearColor(bg_color.x * bg_color.w, bg_color.y * bg_color.w, bg_color.z * bg_color.w, bg_color.w);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glEnable(GL_DEPTH_TEST);
+    ClearBackground(ColorFromNormalized(Vector4{ bg_color.x * bg_color.w, bg_color.y * bg_color.w, bg_color.z * bg_color.w, bg_color.w }));
+    rlEnableDepthTest();
 
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
+    rlMatrixMode(RL_PROJECTION);
+    rlLoadIdentity();
 
     updateCameraTransition();
 
@@ -1539,7 +1546,7 @@ void display()
 
     if (!is_ortho)
     {
-        reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
+        reshape((int)io.DisplaySize.x, (int)io.DisplaySize.y);
 
         viewLocal.translate(rotation_center);
 
@@ -1552,10 +1559,11 @@ void display()
 
         viewLocal.translate(-rotation_center);
 
-        glLoadMatrixf(viewLocal.matrix().data());
+        rlMultMatrixf(viewLocal.matrix().data());
     }
     else
         updateOrthoView();
+    captureFrameMatrices();
 
     //
     /* glPointSize(point_size);
@@ -1579,12 +1587,12 @@ void display()
      glEnd();
      glPointSize(1);*/
 
-    glPointSize(point_size);
-    glBegin(GL_POINTS);
+    beginPoints(point_size);
     if (index_rendered_points_local >= 0 && index_rendered_points_local < all_data.size())
     {
         double max_diff = 0.0;
         float max_intensity = 0.0f;
+        const IntensityRange range = intensityRange(all_data[index_rendered_points_local].points_local);
         for (size_t i = 0; i < all_data[index_rendered_points_local].points_local.size(); i++)
         {
             if (color_by_intensity && all_data[index_rendered_points_local].points_local[i].intensity > max_intensity)
@@ -1642,21 +1650,24 @@ void display()
                         ii = std::clamp(ii, 0.0f, 1.0f);
                         if (intensity_gamma != 1.0f)
                             ii = std::pow(ii, intensity_gamma);
-                        glColor3f(ii, ii, ii);
+                        color3f(ii, ii, ii);
                     }
-                    else if (all_data[index_rendered_points_local].lidar_ids[i] == 0)
-                        glColor3f(pc_color.x, pc_color.y, pc_color.z);
                     else
-                        glColor3f(pc_color2.x, pc_color2.y, pc_color2.z);
+                    {
+                        const ImVec4& c = all_data[index_rendered_points_local].lidar_ids[i] == 0 ? pc_color : pc_color2;
+                        if (intensity_shading)
+                            color3fIntensityShaded(c.x, c.y, c.z, all_data[index_rendered_points_local].points_local[i].intensity, range);
+                        else
+                            color3f(c.x, c.y, c.z);
+                    }
 
-                    glVertex3f(p.x(), p.y(), p.z());
+                    pointVertex3f(p.x(), p.y(), p.z());
                     //}
                 }
             }
         }
     }
-    glEnd();
-    glPointSize(1);
+    endPoints();
 
     if (index_rendered_points_local >= 0 && index_rendered_points_local < all_data.size())
     {
@@ -1688,22 +1699,21 @@ void display()
                 }
                 glVertex3f(p.x(), p.y(), p.z());*/
 
+                // Drawn 1 px wide: the core-profile context has no wide lines (was glLineWidth(2)).
                 Eigen::Affine3d m = all_data[index_rendered_points_local].poses[index_pose];
-                glLineWidth(2.0);
-                glBegin(GL_LINES);
-                glColor3f(1.0f, 0.0f, 0.0f);
-                glVertex3f(m(0, 3), m(1, 3), m(2, 3));
-                glVertex3f(m(0, 3) + m(0, 0), m(1, 3) + m(1, 0), m(2, 3) + m(2, 0));
+                rlBegin(RL_LINES);
+                rlColor3f(1.0f, 0.0f, 0.0f);
+                rlVertex3f(m(0, 3), m(1, 3), m(2, 3));
+                rlVertex3f(m(0, 3) + m(0, 0), m(1, 3) + m(1, 0), m(2, 3) + m(2, 0));
 
-                glColor3f(0.0f, 1.0f, 0.0f);
-                glVertex3f(m(0, 3), m(1, 3), m(2, 3));
-                glVertex3f(m(0, 3) + m(0, 1), m(1, 3) + m(1, 1), m(2, 3) + m(2, 1));
+                rlColor3f(0.0f, 1.0f, 0.0f);
+                rlVertex3f(m(0, 3), m(1, 3), m(2, 3));
+                rlVertex3f(m(0, 3) + m(0, 1), m(1, 3) + m(1, 1), m(2, 3) + m(2, 1));
 
-                glColor3f(0.0f, 0.0f, 1.0f);
-                glVertex3f(m(0, 3), m(1, 3), m(2, 3));
-                glVertex3f(m(0, 3) + m(0, 2), m(1, 3) + m(1, 2), m(2, 3) + m(2, 2));
-                glEnd();
-                glLineWidth(1.0);
+                rlColor3f(0.0f, 0.0f, 1.0f);
+                rlVertex3f(m(0, 3), m(1, 3), m(2, 3));
+                rlVertex3f(m(0, 3) + m(0, 2), m(1, 3) + m(1, 2), m(2, 3) + m(2, 2));
+                rlEnd();
                 break;
             }
         }
@@ -1711,14 +1721,14 @@ void display()
 
     if (show_rgd_nn)
     {
-        glColor3f(0, 0, 0);
-        glBegin(GL_LINES);
+        rlBegin(RL_LINES);
+        rlColor3f(0, 0, 0);
         for (const auto& nn : rgd_nn)
         {
-            glVertex3f(nn.first.x(), nn.first.y(), nn.first.z());
-            glVertex3f(nn.second.x(), nn.second.y(), nn.second.z());
+            rlVertex3f(nn.first.x(), nn.first.y(), nn.first.z());
+            rlVertex3f(nn.second.x(), nn.second.y(), nn.second.z());
         }
-        glEnd();
+        rlEnd();
     }
 
     if (show_mean_cov)
@@ -1729,13 +1739,15 @@ void display()
 
     showAxes();
 
-    ImGui_ImplOpenGL2_NewFrame();
-    ImGui_ImplGLUT_NewFrame();
-    ImGui::NewFrame();
+    rlImGuiBegin();
 
     ShowMainDockSpace();
 
     view_kbd_shortcuts();
+
+    const auto dropped = takeDroppedFiles();
+    if (!dropped.empty())
+        openDropped(dropped);
 
     if (all_data.size() > 0)
     {
@@ -1765,7 +1777,7 @@ void display()
             if (ImGui::Button("Open folder"))
                 openFolder();
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Select folder containing files for analyze (Ctrl+O)");
+                ImGui::SetTooltip("Select folder containing files for analyze (Ctrl+O), or drop folders/files on the window");
 
             ImGui::SameLine();
 
@@ -1844,6 +1856,9 @@ void display()
             ImGui::MenuItem("Show IMU data", nullptr, &show_imu_data);
             ImGui::MenuItem("Show cameras data", nullptr, &show_cameras_data);
 
+            ImGui::MenuItem("Intensity shading", nullptr, &intensity_shading);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Shade the point cloud colors by LiDAR intensity");
             ImGui::MenuItem("Color by intensity", nullptr, &color_by_intensity);
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Render points as grayscale from LiDAR intensity (normalized to current block max)");
@@ -1954,6 +1969,8 @@ void display()
 
     info_window(infoLines, appShortcuts);
 
+    end3DAndDrawLabels();
+
     if (compass_ruler)
         drawMiniCompassWithRuler();
 
@@ -1977,34 +1994,12 @@ void display()
     if (is_settings_gui)
         settings_gui();
 
-    ImGui::Render();
-    ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
-
-    glutSwapBuffers();
-    glutPostRedisplay();
+    rlImGuiEnd();
 }
 
 void mouse(int glut_button, int state, int x, int y)
 {
     ImGuiIO& io = ImGui::GetIO();
-    io.MousePos = ImVec2((float)x, (float)y);
-    int button = -1;
-    if (glut_button == GLUT_LEFT_BUTTON)
-        button = 0;
-    if (glut_button == GLUT_RIGHT_BUTTON)
-        button = 1;
-    if (glut_button == GLUT_MIDDLE_BUTTON)
-        button = 2;
-    if (button != -1 && state == GLUT_DOWN)
-        io.MouseDown[button] = true;
-    if (button != -1 && state == GLUT_UP)
-        io.MouseDown[button] = false;
-
-    static int glutMajorVersion = glutGet(GLUT_VERSION) / 10000;
-    if (state == GLUT_DOWN && (glut_button == 3 || glut_button == 4) && glutMajorVersion < 3)
-    {
-        wheel(glut_button, glut_button == 3 ? 1 : -1, x, y);
-    }
 
     if (!io.WantCaptureMouse)
     {
@@ -2058,12 +2053,12 @@ int main(int argc, char* argv[])
             }
         }
 
-        glutMainLoop();
+        mainLoop();
 
-        ImGui_ImplOpenGL2_Shutdown();
-        ImGui_ImplGLUT_Shutdown();
-        ImGui::DestroyContext();
         ImPlot::DestroyContext();
+        if (photos::photo_texture_cam0 != 0)
+            rlUnloadTexture(photos::photo_texture_cam0);
+        shutdownGL();
     } catch (const std::bad_alloc& e)
     {
         spdlog::error("System is out of memory : {}", e.what());

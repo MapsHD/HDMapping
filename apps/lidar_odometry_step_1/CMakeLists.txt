@@ -24,7 +24,6 @@ set(SOURCES
   points_global_spill.h points_global_spill.cpp
   raw_cloud_loader.h raw_cloud_loader.cpp
   toml_io.h toml_io.cpp
-  "../../core/src/utils.cpp"
 )
 
 # Windows: add resource file
@@ -39,6 +38,9 @@ add_executable(
 target_compile_definitions(lidar_odometry_step_1 PRIVATE WITH_GUI=1)
 target_apply_hdmapping_profiler(lidar_odometry_step_1)
 
+# lidar_odometry_gui.cpp is raylib-based (ported off GLUT; the GLUT build is kept as
+# apps/lidar_odometry_step_1_legacy): <Core/raylib_utils.hpp> (core_raylib_utils) replaces
+# <Core/utils.hpp> with the same names, so only the GL calls changed.
 target_include_directories(
   lidar_odometry_step_1
   PRIVATE include
@@ -48,11 +50,6 @@ target_include_directories(
           ${THIRDPARTY_DIRECTORY}/glm
           ${EIGEN3_INCLUDE_DIR}
           ${THIRDPARTY_DIRECTORY}/tomlplusplus/include
-          ${THIRDPARTY_DIRECTORY}/imgui
-          ${THIRDPARTY_DIRECTORY}/imgui/backends
-          ${THIRDPARTY_DIRECTORY}/ImGuizmo
-          ${THIRDPARTY_DIRECTORY}/glew-cmake/include
-          ${FREEGLUT_INCLUDE_DIR}
           ${THIRDPARTY_DIRECTORY}/json/include
           ${THIRDPARTY_DIRECTORY}/portable-file-dialogs-master
           ${LASZIP_INCLUDE_DIR}/LASzip/include
@@ -62,19 +59,18 @@ target_include_directories(
 
 target_link_libraries(
           lidar_odometry_step_1
-          PRIVATE 
-          vqf 
+          PRIVATE
+          # core_raylib_utils brings in core_raylib (core, raylib), raylib_widgets and rlImGui.
+          core_raylib_utils
+          imgui_raylib
+          imguizmo_raylib
+          vqf
           Fusion
           unordered_dense::unordered_dense
           spdlog::spdlog
           UTL::include
-          OpenGL::GLU
-          ${FREEGLUT_LIBRARY}
-          ${OPENGL_gl_LIBRARY}
           ${PLATFORM_LASZIP_LIB}
-          ${PLATFORM_MISCELLANEOUS_LIBS}
-          ${CORE_LIBRARIES}
-          ${GUI_LIBRARIES})
+          ${PLATFORM_MISCELLANEOUS_LIBS})
 
 if(WIN32)
   add_custom_command(
@@ -92,6 +88,8 @@ endif()
 
 add_executable(
   drag_folder_with_mandeye_data_and_drop_here-precision_forestry drag_folder_with_mandeye_data_and_drop_here-precision_forestry.cpp ${SOURCES}
+  # Still GLUT-based.
+  "../../core/src/utils.cpp"
   )
 
 target_compile_definitions(drag_folder_with_mandeye_data_and_drop_here-precision_forestry PRIVATE WITH_GUI=1)

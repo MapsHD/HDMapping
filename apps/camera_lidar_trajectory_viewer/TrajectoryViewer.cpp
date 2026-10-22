@@ -799,8 +799,7 @@ static bool readSessionFiles(const fs::path& mjs, SessionFiles& out, std::string
         out.hasPoses = !out.poses.empty();
         for (const auto& fn : data["laz_file_names"])
             out.lazPaths.push_back(relocate(fn.value("file_name", "")));
-    }
-    catch (const std::exception& e)
+    } catch (const std::exception& e)
     {
         err = "Bad session file " + mjs.string() + ": " + e.what();
         return false;

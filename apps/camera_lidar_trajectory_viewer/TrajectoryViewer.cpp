@@ -55,7 +55,7 @@ static const std::vector<raylib_widgets::ShortcutEntry> appShortcuts = {
     { "", "P", "Toggle show path" },
     { "", "V", "Toggle show frustums" },
     { "", "Ctrl (tap)", "Toggle Intensity <-> RGB point color" },
-    { "", "Ctrl+O", "Select LIO result directory" },
+    { "", "Ctrl+O", "Select session (.mjs)" },
     { "", "Ctrl+Shift+O", "Select CAMERA_0 directory" },
     { "", "Ctrl+Shift+C", "Open calibration" },
     { "", "Ctrl+S", "Export colored point cloud (LAS/LAZ)" },
@@ -632,10 +632,15 @@ static int64_t parseImageTsNs(const fs::path& p)
 }
 
 //! Directory holding the camera frames: whatever the user picked, else the
-//! CAMERA_0 sibling of the session dir.
+//! CAMERA_0 sibling of the session dir (the .mjs manifest's directory, or the
+//! directory itself when one is entered instead of a manifest).
 static fs::path cameraDir(const AppState& s)
 {
-    return s.cameraBuf[0] ? fs::path(s.cameraBuf) : fs::path(s.sessionBuf).parent_path() / "CAMERA_0";
+    if (s.cameraBuf[0])
+        return fs::path(s.cameraBuf);
+    fs::path sess(s.sessionBuf);
+    fs::path sessDir = fs::is_directory(sess) ? sess : sess.parent_path();
+    return sessDir.parent_path() / "CAMERA_0";
 }
 
 //! AppState::timeOffsetSec in nanoseconds, to match the timestamps.
@@ -727,6 +732,104 @@ static std::map<std::string, Eigen::Affine3f> parseMRP(const fs::path& mrpPath)
     return result;
 }
 
+//! One session's files, read from its *.mjs manifest rather than by scanning
+//! the directory -- a directory can hold more than one session, each with its
+//! own poses file and chunk list.
+struct SessionFiles
+{
+    fs::path mjs;
+    std::map<std::string, Eigen::Affine3f> poses; //!< chunk stem -> pose; poses_file_name, else initial_poses_file_name
+    bool hasPoses = false;
+    std::vector<fs::path> lazPaths; //!< laz_file_names, in manifest order
+};
+
+//! The manifest s.sessionBuf names: a *.mjs file as is; a directory resolves to
+//! its session.mjs (what lidar_odometry_step_1 writes), else its only *.mjs.
+//! Empty path + err set when there is no single answer.
+static fs::path resolveMjs(const fs::path& p, std::string& err)
+{
+    if (!fs::is_directory(p))
+    {
+        if (fs::is_regular_file(p))
+            return p;
+        err = "Session file not found: " + p.string();
+        return {};
+    }
+    if (fs::is_regular_file(p / "session.mjs"))
+        return p / "session.mjs";
+    std::vector<fs::path> found;
+    for (const auto& e : fs::directory_iterator(p))
+        if (e.path().extension() == ".mjs")
+            found.push_back(e.path());
+    if (found.size() == 1)
+        return found.front();
+    err = found.empty() ? "No .mjs session file in " + p.string()
+                        : std::to_string(found.size()) + " .mjs files in " + p.string() + " -- pick one";
+    return {};
+}
+
+//! Read the manifest's poses and chunk list. A stored path that no longer exists
+//! falls back to the same file name next to the manifest, as Session::load does.
+static bool readSessionFiles(const fs::path& mjs, SessionFiles& out, std::string& err)
+{
+    out = SessionFiles{};
+    out.mjs = mjs;
+    auto relocate = [&](std::string path) -> fs::path
+    {
+        std::replace(path.begin(), path.end(), '\\', '/');
+        fs::path p(path);
+        std::error_code ec;
+        if (path.empty() || fs::exists(p, ec))
+            return p;
+        return mjs.parent_path() / p.filename();
+    };
+    try
+    {
+        std::ifstream f(mjs);
+        if (!f)
+        {
+            err = "Cannot open " + mjs.string();
+            return false;
+        }
+        nlohmann::json data = nlohmann::json::parse(f);
+        const auto& settings = data["Session Settings"];
+        out.poses = parseMRP(relocate(settings.value("poses_file_name", "")));
+        if (out.poses.empty())
+            out.poses = parseMRP(relocate(settings.value("initial_poses_file_name", "")));
+        out.hasPoses = !out.poses.empty();
+        for (const auto& fn : data["laz_file_names"])
+            out.lazPaths.push_back(relocate(fn.value("file_name", "")));
+    }
+    catch (const std::exception& e)
+    {
+        err = "Bad session file " + mjs.string() + ": " + e.what();
+        return false;
+    }
+    return true;
+}
+
+//! Resolve s.sessionBuf and read it; on success the buffer is set to the manifest
+//! actually used, so a directory entry shows which session it picked.
+static bool openSessionFiles(AppState& s, SessionFiles& out)
+{
+    std::string err;
+    fs::path mjs = resolveMjs(fs::path(s.sessionBuf), err);
+    if (mjs.empty() || !readSessionFiles(mjs, out, err))
+    {
+        s.status = err;
+        return false;
+    }
+    setBuf(s.sessionBuf, sizeof(s.sessionBuf), mjs.string());
+    return true;
+}
+
+//! "scan_lio_N" chunk's trajectory: trajectory_lio_N.csv next to its laz.
+static fs::path chunkTrajectoryCsv(const fs::path& lazPath)
+{
+    std::string stem = lazPath.stem().string();
+    return lazPath.parent_path() / ("trajectory_lio_" + stem.substr(stem.rfind('_') + 1) + ".csv");
+}
+
 static void loadSession(AppState& s)
 {
     s.traj.poses.clear();
@@ -739,32 +842,18 @@ static void loadSession(AppState& s)
     s.cloud.unload();
     loadImages(s);
 
-    fs::path d(s.sessionBuf);
-    if (!fs::is_directory(d))
-    {
-        s.status = "Not a directory";
+    SessionFiles sf;
+    if (!openSessionFiles(s, sf))
         return;
-    }
+    const auto& mrp = sf.poses;
 
-    // parse MRP if present
-    auto mrp = parseMRP(d / "session_poses.mrp");
-    if (mrp.empty())
-        mrp = parseMRP(d / "session_ini_poses.mri");
-
-    // trajectory CSVs — apply corresponding MRP transform per chunk
-    std::vector<fs::path> csvPaths;
-    for (auto& e : fs::directory_iterator(d))
+    // trajectory CSVs of the manifest's chunks — apply the chunk's pose to each
+    for (const auto& lp : sf.lazPaths)
     {
-        std::string n = e.path().filename().string();
-        if (n.rfind("trajectory_lio_", 0) == 0 && e.path().extension() == ".csv")
-            csvPaths.push_back(e.path());
-    }
-    std::sort(csvPaths.begin(), csvPaths.end());
-    for (auto& cp : csvPaths)
-    {
-        std::string stem = cp.stem().string();
-        std::string idx = stem.substr(stem.rfind('_') + 1);
-        std::string key = "scan_lio_" + idx;
+        fs::path cp = chunkTrajectoryCsv(lp);
+        if (!fs::exists(cp))
+            continue;
+        std::string key = lp.stem().string();
         const Eigen::Affine3f* M = mrp.count(key) ? &mrp.at(key) : nullptr;
         s.traj.loadCSV(cp.string(), M);
     }
@@ -802,25 +891,11 @@ static void loadCloud(AppState& s)
     s.exportSegments.clear();
     s.cloud.unload();
 
-    fs::path d(s.sessionBuf);
-    if (!fs::is_directory(d))
-    {
-        s.status = "No session loaded";
+    SessionFiles sf;
+    if (!openSessionFiles(s, sf))
         return;
-    }
-
-    auto mrp = parseMRP(d / "session_poses.mrp");
-    if (mrp.empty())
-        mrp = parseMRP(d / "session_ini_poses.mri");
-
-    std::vector<fs::path> lazPaths;
-    for (auto& e : fs::directory_iterator(d))
-    {
-        std::string n = e.path().filename().string();
-        if (n.rfind("scan_lio_", 0) == 0 && e.path().extension() == ".laz")
-            lazPaths.push_back(e.path());
-    }
-    std::sort(lazPaths.begin(), lazPaths.end());
+    const auto& mrp = sf.poses;
+    const auto& lazPaths = sf.lazPaths;
 
     bool canColor = s.calibLoaded && !s.imagesFilenamesInTime.empty();
     Eigen::Matrix3f R_wc = canColor ? s.R_wc : Eigen::Matrix3f::Identity();
@@ -884,13 +959,12 @@ static void loadCloud(AppState& s)
     for (auto& lp : lazPaths)
     {
         std::string key = lp.stem().string(); // "scan_lio_N"
-        std::string idx = key.substr(key.rfind('_') + 1);
         const Eigen::Affine3f* M = mrp.count(key) ? &mrp.at(key) : nullptr;
 
         // ── step 1: read chunk time range from the matching trajectory CSV ──
         int64_t chunkFirst = 0, chunkLast = 0;
         {
-            fs::path csvPath = d / ("trajectory_lio_" + idx + ".csv");
+            fs::path csvPath = chunkTrajectoryCsv(lp);
             std::ifstream cf(csvPath);
             if (cf)
             {
@@ -1892,9 +1966,11 @@ static void toggleFlyoverPlaying(AppState& s)
 //! Factored out so the File menu items and their keyboard shortcuts (in the
 //! main loop below) call the exact same code, matching the openSession()-style
 //! convention used by mandeye_single_session_viewer/multi_view_tls_registration.
-static void actionSelectLioResultDir(AppState& s)
+static void actionSelectSession(AppState& s)
 {
-    setBuf(s.sessionBuf, sizeof(s.sessionBuf), mandeye::fd::SelectFolder("Select LIO result directory"));
+    std::string path = mandeye::fd::OpenFileDialogOneFile("Select session (*.mjs)", mandeye::fd::Session_filter);
+    if (!path.empty())
+        setBuf(s.sessionBuf, sizeof(s.sessionBuf), path);
 }
 
 static void actionSelectCamera0Dir(AppState& s)
@@ -1938,8 +2014,8 @@ static void actionOpenMask(AppState& s)
 //! than waiting for "Load session" -- a drop is already an explicit "load this".
 //! A dropped directory containing a *.mjs manifest is a session (LIO result
 //! dir); any other dropped directory is the camera directory (only the images
-//! are swapped, so the trajectory and cloud survive); a *.mjs file is a
-//! session manifest (its parent directory is the session, as with --mjs); a
+//! are swapped, so the trajectory and cloud survive); a *.mjs file is that
+//! exact session, as with --mjs; a
 //! *.json is a calibration file.
 static void handleDroppedPath(AppState& s, const std::string& path)
 {
@@ -1979,8 +2055,8 @@ static void handleDroppedPath(AppState& s, const std::string& path)
     }
     else if (ext == ".mjs")
     {
-        // Session manifest, same convention as --mjs: the session directory is its parent.
-        setBuf(s.sessionBuf, sizeof(s.sessionBuf), fs::path(path).parent_path().string());
+        // Session manifest, used as is -- its directory may hold other sessions too.
+        setBuf(s.sessionBuf, sizeof(s.sessionBuf), path);
         loadSession(s);
     }
     else if (ext == ".png" || ext == ".bmp" || ext == ".jpg" || ext == ".jpeg")
@@ -2185,23 +2261,11 @@ static void buildRosInput(AppState& s, RosExportInput& in)
     in.E = s.E;
     in.R_wc = s.R_wc;
 
-    fs::path d(s.sessionBuf);
-    if (!fs::is_directory(d))
+    SessionFiles sf;
+    if (!openSessionFiles(s, sf))
         return;
-
-    auto mrp = parseMRP(d / "session_poses.mrp");
-    if (mrp.empty())
-        mrp = parseMRP(d / "session_ini_poses.mri");
-
-    std::vector<fs::path> lazPaths;
-    for (auto& e : fs::directory_iterator(d))
-    {
-        std::string n = e.path().filename().string();
-        if (n.rfind("scan_lio_", 0) == 0 && e.path().extension() == ".laz")
-            lazPaths.push_back(e.path());
-    }
-    std::sort(lazPaths.begin(), lazPaths.end());
-    for (auto& lp : lazPaths)
+    const auto& mrp = sf.poses;
+    for (const auto& lp : sf.lazPaths)
     {
         RosExportInput::Chunk ch;
         ch.lazPath = lp.string();
@@ -2372,18 +2436,15 @@ int main(int argc, char* argv[])
     }
 
     AppState s;
-    // --mjs gives the session manifest; the session directory is its parent.
-    // Also accepts the session directory itself, for symmetry with drag & drop.
-    std::string sessionDir;
+    // --mjs gives the session manifest, used as is. A directory is also accepted,
+    // for symmetry with drag & drop; loadSession() resolves it to its session.mjs.
+    std::string session;
     if (args.has("mjs"))
-    {
-        fs::path mjsPath(args.get("mjs"));
-        sessionDir = fs::is_directory(mjsPath) ? mjsPath.string() : mjsPath.parent_path().string();
-    }
+        session = args.get("mjs");
     else if (!args.positional.empty())
-        sessionDir = args.positional.front(); // back-compat
-    if (!sessionDir.empty())
-        strncpy(s.sessionBuf, sessionDir.c_str(), sizeof(s.sessionBuf) - 1);
+        session = args.positional.front(); // back-compat
+    if (!session.empty())
+        strncpy(s.sessionBuf, session.c_str(), sizeof(s.sessionBuf) - 1);
 
     if (args.has("camera_dir"))
         strncpy(s.cameraBuf, args.get("camera_dir").c_str(), sizeof(s.cameraBuf) - 1);
@@ -2482,7 +2543,7 @@ int main(int argc, char* argv[])
     {
         bool imguiWants = ImGui::GetIO().WantCaptureMouse;
         s.orbit.updateEulerTransition(GetFrameTime());
-        // Drag & drop the LIO result directory (this app's session), a CAMERA_0 directory or a
+        // Drag & drop a session (*.mjs, or its LIO result directory), a CAMERA_0 directory or a
         // calibration *.json onto the window to load it -- raylib's GLFW backend surfaces OS
         // drag & drop the same way on Windows, Linux and macOS, so no platform-specific code
         // is needed here. See handleDroppedPath() for how a dropped path is classified.
@@ -2519,7 +2580,7 @@ int main(int argc, char* argv[])
             if (ctrlDown && shiftDown && IsKeyPressed(KEY_O))
                 actionSelectCamera0Dir(s);
             else if (ctrlDown && IsKeyPressed(KEY_O))
-                actionSelectLioResultDir(s);
+                actionSelectSession(s);
             if (ctrlDown && shiftDown && IsKeyPressed(KEY_C))
                 actionOpenCalibration(s);
             if (ctrlDown && IsKeyPressed(KEY_S))
@@ -2794,8 +2855,8 @@ int main(int argc, char* argv[])
         {
             if (ImGui::BeginMenu("File"))
             {
-                if (ImGui::MenuItem("Select LIO Result Directory...", "Ctrl+O"))
-                    actionSelectLioResultDir(s);
+                if (ImGui::MenuItem("Select Session (.mjs)...", "Ctrl+O"))
+                    actionSelectSession(s);
                 if (ImGui::MenuItem("Select CAMERA_0 Directory...", "Ctrl+Shift+O"))
                     actionSelectCamera0Dir(s);
                 ImGui::Separator();
@@ -2948,7 +3009,7 @@ int main(int argc, char* argv[])
         if (ImGui::CollapsingHeader("Session", ImGuiTreeNodeFlags_DefaultOpen))
         {
             ImGui::PushItemWidth(-1);
-            ImGui::Text("LIO result directory:");
+            ImGui::Text("Session (.mjs):");
             ImGui::InputText("##sess", s.sessionBuf, sizeof(s.sessionBuf));
             ImGui::Text("CAMERA_0 directory (empty = auto):");
             ImGui::InputText("##cam", s.cameraBuf, sizeof(s.cameraBuf));

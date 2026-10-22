@@ -74,8 +74,8 @@ CliArgs parseArgs(int argc, char* argv[]);
 //! @ref printUsage; the -h/--help line is always added automatically.
 namespace cliopt {
 inline constexpr const char* MJS =
-    "  --mjs <file.mjs>             session manifest file; the session\n"
-    "                               directory is its parent folder";
+    "  --mjs <file.mjs>             session manifest file; its poses file and\n"
+    "                               chunk list are used, not the whole folder";
 inline constexpr const char* CAMERA_DIR =
     "  --camera_dir <dir>           directory of CAMERA_0 images";
 inline constexpr const char* CALIB =

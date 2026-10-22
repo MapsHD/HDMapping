@@ -3,6 +3,12 @@
 #include <implot/implot.h>
 #include <rlImGui.h>
 
+#ifdef _WIN32
+// windows.h (pulled in transitively by the headers below) declares CloseWindow/ShowCursor like raylib.h does.
+#define CloseWindow CloseWindow_win32
+#define ShowCursor ShowCursor_win32
+#endif
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -30,6 +36,8 @@
 #include <opencv2/opencv.hpp>
 
 #ifdef _WIN32
+#undef CloseWindow
+#undef ShowCursor
 #include "resource.h"
 #endif
 

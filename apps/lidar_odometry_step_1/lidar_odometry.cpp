@@ -270,7 +270,6 @@ bool load_data(
                 });
             for (auto& chunk : murataChunks)
                 imu_data.insert(imu_data.end(), std::make_move_iterator(chunk.begin()), std::make_move_iterator(chunk.end()));
-
         }
 
         // Sort once after merging

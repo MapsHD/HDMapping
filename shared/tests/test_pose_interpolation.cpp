@@ -39,6 +39,19 @@ TEST_CASE("getInterpolatedPose: query before the first timestamp returns a zero 
     CHECK(isZeroMatrix(getInterpolatedPose(traj, -100.0)));
 }
 
+TEST_CASE("getInterpolatedPose: query after the last timestamp returns a zero matrix")
+{
+    // lower_bound() returns end() here, which must not be dereferenced --
+    // the _GLIBCXX_DEBUG build of this test (see CMakeLists.txt) aborts if it is.
+    std::map<double, Eigen::Matrix4d> traj{
+        { 1.0, makePose(0, 0, 0) },
+        { 2.0, makePose(10, 0, 0) },
+        { 3.0, makePose(20, 0, 0) },
+    };
+    CHECK(isZeroMatrix(getInterpolatedPose(traj, 3.5)));
+    CHECK(isZeroMatrix(getInterpolatedPose(traj, 100.0)));
+}
+
 TEST_CASE("getInterpolatedPose: exact match at an interior timestamp returns that exact pose")
 {
     // Interior = not the very first key -- see the "first segment" case below

@@ -22,5 +22,11 @@ if (MSVC)
     target_compile_definitions(hdmapping_shared_tests PRIVATE _USE_MATH_DEFINES)
 endif()
 
+# Build in libstdc++ debug mode so iterator misuse (e.g. dereferencing end())
+# fails the test run instead of passing by luck. Safe because the code under
+# test is header-only and no other C++ library is linked in; other standard
+# libraries ignore the macro.
+target_compile_definitions(hdmapping_shared_tests PRIVATE _GLIBCXX_DEBUG)
+
 include(CTest)
 add_test(NAME hdmapping_shared_tests COMMAND hdmapping_shared_tests)

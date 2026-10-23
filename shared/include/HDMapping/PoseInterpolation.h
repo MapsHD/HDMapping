@@ -27,15 +27,16 @@ inline Eigen::Matrix4d getInterpolatedPose(const std::map<double, Eigen::Matrix4
     {
         return ret;
     }
+    // query_time is past the last pose; end() must be caught before it_lower is dereferenced
+    if (it_lower == trajectory.end())
+    {
+        return ret;
+    }
     if (it_lower->first > query_time)
     {
         it_lower = std::prev(it_lower);
     }
     if (it_lower == trajectory.begin())
-    {
-        return ret;
-    }
-    if (it_lower == trajectory.end())
     {
         return ret;
     }

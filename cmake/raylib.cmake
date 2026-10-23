@@ -77,3 +77,16 @@ set(IMGUIZMO_RAYLIB_DIR ${THIRDPARTY_DIRECTORY}/ImGuizmo)
 add_library(imguizmo_raylib STATIC ${IMGUIZMO_RAYLIB_DIR}/ImGuizmo.cpp)
 target_include_directories(imguizmo_raylib PUBLIC ${IMGUIZMO_RAYLIB_DIR})
 target_link_libraries(imguizmo_raylib PUBLIC imgui_raylib)
+
+# ImPlot -- same story as ImGuizmo above: the vendored 3rdparty/implot sources,
+# built as a separate static lib against imgui_raylib instead of reusing the
+# `implot` target (cmake/implot.cmake), which links the GLUT-backed `imgui`.
+# Used by apps/mandeye_raw_data_viewer's IMU plots.
+set(IMPLOT_RAYLIB_DIR ${THIRDPARTY_DIRECTORY}/implot)
+add_library(implot_raylib STATIC
+    ${IMPLOT_RAYLIB_DIR}/implot.cpp
+    ${IMPLOT_RAYLIB_DIR}/implot_items.cpp
+    ${IMPLOT_RAYLIB_DIR}/implot_demo.cpp
+)
+target_include_directories(implot_raylib PUBLIC ${IMPLOT_RAYLIB_DIR})
+target_link_libraries(implot_raylib PUBLIC imgui_raylib)

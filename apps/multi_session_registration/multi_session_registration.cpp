@@ -4105,6 +4105,7 @@ int main(int argc, char* argv[])
 
         mainLoop();
 
+        releaseSessionRenderers();
         shutdownGL();
     } catch (const std::bad_alloc& e)
     {

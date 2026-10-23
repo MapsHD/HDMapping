@@ -1,12 +1,19 @@
-﻿#include <imgui.h>
-#include <imgui_impl_glut.h>
-#include <imgui_impl_opengl2.h>
+#include <imgui.h>
 #include <imgui_internal.h>
+#include <rlImGui.h>
 
 #include <ImGuizmo.h>
 
-#include <GL/freeglut.h>
+#ifdef _WIN32
+// windows.h (pulled in by portable-file-dialogs.h) declares CloseWindow/ShowCursor like raylib.h does.
+#define CloseWindow CloseWindow_win32
+#define ShowCursor ShowCursor_win32
+#endif
 #include <portable-file-dialogs.h>
+#ifdef _WIN32
+#undef CloseWindow
+#undef ShowCursor
+#endif
 
 #include "lidar_odometry.h"
 #include "lidar_odometry_utils.h"
@@ -14,13 +21,14 @@
 #include <Core/export_laz.h>
 #include <Core/hash_utils.h>
 #include <Core/pfd_wrapper.hpp>
+#include <Core/raylib_utils.hpp>
 #include <Core/registration_plane_feature.h>
 #include <Core/session.h>
-#include <Core/utils.hpp>
 
 #include "toml_io.h"
 #include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
 #include <chrono>
+#include <cstdlib>
 #include <ctime>
 #include <mutex>
 #include <spdlog/cfg/env.h>
@@ -28,7 +36,6 @@
 
 #ifdef _WIN32
 #include "resource.h"
-#include <windows.h>
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////////
@@ -135,7 +142,7 @@ namespace fs = std::filesystem;
 bool is_settings_gui = false;
 bool full_debug_messages = false;
 NDT ndt;
-bool show_reference_buckets_indoor = false;
+bool show_reference_buckets_indoor = true;
 bool show_reference_buckets_outdoor = false;
 bool show_reference_points = false;
 int dec_reference_points = 100;
@@ -155,6 +162,7 @@ bool calculations_failed = false;
 bool show_without_filtered_buckets = false;
 bool show_normal_vectors_indoor = false;
 bool show_normal_vectors_outdoor = false;
+bool intensity_shading = true;
 
 int lastPar = 1;
 
@@ -184,6 +192,10 @@ Trajectory trajectory;
 std::atomic<bool> loRunning{ false };
 std::atomic<float> loProgress{ 0.0 };
 std::atomic<bool> loPause{ false };
+std::atomic<bool> loParked{ false }; //!< step 2 is waiting on loPause and touches no file (see compute_step_2)
+bool loQuitting = false; //!< quit confirmed mid-run: the run is paused, display() exits once it is parked or done
+std::string pendingLoadFolder; //!< openData() picked it; display() loads it once the "Loading data" modal is on screen
+int pendingLoadFrames = 0; //!< frames left before that load; 0 = none pending
 std::chrono::time_point<std::chrono::system_clock> loStartTime;
 std::atomic<double> loElapsedSeconds{ 0.0 };
 std::atomic<double> loEstimatedTimeRemaining{ 0.0 };
@@ -619,18 +631,16 @@ Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking& observ
     return pos;
 }
 
-void step1(const std::atomic<bool>& loPause)
+void step1(const std::string& input_folder_name, const std::atomic<bool>& loPause)
 {
-    std::string input_folder_name;
     std::vector<std::string> input_file_names;
-    input_folder_name = mandeye::fd::SelectFolder("Select Mandeye data folder");
 
     std::cout << "Selected folder: '" << input_folder_name << std::endl;
 
     if (fs::exists(input_folder_name))
     {
         std::string newTitle = winTitle + " - ..\\" + std::filesystem::path(input_folder_name).filename().string();
-        glutSetWindowTitle(newTitle.c_str());
+        SetWindowTitle(newTitle.c_str());
 
         for (const auto& entry : fs::directory_iterator(input_folder_name))
             if (entry.is_regular_file())
@@ -664,7 +674,7 @@ void step1(const std::atomic<bool>& loPause)
 void step2(const std::atomic<bool>& loPause)
 {
     double ts_failure = 0.0;
-    if (compute_step_2(worker_data, params, ts_failure, loProgress, loPause, full_debug_messages))
+    if (compute_step_2(worker_data, params, ts_failure, loProgress, loPause, full_debug_messages, loParked))
         step_2_done = true;
     else
     {
@@ -1150,7 +1160,7 @@ void settings_gui()
             {
                 loStartTime = std::chrono::system_clock::now();
 
-                step1(loPause);
+                step1(mandeye::fd::SelectFolder("Select Mandeye data folder"), loPause);
                 std::cout << "Load data done please click 'Compute all' to continue calculations" << std::endl;
 
                 std::chrono::duration<double> elapsed = std::chrono::system_clock::now() - loStartTime;
@@ -1737,7 +1747,9 @@ void progress_window()
 
     ImGui::NewLine();
 
-    if (!loPause)
+    if (loQuitting)
+        ImGui::TextColored(ImVec4(1.f, 0.6f, 0.2f, 1.f), "Quitting: waiting for the current worker to finish...");
+    else if (!loPause)
     {
         if (ImGui::Button("Pause"))
             loPause.store(true);
@@ -1761,6 +1773,7 @@ void progress_window()
     ImGui::Checkbox("Show reference buckets indoor", &show_reference_buckets_indoor);
     ImGui::Checkbox("Show reference buckets outdoor", &show_reference_buckets_outdoor);
     ImGui::Checkbox("Show initial points", &show_initial_points);
+    ImGui::Checkbox("Intensity shading", &intensity_shading);
     ImGui::Checkbox("Show trajectory", &show_trajectory);
     ImGui::Checkbox("Show trajectory as axes", &show_trajectory_as_axes);
     ImGui::Checkbox("Show prediction vectors", &show_prediction_vectors);
@@ -1774,7 +1787,19 @@ void progress_window()
     ImGui::End();
 }
 
-void openData()
+//! folder: Mandeye data folder to process; empty asks for one with a folder dialog.
+//! Loading (step 1) blocks the UI thread, so display() first presents a "Loading data" modal and only
+//! then calls loadData(): one frame for the auto-resized modal to measure itself, one to show it.
+void openData(const std::string& folder = "")
+{
+    const std::string input_folder_name = folder.empty() ? mandeye::fd::SelectFolder("Select Mandeye data folder") : folder;
+    if (input_folder_name.empty())
+        return;
+    pendingLoadFolder = input_folder_name;
+    pendingLoadFrames = 3;
+}
+
+void loadData(const std::string& input_folder_name)
 {
     is_settings_gui = false;
     info_gui = false;
@@ -1785,7 +1810,7 @@ void openData()
     loEstimatedTimeRemaining.store(0.0);
     loStartTime = std::chrono::system_clock::now();
 
-    step1(loPause);
+    step1(input_folder_name, loPause);
 
     if (step_1_done)
     {
@@ -1864,7 +1889,8 @@ bool step2(std::vector<WorkerData>& worker_data, LidarOdometryParams& params, co
 {
     double ts_failure = 0.0;
     std::atomic<float> loProgress;
-    return compute_step_2(worker_data, params, ts_failure, loProgress, loPause, full_debug_messages);
+    std::atomic<bool> parked{ false };
+    return compute_step_2(worker_data, params, ts_failure, loProgress, loPause, full_debug_messages, parked);
 }
 
 void save_results(
@@ -1878,22 +1904,67 @@ void save_results(
     save_result(worker_data, params, outwd, elapsed_seconds);
 }
 
+//! Window close: while odometry runs, ask first. A confirmed quit pauses the run and keeps the
+//! window open until display() sees the run parked or finished (quit_abandoned_run()).
+bool confirm_close()
+{
+    if (!loRunning)
+        return true;
+    if (loQuitting)
+        return false;
+    pfd::message message(
+        "Lidar odometry is running",
+        "Quit anyway? The run is abandoned: nothing is saved and the cache is deleted.",
+        pfd::choice::yes_no,
+        pfd::icon::warning);
+    if (message.result() != pfd::button::yes)
+        return false;
+    loQuitting = true;
+    loPause.store(true);
+    return false;
+}
+
+//! The detached run thread can't be joined and still uses the globals, so the process ends
+//! without destructors, after removing the cache the parked (or finished) run no longer reads.
+static void quit_abandoned_run()
+{
+    remove_cache(params);
+    std::_Exit(0);
+}
+
+//! intensityRange() over the buckets' mean intensities; ray-marked buckets (number_of_points == -1) carry none.
+static IntensityRange bucketIntensityRange(const NDTBucketMapType& buckets)
+{
+    IntensityRange range;
+    bool first = true;
+    for (const auto& b : buckets)
+    {
+        if (b.second.number_of_points == -1)
+            continue;
+        range.min = first ? b.second.intensity : std::min(range.min, b.second.intensity);
+        range.max = first ? b.second.intensity : std::max(range.max, b.second.intensity);
+        first = false;
+    }
+    return range;
+}
+
 void display()
 {
+    if (loQuitting && (loParked || !loRunning))
+        quit_abandoned_run();
+
     ImGuiIO& io = ImGui::GetIO();
-    glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
+    rlViewport(0, 0, GetRenderWidth(), GetRenderHeight());
 
-    glClearColor(bg_color.x * bg_color.w, bg_color.y * bg_color.w, bg_color.z * bg_color.w, bg_color.w);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glEnable(GL_DEPTH_TEST);
+    ClearBackground(ColorFromNormalized(Vector4{ bg_color.x * bg_color.w, bg_color.y * bg_color.w, bg_color.z * bg_color.w, bg_color.w }));
+    rlEnableDepthTest();
 
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
+    rlMatrixMode(RL_PROJECTION);
+    rlLoadIdentity();
 
     updateCameraTransition();
 
-    reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
+    reshape((int)io.DisplaySize.x, (int)io.DisplaySize.y);
 
     viewLocal = Eigen::Affine3f::Identity();
 
@@ -1908,22 +1979,24 @@ void display()
 
     viewLocal.translate(-rotation_center);
 
-    glMatrixMode(GL_MODELVIEW);
-    glLoadMatrixf(viewLocal.matrix().data());
+    rlMultMatrixf(viewLocal.matrix().data());
+    captureFrameMatrices();
 
     showAxes();
 
     if (show_initial_points)
     {
-        glColor3d(0.0, 1.0, 0.0);
-        glPointSize(point_size);
-        glBegin(GL_POINTS);
+        const IntensityRange range = intensityRange(params.initial_points);
+        color3f(0.0f, 1.0f, 0.0f);
+        beginPoints(point_size);
         for (const auto& p : params.initial_points)
         {
+            if (intensity_shading)
+                color3fIntensityShaded(0.0f, 1.0f, 0.0f, p.intensity, range);
             auto pp = params.m_g * p.point;
-            glVertex3d(pp.x(), pp.y(), pp.z());
+            pointVertex3f(pp.x(), pp.y(), pp.z());
         }
-        glEnd();
+        endPoints();
     }
 
 #if 0 // ToDo
@@ -1960,42 +2033,48 @@ void display()
 
     if (show_reference_points)
     {
-        glColor3f(1, 0, 0);
-        glBegin(GL_POINTS);
+        const IntensityRange range = intensityRange(params.reference_points, dec_reference_points);
+        color3f(1, 0, 0);
+        beginPoints(point_size);
         for (size_t i = 0; i < params.reference_points.size(); i += dec_reference_points)
-            glVertex3f(params.reference_points[i].point.x(), params.reference_points[i].point.y(), params.reference_points[i].point.z());
-        glEnd();
+        {
+            if (intensity_shading)
+                color3fIntensityShaded(1, 0, 0, params.reference_points[i].intensity, range);
+            pointVertex3f(params.reference_points[i].point.x(), params.reference_points[i].point.y(), params.reference_points[i].point.z());
+        }
+        endPoints();
     }
 
     if (show_trajectory_as_axes)
     {
-        // glBegin(GL_LINE_STRIP);
-        glBegin(GL_LINES);
+        rlBegin(RL_LINES);
         for (const auto& wd : worker_data)
         {
             for (const auto& it : wd.intermediate_trajectory)
             {
-                glColor3f(1, 0, 0);
-                glVertex3f(it(0, 3), it(1, 3), it(2, 3));
-                glVertex3f(it(0, 3) + it(0, 0) * 0.1, it(1, 3) + it(1, 0) * 0.1, it(2, 3) + it(2, 0) * 0.1);
+                rlColor3f(1, 0, 0);
+                rlVertex3f(it(0, 3), it(1, 3), it(2, 3));
+                rlVertex3f(it(0, 3) + it(0, 0) * 0.1, it(1, 3) + it(1, 0) * 0.1, it(2, 3) + it(2, 0) * 0.1);
 
-                glColor3f(0, 1, 0);
-                glVertex3f(it(0, 3), it(1, 3), it(2, 3));
-                glVertex3f(it(0, 3) + it(0, 1) * 0.1, it(1, 3) + it(1, 1) * 0.1, it(2, 3) + it(2, 1) * 0.1);
+                rlColor3f(0, 1, 0);
+                rlVertex3f(it(0, 3), it(1, 3), it(2, 3));
+                rlVertex3f(it(0, 3) + it(0, 1) * 0.1, it(1, 3) + it(1, 1) * 0.1, it(2, 3) + it(2, 1) * 0.1);
 
-                glColor3f(0, 0, 1);
-                glVertex3f(it(0, 3), it(1, 3), it(2, 3));
-                glVertex3f(it(0, 3) + it(0, 2) * 0.1, it(1, 3) + it(1, 2) * 0.1, it(2, 3) + it(2, 2) * 0.1);
+                rlColor3f(0, 0, 1);
+                rlVertex3f(it(0, 3), it(1, 3), it(2, 3));
+                rlVertex3f(it(0, 3) + it(0, 2) * 0.1, it(1, 3) + it(1, 2) * 0.1, it(2, 3) + it(2, 2) * 0.1);
             }
         }
-        glEnd();
+        rlEnd();
     }
 
     if (show_prediction_vectors)
     {
-        glDisable(GL_DEPTH_TEST);
-        glLineWidth(3.0f);
-        glBegin(GL_LINES);
+        // Depth test state applies when the batch is drawn, so flush around the toggle. Line widths
+        // other than 1 aren't supported by the core-profile context, so these are drawn 1 px wide.
+        rlDrawRenderBatchActive();
+        rlDisableDepthTest();
+        rlBegin(RL_LINES);
         for (const auto& wd : worker_data)
         {
             if (wd.intermediate_trajectory.empty() || wd.imu_prediction_vector.norm() < 1e-6)
@@ -2004,19 +2083,18 @@ void display()
             Eigen::Vector3d start = wd.intermediate_trajectory.front().translation();
             Eigen::Vector3d end = start + wd.imu_prediction_vector;
 
-            glColor3f(1.0f, 0.0f, 1.0f); // magenta
-            glVertex3d(start.x(), start.y(), start.z());
-            glVertex3d(end.x(), end.y(), end.z());
+            rlColor3f(1.0f, 0.0f, 1.0f); // magenta
+            rlVertex3f(start.x(), start.y(), start.z());
+            rlVertex3f(end.x(), end.y(), end.z());
         }
-        glEnd();
-        glLineWidth(1.0f);
-        glEnable(GL_DEPTH_TEST);
+        rlEnd();
+        rlDrawRenderBatchActive();
+        rlEnableDepthTest();
     }
 
     if (intermediate_trajectory_prediction_axes)
     {
-        glLineWidth(1.0f);
-        glBegin(GL_LINES);
+        rlBegin(RL_LINES);
         for (const auto& wd : worker_data)
         {
             if (wd.intermediate_trajectory.empty() || wd.intermediate_trajectory_prediction.empty())
@@ -2027,38 +2105,35 @@ void display()
                 const auto& it = wd.intermediate_trajectory[i];
                 const auto& pred_axis = wd.intermediate_trajectory_prediction[i];
 
-                glColor3f(1, 0, 0);
-                glVertex3f(it(0, 3), it(1, 3), it(2, 3));
-                glVertex3f(it(0, 3) + pred_axis(0, 0) * 0.05, it(1, 3) + pred_axis(1, 0) * 0.05, it(2, 3) + pred_axis(2, 0) * 0.05);
+                rlColor3f(1, 0, 0);
+                rlVertex3f(it(0, 3), it(1, 3), it(2, 3));
+                rlVertex3f(it(0, 3) + pred_axis(0, 0) * 0.05, it(1, 3) + pred_axis(1, 0) * 0.05, it(2, 3) + pred_axis(2, 0) * 0.05);
 
-                glColor3f(0, 1, 0);
-                glVertex3f(it(0, 3), it(1, 3), it(2, 3));
-                glVertex3f(it(0, 3) + pred_axis(0, 1) * 0.05, it(1, 3) + pred_axis(1, 1) * 0.05, it(2, 3) + pred_axis(2, 1) * 0.05);
+                rlColor3f(0, 1, 0);
+                rlVertex3f(it(0, 3), it(1, 3), it(2, 3));
+                rlVertex3f(it(0, 3) + pred_axis(0, 1) * 0.05, it(1, 3) + pred_axis(1, 1) * 0.05, it(2, 3) + pred_axis(2, 1) * 0.05);
 
-                glColor3f(0, 0, 1);
-                glVertex3f(it(0, 3), it(1, 3), it(2, 3));
-                glVertex3f(it(0, 3) + pred_axis(0, 2) * 0.05, it(1, 3) + pred_axis(1, 2) * 0.05, it(2, 3) + pred_axis(2, 2) * 0.05);
+                rlColor3f(0, 0, 1);
+                rlVertex3f(it(0, 3), it(1, 3), it(2, 3));
+                rlVertex3f(it(0, 3) + pred_axis(0, 2) * 0.05, it(1, 3) + pred_axis(1, 2) * 0.05, it(2, 3) + pred_axis(2, 2) * 0.05);
             }
         }
-        glEnd();
-        glLineWidth(1.0f);
+        rlEnd();
     }
 
     if (show_trajectory)
     {
-        glPointSize(3);
-        glColor3f(0, 1, 1);
-        glBegin(GL_POINTS);
+        color3f(0, 1, 1);
+        beginPoints(3);
         for (const auto& wd : worker_data)
         {
             for (const auto& it : wd.intermediate_trajectory)
-                glVertex3f(it(0, 3), it(1, 3), it(2, 3));
+                pointVertex3f(it(0, 3), it(1, 3), it(2, 3));
         }
-        glEnd();
-        glPointSize(1);
+        endPoints();
 
-        glColor3f(1, 0, 0);
-        glBegin(GL_LINES);
+        rlBegin(RL_LINES);
+        rlColor3f(1, 0, 0);
         if (worker_data.size() > 0)
         {
             const auto& wd = worker_data[worker_data.size() - 1];
@@ -2066,114 +2141,122 @@ void display()
             {
                 const auto& it = wd.intermediate_trajectory[wd.intermediate_trajectory.size() - 1];
 
-                glVertex3f(it(0, 3) - 1, it(1, 3), it(2, 3));
-                glVertex3f(it(0, 3) + 1, it(1, 3), it(2, 3));
+                rlVertex3f(it(0, 3) - 1, it(1, 3), it(2, 3));
+                rlVertex3f(it(0, 3) + 1, it(1, 3), it(2, 3));
 
-                glVertex3f(it(0, 3), it(1, 3) - 1, it(2, 3));
-                glVertex3f(it(0, 3), it(1, 3) + 1, it(2, 3));
+                rlVertex3f(it(0, 3), it(1, 3) - 1, it(2, 3));
+                rlVertex3f(it(0, 3), it(1, 3) + 1, it(2, 3));
 
-                glVertex3f(it(0, 3), it(1, 3), it(2, 3) - 1);
-                glVertex3f(it(0, 3), it(1, 3), it(2, 3) + 1);
+                rlVertex3f(it(0, 3), it(1, 3), it(2, 3) - 1);
+                rlVertex3f(it(0, 3), it(1, 3), it(2, 3) + 1);
             }
         }
-        glEnd();
+        rlEnd();
     }
 
     if (show_reference_buckets_indoor)
     {
         std::scoped_lock lock(params.mutex_buckets_indoor);
-        glColor3f(1, 0, 0);
-        glBegin(GL_POINTS);
+        const IntensityRange range = bucketIntensityRange(params.buckets_indoor);
+        color3f(1, 0, 0);
+        beginPoints(1);
         for (const auto& b : params.buckets_indoor)
         {
             if (b.second.number_of_points == -1)
             {
-                glColor3f(0, 1, 1);
+                color3f(0, 1, 1);
+            }
+            else if (intensity_shading)
+            {
+                color3fIntensityShaded(1, 0, 0, b.second.intensity, range);
             }
             else
             {
-                glColor3f(1, 0, 0);
+                color3f(1, 0, 0);
             }
             if (!show_without_filtered_buckets)
             {
-                glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
+                pointVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
             }
             else
             {
                 if (b.second.number_of_hits < 20)
                 {
-                    glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
+                    pointVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
                 }
             }
         }
-        glEnd();
+        endPoints();
     }
 
     if (show_reference_buckets_outdoor)
     {
         std::scoped_lock lock2(params.mutex_buckets_outdoor);
-        glColor3f(0, 0, 1);
-        glBegin(GL_POINTS);
+        const IntensityRange range = bucketIntensityRange(params.buckets_outdoor);
+        color3f(0, 0, 1);
+        beginPoints(1);
         for (const auto& b : params.buckets_outdoor)
         {
             if (b.second.number_of_points == -1)
             {
-                glColor3f(1, 0, 1);
+                color3f(1, 0, 1);
+            }
+            else if (intensity_shading)
+            {
+                color3fIntensityShaded(0, 0, 1, b.second.intensity, range);
             }
             else
             {
-                glColor3f(0, 0, 1);
+                color3f(0, 0, 1);
             }
-            // glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
+            // rlVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
             if (!show_without_filtered_buckets)
             {
-                glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
+                pointVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
             }
             else
             {
                 if (b.second.number_of_hits < 20)
                 {
-                    glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
+                    pointVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
                 }
             }
         }
-        glEnd();
+        endPoints();
     }
 
     if (show_normal_vectors_indoor)
     {
         std::scoped_lock lock2(params.mutex_buckets_indoor);
-        glColor3f(0, 0, 1);
-        glBegin(GL_LINES);
+        rlBegin(RL_LINES);
         for (const auto& b : params.buckets_indoor)
         {
-            glColor3f(fabs(b.second.normal_vector.x()), fabs(b.second.normal_vector.y()), fabs(b.second.normal_vector.z()));
+            rlColor3f(fabs(b.second.normal_vector.x()), fabs(b.second.normal_vector.y()), fabs(b.second.normal_vector.z()));
 
-            glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
-            glVertex3f(
+            rlVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
+            rlVertex3f(
                 b.second.mean.x() + b.second.normal_vector.x(),
                 b.second.mean.y() + b.second.normal_vector.y(),
                 b.second.mean.z() + b.second.normal_vector.z());
         }
-        glEnd();
+        rlEnd();
     }
 
     if (show_normal_vectors_outdoor)
     {
         std::scoped_lock lock2(params.mutex_buckets_outdoor);
-        glColor3f(0, 0, 1);
-        glBegin(GL_LINES);
+        rlBegin(RL_LINES);
         for (const auto& b : params.buckets_outdoor)
         {
-            glColor3f(fabs(b.second.normal_vector.x()), fabs(b.second.normal_vector.y()), fabs(b.second.normal_vector.z()));
+            rlColor3f(fabs(b.second.normal_vector.x()), fabs(b.second.normal_vector.y()), fabs(b.second.normal_vector.z()));
 
-            glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
-            glVertex3f(
+            rlVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
+            rlVertex3f(
                 b.second.mean.x() + b.second.normal_vector.x(),
                 b.second.mean.y() + b.second.normal_vector.y(),
                 b.second.mean.z() + b.second.normal_vector.z());
         }
-        glEnd();
+        rlEnd();
     }
 
     if (show_covs_indoor)
@@ -2195,52 +2278,81 @@ void display()
     {
         if (index_begin < worker_data.size())
         {
-            glColor3f(1, 1, 0);
-            glBegin(GL_LINES);
+            rlBegin(RL_LINES);
+            rlColor3f(1, 1, 0);
             if (worker_data[index_begin].intermediate_trajectory.size() > 0)
             {
                 auto p = worker_data[index_begin].intermediate_trajectory[0].translation();
-                glVertex3f(p.x() - 1, p.y(), p.z());
-                glVertex3f(p.x() + 1, p.y(), p.z());
+                rlVertex3f(p.x() - 1, p.y(), p.z());
+                rlVertex3f(p.x() + 1, p.y(), p.z());
 
-                glVertex3f(p.x(), p.y() - 1, p.z());
-                glVertex3f(p.x(), p.y() + 1, p.z());
+                rlVertex3f(p.x(), p.y() - 1, p.z());
+                rlVertex3f(p.x(), p.y() + 1, p.z());
 
-                glVertex3f(p.x(), p.y(), p.z() - 1);
-                glVertex3f(p.x(), p.y(), p.z() + 1);
+                rlVertex3f(p.x(), p.y(), p.z() - 1);
+                rlVertex3f(p.x(), p.y(), p.z() + 1);
             }
-            glEnd();
+            rlEnd();
         }
 
         if (index_end < worker_data.size())
         {
-            glColor3f(0, 1, 1);
-            glBegin(GL_LINES);
+            rlBegin(RL_LINES);
+            rlColor3f(0, 1, 1);
             if (worker_data[index_end].intermediate_trajectory.size() > 0)
             {
                 auto p = worker_data[index_end].intermediate_trajectory[0].translation();
-                glVertex3f(p.x() - 1, p.y(), p.z());
-                glVertex3f(p.x() + 1, p.y(), p.z());
+                rlVertex3f(p.x() - 1, p.y(), p.z());
+                rlVertex3f(p.x() + 1, p.y(), p.z());
 
-                glVertex3f(p.x(), p.y() - 1, p.z());
-                glVertex3f(p.x(), p.y() + 1, p.z());
+                rlVertex3f(p.x(), p.y() - 1, p.z());
+                rlVertex3f(p.x(), p.y() + 1, p.z());
 
-                glVertex3f(p.x(), p.y(), p.z() - 1);
-                glVertex3f(p.x(), p.y(), p.z() + 1);
+                rlVertex3f(p.x(), p.y(), p.z() - 1);
+                rlVertex3f(p.x(), p.y(), p.z() + 1);
             }
-            glEnd();
+            rlEnd();
         }
     }
 
-    ImGui_ImplOpenGL2_NewFrame();
-    ImGui_ImplGLUT_NewFrame();
-    ImGui::NewFrame();
+    rlImGuiBegin();
 
     ShowMainDockSpace();
 
     view_kbd_shortcuts();
 
-    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_O, false))
+    // Drag and drop: a Mandeye data folder, or any file in one, is processed like "Load & process scanning".
+    const auto dropped = takeDroppedFiles();
+    if (!dropped.empty() && !loRunning && pendingLoadFrames == 0)
+    {
+        fs::path folder(dropped[0]);
+        if (!fs::is_directory(folder))
+            folder = folder.parent_path();
+        openData(folder.string());
+    }
+
+    // The previous frame presented the "Loading data" modal, so it stays on screen while loading blocks.
+    if (pendingLoadFrames == 1)
+    {
+        pendingLoadFrames = 0;
+        loadData(pendingLoadFolder);
+    }
+    else if (pendingLoadFrames > 1)
+        --pendingLoadFrames;
+
+    if (pendingLoadFrames > 0 && !ImGui::IsPopupOpen("Loading data"))
+        ImGui::OpenPopup("Loading data");
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    if (ImGui::BeginPopupModal("Loading data", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        ImGui::Text("Loading data and running step 1 from folder:\n'%s'", pendingLoadFolder.c_str());
+        ImGui::TextDisabled("The window does not respond until this finishes, see console for progress.");
+        if (pendingLoadFrames == 0)
+            ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+    }
+
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_O, false) && !loRunning && pendingLoadFrames == 0)
     {
         openData();
 
@@ -2447,7 +2559,7 @@ void display()
             if (ImGui::Button("Load & process scanning"))
                 openData();
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Select folder from where to load data and start processing (Ctrl+O)");
+                ImGui::SetTooltip("Select folder from where to load data and start processing (Ctrl+O), or drop the folder on the window");
 
             ImGui::SameLine();
             ImGui::Dummy(ImVec2(20, 0));
@@ -2476,6 +2588,9 @@ void display()
                 ImGui::EndDisabled();
 
                 ImGui::MenuItem("Show initial points", nullptr, &show_initial_points);
+                ImGui::MenuItem("Intensity shading", nullptr, &intensity_shading);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Shade initial and reference points by LiDAR intensity");
                 ImGui::MenuItem("Show trajectory", nullptr, &show_trajectory);
                 ImGui::MenuItem("Show trajectory as axes", nullptr, &show_trajectory_as_axes);
                 ImGui::MenuItem("Show prediction vectors", nullptr, &show_prediction_vectors);
@@ -2535,11 +2650,11 @@ void display()
         ImGuizmo::Enable(true);
         ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
 
-        GLfloat projection[16];
-        glGetFloatv(GL_PROJECTION_MATRIX, projection);
+        float projection[16];
+        getProjectionMatrix(projection);
 
-        GLfloat modelview[16];
-        glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
+        float modelview[16];
+        getModelviewMatrix(modelview);
 
         ImGuizmo::Manipulate(
             &modelview[0],
@@ -2575,11 +2690,11 @@ void display()
         ImGuizmo::Enable(true);
         ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
 
-        GLfloat projection[16];
-        glGetFloatv(GL_PROJECTION_MATRIX, projection);
+        float projection[16];
+        getProjectionMatrix(projection);
 
-        GLfloat modelview[16];
-        glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
+        float modelview[16];
+        getModelviewMatrix(modelview);
 
         ImGuizmo::Manipulate(
             &modelview[0],
@@ -2625,14 +2740,12 @@ void display()
         info_window(infoLines, appShortcuts);
     }
 
+    end3DAndDrawLabels();
+
     if (compass_ruler)
         drawMiniCompassWithRuler();
 
-    ImGui::Render();
-    ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
-
-    glutSwapBuffers();
-    glutPostRedisplay();
+    rlImGuiEnd();
 }
 
 void on_exit()
@@ -2643,23 +2756,6 @@ void on_exit()
 void mouse(int glut_button, int state, int x, int y)
 {
     ImGuiIO& io = ImGui::GetIO();
-    io.MousePos = ImVec2((float)x, (float)y);
-
-    int button = -1;
-    if (glut_button == GLUT_LEFT_BUTTON)
-        button = 0;
-    if (glut_button == GLUT_RIGHT_BUTTON)
-        button = 1;
-    if (glut_button == GLUT_MIDDLE_BUTTON)
-        button = 2;
-    if (button != -1 && state == GLUT_DOWN)
-        io.MouseDown[button] = true;
-    if (button != -1 && state == GLUT_UP)
-        io.MouseDown[button] = false;
-
-    static int glutMajorVersion = glutGet(GLUT_VERSION) / 10000;
-    if (state == GLUT_DOWN && (glut_button == 3 || glut_button == 4) && glutMajorVersion < 3)
-        wheel(glut_button, glut_button == 3 ? 1 : -1, x, y);
 
     if (!io.WantCaptureMouse)
     {
@@ -2805,17 +2901,15 @@ int main(int argc, char* argv[])
             std::cout << argv[0] << " input_folder parameters(*.toml) output_folder" << std::endl;
 
             initGL(&argc, argv, winTitle, display, mouse);
-            glutCloseFunc(on_exit);
 
 #ifdef _WIN32
             InitTaskbarProgress();
 #endif
 
-            glutMainLoop();
+            mainLoop(confirm_close);
 
-            ImGui_ImplOpenGL2_Shutdown();
-            ImGui_ImplGLUT_Shutdown();
-            ImGui::DestroyContext();
+            shutdownGL();
+            on_exit();
         }
     } catch (const std::bad_alloc& e)
     {

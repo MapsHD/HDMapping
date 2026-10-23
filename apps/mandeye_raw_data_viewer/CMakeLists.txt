@@ -11,7 +11,6 @@ set(SOURCES
   ../lidar_odometry_step_1/lidar_odometry_utils_optimizers.cpp
   ../lidar_odometry_step_1/points_global_spill.cpp
   ../lidar_odometry_step_1/raw_cloud_loader.cpp
-    "../../core/src/utils.cpp"
 )
 
 # Windows: add resource file
@@ -23,6 +22,8 @@ add_executable(
   mandeye_raw_data_viewer ${SOURCES}
 )
 
+# raylib-based (ported off GLUT; the GLUT build is kept as apps/mandeye_raw_data_viewer_legacy):
+# <Core/raylib_utils.hpp> (core_raylib_utils) replaces <Core/utils.hpp> with the same names.
 target_include_directories(
   mandeye_raw_data_viewer
   PRIVATE include
@@ -32,11 +33,6 @@ target_include_directories(
   ${THIRDPARTY_DIRECTORY}/glm
   ${EIGEN3_INCLUDE_DIR}
   ${THIRDPARTY_DIRECTORY}/tomlplusplus/include
-  ${THIRDPARTY_DIRECTORY}/imgui
-  ${THIRDPARTY_DIRECTORY}/imgui/backends
-  ${THIRDPARTY_DIRECTORY}/ImGuizmo
-  ${THIRDPARTY_DIRECTORY}/glew-cmake/include
-  ${FREEGLUT_INCLUDE_DIR}
   ${THIRDPARTY_DIRECTORY}/json/include
   ${THIRDPARTY_DIRECTORY}/portable-file-dialogs-master
   ${LASZIP_INCLUDE_DIR}/LASzip/include
@@ -46,16 +42,16 @@ target_include_directories(
 
 target_link_libraries(
   mandeye_raw_data_viewer
-  PRIVATE vqf Fusion
+  PRIVATE
+  # core_raylib_utils brings in core_raylib (core, raylib), raylib_widgets and rlImGui.
+  core_raylib_utils
+  imgui_raylib
+  implot_raylib
+  vqf Fusion
   unordered_dense::unordered_dense
   spdlog::spdlog
   UTL::include
-  ${FREEGLUT_LIBRARY}
-  ${OPENGL_gl_LIBRARY}
-  OpenGL::GLU
   ${PLATFORM_LASZIP_LIB}
-  ${CORE_LIBRARIES}
-  ${GUI_LIBRARIES}
   ${PLATFORM_MISCELLANEOUS_LIBS}
   ${OpenCV_LIBS})
 

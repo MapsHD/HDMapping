@@ -100,6 +100,7 @@ void update_rgd_ray(
             {
                 auto& this_bucket = bucket_it->second;
                 this_bucket.number_of_points++;
+                this_bucket.intensity += (points_global[i].intensity - this_bucket.intensity) / this_bucket.number_of_points;
                 const auto& curr_mean = points_global[i].point;
                 const auto& mean = this_bucket.mean;
                 // buckets[index_of_bucket].mean += (mean - curr_mean) / buckets[index_of_bucket].number_of_points;
@@ -165,6 +166,7 @@ void update_rgd_ray(
             bucket_to_add.cov = Eigen::Matrix3d::Identity() * 0.03 * 0.03; // ToDo move to params
             bucket_to_add.cov_inverse = bucket_to_add.cov.inverse();
             bucket_to_add.number_of_points = 1;
+            bucket_to_add.intensity = points_global[i].intensity;
             buckets.emplace(index_of_bucket, bucket_to_add);
 
             /*Eigen::Vector3d direction = points_global[i].point - viewport;
@@ -296,6 +298,7 @@ void update_rgd_spherical_coordinates(
         {
             auto& this_bucket = bucket_it->second;
             this_bucket.number_of_points++;
+            this_bucket.intensity += (points_global[i].intensity - this_bucket.intensity) / this_bucket.number_of_points;
             const auto& curr_mean = points_global[i].point;
             const auto& mean = this_bucket.mean;
             // buckets[index_of_bucket].mean += (mean - curr_mean) / buckets[index_of_bucket].number_of_points;
@@ -359,6 +362,7 @@ void update_rgd_spherical_coordinates(
             bucket_to_add.cov = Eigen::Matrix3d::Identity() * 0.03 * 0.03;
             bucket_to_add.cov_inverse = bucket_to_add.cov.inverse();
             bucket_to_add.number_of_points = 1;
+            bucket_to_add.intensity = points_global[i].intensity;
             buckets.emplace(index_of_bucket, bucket_to_add);
         }
     }

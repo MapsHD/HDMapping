@@ -41,7 +41,9 @@ target_include_directories(
 target_link_libraries(
   multi_session_registration_step_3
   # PRIVATE ${THIRDPARTY_DIRECTORY}/glew-2.2.0/lib/Release/x64/glew32s.lib
-  # raylib-based like step 2; core_raylib brings in core, raylib and ScanRenderer.
+  # raylib-based like step 2; core_raylib brings in core, raylib and ScanRenderer, core_raylib_utils the
+  # shared raylib replacement for <Core/utils.hpp>.
+  core_raylib_utils
   core_raylib
   raylib_widgets
   imgui_raylib

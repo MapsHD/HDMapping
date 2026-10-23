@@ -482,13 +482,15 @@ bool process_worker_step_update_rgd_after(
     LookupStats& lookup_stats,
     std::vector<Point3Di>& intermediate_points);
 
+// parked is true while the run waits on pause between workers: it then touches no file until resumed
 bool compute_step_2(
     std::vector<WorkerData>& worker_data,
     LidarOdometryParams& params,
     double& ts_failure,
     std::atomic<float>& loProgress,
     const std::atomic<bool>& pause,
-    bool debugMsg);
+    bool debugMsg,
+    std::atomic<bool>& parked);
 
 // for reconstructing worker data from step 1 output
 bool loadLaz(

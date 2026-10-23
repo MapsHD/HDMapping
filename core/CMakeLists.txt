@@ -178,3 +178,23 @@ target_include_directories(core_raylib PRIVATE
 # CMake's static-library dependency reordering sort libglut.so before
 # libcore.a, leaving those symbols unresolved.
 target_link_libraries(core_raylib PUBLIC core raylib ${FREEGLUT_LIBRARY})
+# ============================================================================
+# core_raylib_utils -- raylib replacement for the camera/input/immediate-mode
+# parts of core/src/utils.cpp (<Core/raylib_utils.hpp>: same names as
+# <Core/utils.hpp>, camera state in raylib_widgets::OrbitCamera), shared by the
+# raylib-based apps that were ported off GLUT with their code otherwise kept
+# as-is (lidar_odometry_step_1, mandeye_raw_data_viewer, step 3). Separate
+# from core_raylib because it needs ImGui (rlImGui, raylib_widgets), which
+# core_raylib deliberately doesn't depend on.
+# ============================================================================
+add_library(core_raylib_utils STATIC src/raylib_utils.cpp src/raylib_taskbar_win.cpp)
+target_compile_definitions(core_raylib_utils PRIVATE WITH_GUI=1)
+target_include_directories(core_raylib_utils PRIVATE
+    include
+    ${EIGEN3_INCLUDE_DIR}
+    ${LASZIP_INCLUDE_DIR}/LASzip/include
+    ${THIRDPARTY_DIRECTORY}/json/include
+    ${THIRDPARTY_DIRECTORY}/observation_equations/codes
+    ${EXTERNAL_LIBRARIES_DIRECTORY}/include
+)
+target_link_libraries(core_raylib_utils PUBLIC core_raylib raylib_widgets rlimgui imgui_raylib)

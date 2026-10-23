@@ -147,9 +147,13 @@ message(STATUS "Using bundled Xerces-C + libE57Format (static) for E57 support")
 # ============================================================================
 
 # OpenCV - Computer vision library
-include(${THIRDPARTY_DIRECTORY_BINARY}/OpenCV/CMakeLists.txt)
-find_package(OpenCV REQUIRED)
-message(STATUS "OpenCV include dir: ${OpenCV_INCLUDE_DIRS}, OpenCV libs: ${OpenCV_LIBS}")
+# Only the camera/raw-viewer apps link it, and HDMAPPING_EASY_GUI_ONLY never configures those, so that build skips
+# it: no Homebrew OpenCV on macOS (built for the runner's macOS version), no ~200 MB download on Windows.
+if(NOT HDMAPPING_EASY_GUI_ONLY)
+    include(${THIRDPARTY_DIRECTORY_BINARY}/OpenCV/CMakeLists.txt)
+    find_package(OpenCV REQUIRED)
+    message(STATUS "OpenCV include dir: ${OpenCV_INCLUDE_DIRS}, OpenCV libs: ${OpenCV_LIBS}")
+endif()
 
 # PROJ - Cartographic projections library
 include(${THIRDPARTY_DIRECTORY_BINARY}/Proj/CMakeLists.txt)

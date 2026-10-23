@@ -1,0 +1,137 @@
+# Easy Forest HDMapping release build for macOS (Apple silicon, macOS 13.0 and newer).
+# Separate from the upstream macos.yml: builds only easy_gui + lidar_odometry_step_1 (HDMAPPING_EASY_GUI_ONLY) and
+# packages them as "Easy Forest HDMapping.app" in a DMG. The packaging steps are scripts in
+# apps/easy_gui/packaging/macos, so they can be run and debugged locally the same way.
+name: Easy Forest HDMapping macOS
+
+on:
+  push:
+    tags: ["easy-forest-v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write # attach the DMG to the release on a tag
+
+env:
+  MIN_MACOS: "13.0"
+  # Picked up by every CMake project (PROJ, the FetchContent raylib) and by clang directly.
+  MACOSX_DEPLOYMENT_TARGET: "13.0"
+
+jobs:
+  build:
+    runs-on: macos-15
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/easy-forest-v* ]]; then
+            echo "VERSION=${GITHUB_REF_NAME#easy-forest-v}" >> "$GITHUB_ENV"
+            # The app shows EASY_FOREST_VERSION from CMake; it must be the tag's version.
+            cmake_version=$(sed -n 's/^set(EASY_FOREST_VERSION "\(.*\)")$/\1/p' apps/easy_gui/CMakeLists.txt)
+            if [[ "$cmake_version" != "${GITHUB_REF_NAME#easy-forest-v}" ]]; then
+              echo "::error::Tag $GITHUB_REF_NAME does not match EASY_FOREST_VERSION $cmake_version in apps/easy_gui/CMakeLists.txt"
+              exit 1
+            fi
+          else
+            echo "VERSION=$(git describe --tags --always)" >> "$GITHUB_ENV"
+          fi
+
+      - uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: "~4.0.0"
+
+      # Homebrew's PROJ is built for the runner's macOS; build a static one for MIN_MACOS instead (see the script).
+      - name: Cache PROJ
+        id: proj-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/proj-install
+          key: proj-macos-${{ env.MIN_MACOS }}-${{ runner.arch }}-${{ hashFiles('apps/easy_gui/packaging/macos/build_proj.sh') }}
+
+      - name: Build PROJ
+        if: steps.proj-cache.outputs.cache-hit != 'true'
+        run: apps/easy_gui/packaging/macos/build_proj.sh "$RUNNER_TEMP/proj-install" "$RUNNER_TEMP/proj-work"
+
+      # TBB_DISABLE_HWLOC_AUTOMATIC_SEARCH: the bundled oneTBB would otherwise pick up a Homebrew hwloc for tbbbind.
+      - name: Configure
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET="$MIN_MACOS" \
+            -DHDMAPPING_EASY_GUI_ONLY=ON \
+            -DBUILD_TESTING=ON \
+            -DFREEGLUT_COCOA=ON \
+            -DHD_CPU_OPTIMIZATION=ARM \
+            -DTBB_DISABLE_HWLOC_AUTOMATIC_SEARCH=ON \
+            -DPROJ_DIR="$RUNNER_TEMP/proj-install/lib/cmake/proj"
+
+      # A static library built for a newer macOS only shows up as a linker warning (the executables still say
+      # minos 13.0), so treat that warning as an error.
+      - name: Build
+        run: |
+          set -o pipefail
+          cmake --build build --config Release -j"$(sysctl -n hw.ncpu)" 2>&1 | tee build.log
+          if grep -i "built for newer macOS version" build.log; then
+            echo "::error::Something was linked that was built for a newer macOS than $MIN_MACOS"
+            exit 1
+          fi
+
+      - name: Test
+        working-directory: build
+        run: ctest -C Release --output-on-failure
+
+      # Also checks minos <= MIN_MACOS for every bundled binary and fails otherwise.
+      - name: Create app bundle
+        run: python3 apps/easy_gui/packaging/macos/make_app.py build/bin dist --version "$VERSION" --min-macos "$MIN_MACOS"
+
+      - name: Smoke test the bundle
+        run: |
+          set +e
+          "dist/Easy Forest HDMapping.app/Contents/MacOS/easy_gui" --headless > usage.txt 2>&1
+          rc=$?
+          set -e
+          cat usage.txt
+          # Exit code 2 + usage text = dyld loaded every bundled library and main() ran.
+          test "$rc" -eq 2 && grep -q "usage:" usage.txt
+
+      - name: Create DMG
+        run: apps/easy_gui/packaging/macos/make_dmg.sh "dist/Easy Forest HDMapping.app" dist/EasyForestHDMapping-mac.dmg
+
+      - name: Sizes
+        run: |
+          {
+            echo "### Easy Forest HDMapping macOS $VERSION"
+            echo '```'
+            ls -l dist/EasyForestHDMapping-mac.dmg
+            du -sh "dist/Easy Forest HDMapping.app"
+            find "dist/Easy Forest HDMapping.app/Contents" -type f -exec ls -l {} \; | awk '{printf "%10d  %s\n", $5, substr($0, index($0, $9))}'
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EasyForestHDMapping-mac-${{ env.VERSION }}
+          path: dist/EasyForestHDMapping-mac.dmg
+          compression-level: 0 # already compressed
+          retention-days: 90
+
+      # The macOS and Windows workflows both run on the same tag: whichever gets here first creates the release.
+      # 0.x versions and versions with a suffix (0.2.0-rc1) are pre-releases. Created with GITHUB_TOKEN, so the
+      # release does not trigger other workflows (upstream windows.yml runs on release: published).
+      - name: Attach to GitHub release
+        if: startsWith(github.ref, 'refs/tags/easy-forest-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PRERELEASE=""
+          if [[ "$VERSION" == 0.* || "$VERSION" == *-* ]]; then PRERELEASE="--prerelease"; fi
+          gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1 \
+            || gh release create "$GITHUB_REF_NAME" --verify-tag --title "Easy Forest HDMapping $VERSION" $PRERELEASE \
+                 --notes "Installation and use: [apps/easy_gui/README.md](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/apps/easy_gui/README.md)" \
+            || gh release view "$GITHUB_REF_NAME" > /dev/null
+          gh release upload "$GITHUB_REF_NAME" dist/EasyForestHDMapping-mac.dmg --clobber

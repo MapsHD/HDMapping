@@ -6,6 +6,7 @@
 
 #include <Core/system_info.hpp>
 #include <Fusion.h>
+#include <HDMapping/SessionPaths.h>
 #if defined(__GLIBC__)
 #include <malloc.h>
 #endif
@@ -1090,22 +1091,25 @@ void save_result(std::vector<WorkerData>& worker_data, LidarOdometryParams& para
     nlohmann::json jj;
     nlohmann::json j;
 
+    // Paths are stored relative to the session file, so the result folder can be moved
+    const std::string session_file = path3.string();
+
     j["offset_x"] = 0.0;
     j["offset_y"] = 0.0;
     j["offset_z"] = 0.0;
-    j["folder_name"] = outwd;
-    j["out_folder_name"] = outwd;
-    j["poses_file_name"] = path2.string();
-    j["initial_poses_file_name"] = path.string();
-    j["out_poses_file_name"] = path2.string();
+    j["folder_name"] = toSessionPath(outwd.string(), session_file);
+    j["out_folder_name"] = toSessionPath(outwd.string(), session_file);
+    j["poses_file_name"] = toSessionPath(path2.string(), session_file);
+    j["initial_poses_file_name"] = toSessionPath(path.string(), session_file);
+    j["out_poses_file_name"] = toSessionPath(path2.string(), session_file);
     j["lidar_odometry_version"] = HDMAPPING_CONFIGURE_PROJECT_VERSION;
     j["length of trajectory[m]"] = params.total_length_of_calculated_trajectory;
     j["elapsed time seconds"] = elapsed_time_s;
     if (params.save_index_pose)
     {
-        j["index_poses_path"] = index_poses_path.string();
+        j["index_poses_path"] = toSessionPath(index_poses_path.string(), session_file);
     }
-    j["point_sizes_path"] = point_sizes_path.string();
+    j["point_sizes_path"] = toSessionPath(point_sizes_path.string(), session_file);
     j["decimation"] = params.decimation;
     j["threshold_nr_poses"] = params.threshold_nr_poses;
 
@@ -1119,7 +1123,7 @@ void save_result(std::vector<WorkerData>& worker_data, LidarOdometryParams& para
         path /= filename;
         std::cout << "adding file: " << path << std::endl;
 
-        nlohmann::json jfn{ { "file_name", path.string() } };
+        nlohmann::json jfn{ { "file_name", toSessionPath(path.string(), session_file) } };
         jlaz_file_names.push_back(jfn);
     }
     jj["laz_file_names"] = jlaz_file_names;

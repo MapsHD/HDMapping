@@ -386,11 +386,11 @@ bool Session::save(
     j["offset_to_apply_x"] = point_clouds_container.offset_to_apply.x();
     j["offset_to_apply_y"] = point_clouds_container.offset_to_apply.y();
     j["offset_to_apply_z"] = point_clouds_container.offset_to_apply.z();
-    j["folder_name"] = point_clouds_container.folder_name;
-    j["out_folder_name"] = point_clouds_container.out_folder_name;
-    j["poses_file_name"] = poses_file_name; // point_clouds_container.poses_file_name;
-    j["initial_poses_file_name"] = initial_poses_file_name; // point_clouds_container.initial_poses_file_name;
-    j["out_poses_file_name"] = point_clouds_container.out_poses_file_name;
+    j["folder_name"] = toSessionPath(point_clouds_container.folder_name, file_name);
+    j["out_folder_name"] = toSessionPath(point_clouds_container.out_folder_name, file_name);
+    j["poses_file_name"] = toSessionPath(poses_file_name, file_name); // point_clouds_container.poses_file_name;
+    j["initial_poses_file_name"] = toSessionPath(initial_poses_file_name, file_name); // point_clouds_container.initial_poses_file_name;
+    j["out_poses_file_name"] = toSessionPath(point_clouds_container.out_poses_file_name, file_name);
     j["ground_truth"] = is_ground_truth;
     j["exporting_software_version"] = HDMAPPING_CONFIGURE_PROJECT_VERSION;
     jj["Session Settings"] = j;
@@ -432,19 +432,27 @@ bool Session::save(
         {
             if (pc.visible)
             {
-                nlohmann::json jfn{ { "file_name", pc.file_name }, { "fuse_inclination_from_IMU", pc.fuse_inclination_from_IMU },
-                                    { "fixed_x", pc.fixed_x },     { "fixed_y", pc.fixed_y },
-                                    { "fixed_z", pc.fixed_z },     { "fixed_om", pc.fixed_om },
-                                    { "fixed_fi", pc.fixed_fi },   { "fixed_ka", pc.fixed_ka } };
+                nlohmann::json jfn{ { "file_name", toSessionPath(pc.file_name, file_name) },
+                                    { "fuse_inclination_from_IMU", pc.fuse_inclination_from_IMU },
+                                    { "fixed_x", pc.fixed_x },
+                                    { "fixed_y", pc.fixed_y },
+                                    { "fixed_z", pc.fixed_z },
+                                    { "fixed_om", pc.fixed_om },
+                                    { "fixed_fi", pc.fixed_fi },
+                                    { "fixed_ka", pc.fixed_ka } };
                 jlaz_file_names.push_back(jfn);
             }
         }
         else
         {
-            nlohmann::json jfn{ { "file_name", pc.file_name }, { "fuse_inclination_from_IMU", pc.fuse_inclination_from_IMU },
-                                { "fixed_x", pc.fixed_x },     { "fixed_y", pc.fixed_y },
-                                { "fixed_z", pc.fixed_z },     { "fixed_om", pc.fixed_om },
-                                { "fixed_fi", pc.fixed_fi },   { "fixed_ka", pc.fixed_ka } };
+            nlohmann::json jfn{ { "file_name", toSessionPath(pc.file_name, file_name) },
+                                { "fuse_inclination_from_IMU", pc.fuse_inclination_from_IMU },
+                                { "fixed_x", pc.fixed_x },
+                                { "fixed_y", pc.fixed_y },
+                                { "fixed_z", pc.fixed_z },
+                                { "fixed_om", pc.fixed_om },
+                                { "fixed_fi", pc.fixed_fi },
+                                { "fixed_ka", pc.fixed_ka } };
             jlaz_file_names.push_back(jfn);
         }
     }

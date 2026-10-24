@@ -1,4 +1,5 @@
 #include <RaylibWidgets/CompassRuler.h>
+
 #include "raymath.h"
 
 #include <algorithm>

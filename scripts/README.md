@@ -3,7 +3,6 @@
 * `run_clang_format.py` — runs `clang-format` on all C/C++ source and header files located in:
 
   * `core`
-  * `core_hd_mapping`
   * `apps`
   * `pybind`
   * `shared`

@@ -6,7 +6,12 @@
 namespace raylib_widgets
 {
     bool pickNearestPoint(
-        const Vector3* points, size_t count, const Ray& ray, float cameraFovYDeg, float viewportHeightPx, float pixelThreshold,
+        const Vector3* points,
+        size_t count,
+        const Ray& ray,
+        float cameraFovYDeg,
+        float viewportHeightPx,
+        float pixelThreshold,
         size_t& outIndex)
     {
         if (points == nullptr || count == 0 || viewportHeightPx <= 0.f)

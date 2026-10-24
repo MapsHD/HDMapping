@@ -9,7 +9,8 @@ PROJECT_DIRECTORY = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
 FILE_LOCATIONS = [os.path.join(PROJECT_DIRECTORY, 'core'),
                   os.path.join(PROJECT_DIRECTORY, 'apps'),
                   os.path.join(PROJECT_DIRECTORY, 'pybind'),
-                  os.path.join(PROJECT_DIRECTORY, 'shared')]
+                  os.path.join(PROJECT_DIRECTORY, 'shared'),
+                  os.path.join(PROJECT_DIRECTORY, 'raylib_widgets')]
 
 FILE_EXTENSIONS = ['.cpp',
                    '.hpp',

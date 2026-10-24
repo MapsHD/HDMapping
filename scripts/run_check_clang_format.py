@@ -12,6 +12,7 @@ FILE_LOCATIONS = [
     os.path.join(PROJECT_DIRECTORY, "apps"),
     os.path.join(PROJECT_DIRECTORY, "pybind"),
     os.path.join(PROJECT_DIRECTORY, "shared"),
+    os.path.join(PROJECT_DIRECTORY, "raylib_widgets"),
 ]
 
 FILE_EXTENSIONS = [

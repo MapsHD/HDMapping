@@ -6,6 +6,7 @@
   * `apps`
   * `pybind`
   * `shared`
+  * `raylib_widgets`
 
 * `run_check_clang_format.py` — checks whether running `clang-format` would modify any tracked project files. The script runs `run_clang_format.py` and then checks the Git working tree for changes. If formatting would produce changes, the check fails and lists the affected files.
 

@@ -5,6 +5,7 @@
 #include <nlohmann/json.hpp>
 
 #include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
+#include <HDMapping/SessionPaths.h>
 
 namespace fs = std::filesystem;
 
@@ -97,29 +98,10 @@ bool Session::load(const std::string& file_name, bool is_decimate, double bucket
     std::vector<bool> vfixed_fi;
     std::vector<bool> vfixed_ka;
 
-    // Get a loaded file directory
-    std::string directory = fs::path(file_name).parent_path().string();
-
-    // Local pathUpdater lambda (keep directories unchanged, update files to be in session directory)
+    // Stored paths are relative to the session file (absolute in older sessions)
     auto getNewPath = [&](const std::string& path) -> std::string
     {
-        // Normalize Windows backslashes to forward slashes so that
-        // std::filesystem::path correctly extracts the filename on Linux.
-        std::string normalized = path;
-        std::replace(normalized.begin(), normalized.end(), '\\', '/');
-        fs::path p(normalized);
-        if (is_directory(p))
-            return p.string();
-        // Prefer the stored path when it still resolves: this keeps sessions
-        // working when they were saved to a directory other than the one that
-        // holds the referenced .laz/.csv files (e.g. session file one level up
-        // from a lio_result_* folder). Only when the stored path is gone do we
-        // fall back to a file of the same name sitting next to the session file
-        // (the "session + data moved together" case).
-        std::error_code ec;
-        if (fs::exists(p, ec))
-            return p.string();
-        return (fs::path(directory) / p.filename()).string();
+        return resolveSessionPath(path, file_name);
     };
 
     try

@@ -3,10 +3,10 @@
 * `run_clang_format.py` — runs `clang-format` on all C/C++ source and header files located in:
 
   * `core`
-  * `core_hd_mapping`
   * `apps`
   * `pybind`
   * `shared`
+  * `raylib_widgets`
 
 * `run_check_clang_format.py` — checks whether running `clang-format` would modify any tracked project files. The script runs `run_clang_format.py` and then checks the Git working tree for changes. If formatting would produce changes, the check fails and lists the affected files.
 

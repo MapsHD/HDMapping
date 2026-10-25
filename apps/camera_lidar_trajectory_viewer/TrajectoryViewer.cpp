@@ -768,8 +768,9 @@ static fs::path resolveMjs(const fs::path& p, std::string& err)
     return {};
 }
 
-//! Read the manifest's poses and chunk list. A stored path that no longer exists
-//! falls back to the same file name next to the manifest, as Session::load does.
+//! Read the manifest's poses and chunk list. Relative paths are relative to the
+//! manifest; a stored path that no longer exists falls back to the same file name
+//! next to the manifest, as Session::load does.
 static bool readSessionFiles(const fs::path& mjs, SessionFiles& out, std::string& err)
 {
     out = SessionFiles{};
@@ -778,6 +779,8 @@ static bool readSessionFiles(const fs::path& mjs, SessionFiles& out, std::string
     {
         std::replace(path.begin(), path.end(), '\\', '/');
         fs::path p(path);
+        if (!path.empty() && p.is_relative())
+            p = mjs.parent_path() / p;
         std::error_code ec;
         if (path.empty() || fs::exists(p, ec))
             return p;

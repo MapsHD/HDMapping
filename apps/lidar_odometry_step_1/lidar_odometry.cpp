@@ -1093,19 +1093,19 @@ void save_result(std::vector<WorkerData>& worker_data, LidarOdometryParams& para
     j["offset_x"] = 0.0;
     j["offset_y"] = 0.0;
     j["offset_z"] = 0.0;
-    j["folder_name"] = outwd;
-    j["out_folder_name"] = outwd;
-    j["poses_file_name"] = path2.string();
-    j["initial_poses_file_name"] = path.string();
-    j["out_poses_file_name"] = path2.string();
+    j["folder_name"] = Session::resolve_session_path(outwd.string(), path3.string());
+    j["out_folder_name"] = Session::resolve_session_path(outwd.string(), path3.string());
+    j["poses_file_name"] = Session::resolve_session_path(path2.string(), path3.string());
+    j["initial_poses_file_name"] = Session::resolve_session_path(path.string(), path3.string());
+    j["out_poses_file_name"] = Session::resolve_session_path(path2.string(), path3.string());
     j["lidar_odometry_version"] = HDMAPPING_CONFIGURE_PROJECT_VERSION;
     j["length of trajectory[m]"] = params.total_length_of_calculated_trajectory;
     j["elapsed time seconds"] = elapsed_time_s;
     if (params.save_index_pose)
     {
-        j["index_poses_path"] = index_poses_path.string();
+        j["index_poses_path"] = Session::resolve_session_path(index_poses_path.string(), path3.string());
     }
-    j["point_sizes_path"] = point_sizes_path.string();
+    j["point_sizes_path"] = Session::resolve_session_path(point_sizes_path.string(), path3.string());
     j["decimation"] = params.decimation;
     j["threshold_nr_poses"] = params.threshold_nr_poses;
 
@@ -1119,7 +1119,7 @@ void save_result(std::vector<WorkerData>& worker_data, LidarOdometryParams& para
         path /= filename;
         std::cout << "adding file: " << path << std::endl;
 
-        nlohmann::json jfn{ { "file_name", path.string() } };
+        nlohmann::json jfn{ { "file_name", Session::resolve_session_path(path.string(), path3.string()) } };
         jlaz_file_names.push_back(jfn);
     }
     jj["laz_file_names"] = jlaz_file_names;

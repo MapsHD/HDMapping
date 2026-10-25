@@ -36,6 +36,15 @@ public:
     bool load_from_point_cloud(
         const std::string& file_name, bool is_decimate, double bucket_x, double bucket_y, double bucket_z, bool calculate_offset);
     static bool is_point_cloud_file(const std::string& file_name);
+    /**
+     * @brief Converts a path to the form stored in a session file: relative to the session .mjs directory.
+     * @param path Absolute path, or relative to the current working directory.
+     * @param session_file_name Path of the session .mjs the result will be stored in.
+     * @return Path relative to the .mjs directory with '/' separators, the absolute path when no relative one exists
+     *         (e.g. another drive on Windows), or an empty string for an empty path.
+     * @note load() accepts both these relative paths and the absolute paths of older sessions.
+     */
+    static std::string resolve_session_path(const std::string& path, const std::string& session_file_name);
     bool save(
         const std::string& file_name, const std::string& poses_file_name, const std::string& initial_poses_file_name, bool is_subsession);
     void fill_session_from_worker_data(

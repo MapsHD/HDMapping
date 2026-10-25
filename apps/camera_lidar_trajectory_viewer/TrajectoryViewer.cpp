@@ -14,6 +14,7 @@
 #include <Core/pfd_wrapper.hpp>
 #include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
 #include <HDMapping/PoseInterpolation.h>
+#include <HDMapping/SessionPaths.h>
 #include <RaylibWidgets/CenterOfRotationWindow.h>
 #include <RaylibWidgets/CompassRuler.h>
 #include <RaylibWidgets/OrbitCamera.h>
@@ -768,20 +769,15 @@ static fs::path resolveMjs(const fs::path& p, std::string& err)
     return {};
 }
 
-//! Read the manifest's poses and chunk list. A stored path that no longer exists
-//! falls back to the same file name next to the manifest, as Session::load does.
+//! Read the manifest's poses and chunk list. Stored paths resolve as in
+//! Session::load (see HDMapping/SessionPaths.h).
 static bool readSessionFiles(const fs::path& mjs, SessionFiles& out, std::string& err)
 {
     out = SessionFiles{};
     out.mjs = mjs;
-    auto relocate = [&](std::string path) -> fs::path
+    auto relocate = [&](const std::string& path) -> fs::path
     {
-        std::replace(path.begin(), path.end(), '\\', '/');
-        fs::path p(path);
-        std::error_code ec;
-        if (path.empty() || fs::exists(p, ec))
-            return p;
-        return mjs.parent_path() / p.filename();
+        return path.empty() ? fs::path() : fs::path(resolveSessionPath(path, mjs.string()));
     };
     try
     {

@@ -5,6 +5,7 @@
 #include <nlohmann/json.hpp>
 
 #include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
+#include <HDMapping/SessionPaths.h>
 
 namespace fs = std::filesystem;
 
@@ -97,29 +98,10 @@ bool Session::load(const std::string& file_name, bool is_decimate, double bucket
     std::vector<bool> vfixed_fi;
     std::vector<bool> vfixed_ka;
 
-    // Get a loaded file directory
-    std::string directory = fs::path(file_name).parent_path().string();
-
-    // Local pathUpdater lambda (keep directories unchanged, update files to be in session directory)
+    // Stored paths are relative to the session file (absolute in older sessions)
     auto getNewPath = [&](const std::string& path) -> std::string
     {
-        // Normalize Windows backslashes to forward slashes so that
-        // std::filesystem::path correctly extracts the filename on Linux.
-        std::string normalized = path;
-        std::replace(normalized.begin(), normalized.end(), '\\', '/');
-        fs::path p(normalized);
-        if (is_directory(p))
-            return p.string();
-        // Prefer the stored path when it still resolves: this keeps sessions
-        // working when they were saved to a directory other than the one that
-        // holds the referenced .laz/.csv files (e.g. session file one level up
-        // from a lio_result_* folder). Only when the stored path is gone do we
-        // fall back to a file of the same name sitting next to the session file
-        // (the "session + data moved together" case).
-        std::error_code ec;
-        if (fs::exists(p, ec))
-            return p.string();
-        return (fs::path(directory) / p.filename()).string();
+        return resolveSessionPath(path, file_name);
     };
 
     try
@@ -404,11 +386,11 @@ bool Session::save(
     j["offset_to_apply_x"] = point_clouds_container.offset_to_apply.x();
     j["offset_to_apply_y"] = point_clouds_container.offset_to_apply.y();
     j["offset_to_apply_z"] = point_clouds_container.offset_to_apply.z();
-    j["folder_name"] = point_clouds_container.folder_name;
-    j["out_folder_name"] = point_clouds_container.out_folder_name;
-    j["poses_file_name"] = poses_file_name; // point_clouds_container.poses_file_name;
-    j["initial_poses_file_name"] = initial_poses_file_name; // point_clouds_container.initial_poses_file_name;
-    j["out_poses_file_name"] = point_clouds_container.out_poses_file_name;
+    j["folder_name"] = toSessionPath(point_clouds_container.folder_name, file_name);
+    j["out_folder_name"] = toSessionPath(point_clouds_container.out_folder_name, file_name);
+    j["poses_file_name"] = toSessionPath(poses_file_name, file_name); // point_clouds_container.poses_file_name;
+    j["initial_poses_file_name"] = toSessionPath(initial_poses_file_name, file_name); // point_clouds_container.initial_poses_file_name;
+    j["out_poses_file_name"] = toSessionPath(point_clouds_container.out_poses_file_name, file_name);
     j["ground_truth"] = is_ground_truth;
     j["exporting_software_version"] = HDMAPPING_CONFIGURE_PROJECT_VERSION;
     jj["Session Settings"] = j;
@@ -450,19 +432,27 @@ bool Session::save(
         {
             if (pc.visible)
             {
-                nlohmann::json jfn{ { "file_name", pc.file_name }, { "fuse_inclination_from_IMU", pc.fuse_inclination_from_IMU },
-                                    { "fixed_x", pc.fixed_x },     { "fixed_y", pc.fixed_y },
-                                    { "fixed_z", pc.fixed_z },     { "fixed_om", pc.fixed_om },
-                                    { "fixed_fi", pc.fixed_fi },   { "fixed_ka", pc.fixed_ka } };
+                nlohmann::json jfn{ { "file_name", toSessionPath(pc.file_name, file_name) },
+                                    { "fuse_inclination_from_IMU", pc.fuse_inclination_from_IMU },
+                                    { "fixed_x", pc.fixed_x },
+                                    { "fixed_y", pc.fixed_y },
+                                    { "fixed_z", pc.fixed_z },
+                                    { "fixed_om", pc.fixed_om },
+                                    { "fixed_fi", pc.fixed_fi },
+                                    { "fixed_ka", pc.fixed_ka } };
                 jlaz_file_names.push_back(jfn);
             }
         }
         else
         {
-            nlohmann::json jfn{ { "file_name", pc.file_name }, { "fuse_inclination_from_IMU", pc.fuse_inclination_from_IMU },
-                                { "fixed_x", pc.fixed_x },     { "fixed_y", pc.fixed_y },
-                                { "fixed_z", pc.fixed_z },     { "fixed_om", pc.fixed_om },
-                                { "fixed_fi", pc.fixed_fi },   { "fixed_ka", pc.fixed_ka } };
+            nlohmann::json jfn{ { "file_name", toSessionPath(pc.file_name, file_name) },
+                                { "fuse_inclination_from_IMU", pc.fuse_inclination_from_IMU },
+                                { "fixed_x", pc.fixed_x },
+                                { "fixed_y", pc.fixed_y },
+                                { "fixed_z", pc.fixed_z },
+                                { "fixed_om", pc.fixed_om },
+                                { "fixed_fi", pc.fixed_fi },
+                                { "fixed_ka", pc.fixed_ka } };
             jlaz_file_names.push_back(jfn);
         }
     }

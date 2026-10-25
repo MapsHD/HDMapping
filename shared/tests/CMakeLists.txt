@@ -11,6 +11,7 @@ project(hdmapping_shared_tests)
 # noticeably to build time.
 add_executable(hdmapping_shared_tests
     test_pose_interpolation.cpp
+    test_session_paths.cpp
 )
 
 target_include_directories(hdmapping_shared_tests PRIVATE

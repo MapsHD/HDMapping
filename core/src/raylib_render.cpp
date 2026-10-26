@@ -60,6 +60,8 @@ void ScanRenderer::init()
         locYzOn_ = rlGetLocationUniform(shader_.id, "yzOn");
         locXyOn_ = rlGetLocationUniform(shader_.id, "xyOn");
         locIntersectionWidth_ = rlGetLocationUniform(shader_.id, "intersectionWidth");
+        locClipPlaneCount_ = rlGetLocationUniform(shader_.id, "clipPlaneCount");
+        locClipPlanes_ = rlGetLocationUniform(shader_.id, "clipPlanes");
     }
     else
     {
@@ -254,6 +256,10 @@ void ScanRenderer::draw(
     rlSetUniform(locXyOn_, &xyOnInt, RL_SHADER_UNIFORM_INT, 1);
     rlSetUniform(locIntersectionWidth_, &intersectionWidth, RL_SHADER_UNIFORM_FLOAT, 1);
 
+    rlSetUniform(locClipPlaneCount_, &clipPlaneCount_, RL_SHADER_UNIFORM_INT, 1);
+    if (clipPlaneCount_ > 0)
+        rlSetUniform(locClipPlanes_, clipPlanes_, RL_SHADER_UNIFORM_VEC4, clipPlaneCount_);
+
     // decimateStride > 1 skips points by widening the vertex attribute
     // stride the GPU fetches from (e.g. stride=10 reads every 10th vertex),
     // rather than by re-uploading a thinned-out buffer -- so it's a pure
@@ -336,6 +342,14 @@ void ScanRenderer::draw(
     }
 
     rlDisableShader();
+}
+
+void ScanRenderer::setClipPlanes(const Eigen::Vector4d* planes, int count)
+{
+    clipPlaneCount_ = std::clamp(count, 0, kMaxClipPlanes);
+    for (int i = 0; i < clipPlaneCount_; ++i)
+        for (int k = 0; k < 4; ++k)
+            clipPlanes_[i * 4 + k] = static_cast<float>(planes[i][k]);
 }
 
 void ScanRenderer::setMarkColor(size_t index, Color color)
@@ -454,6 +468,8 @@ void ScanRenderer::drawCachedWithTransform(
     rlSetUniform(locYzOn_, &yzOnInt, RL_SHADER_UNIFORM_INT, 1);
     rlSetUniform(locXyOn_, &xyOnInt, RL_SHADER_UNIFORM_INT, 1);
     rlSetUniform(locIntersectionWidth_, &intersectionWidth, RL_SHADER_UNIFORM_FLOAT, 1);
+    int clipOff = 0;
+    rlSetUniform(locClipPlaneCount_, &clipOff, RL_SHADER_UNIFORM_INT, 1);
 
     for (const auto& part : gpu.parts)
     {
@@ -524,6 +540,7 @@ void ScanRenderer::drawPoints(const PointsGPU& gpu, Color color, float pointSize
     rlSetUniform(locXzOn_, &intersectionOff, RL_SHADER_UNIFORM_INT, 1);
     rlSetUniform(locYzOn_, &intersectionOff, RL_SHADER_UNIFORM_INT, 1);
     rlSetUniform(locXyOn_, &intersectionOff, RL_SHADER_UNIFORM_INT, 1);
+    rlSetUniform(locClipPlaneCount_, &intersectionOff, RL_SHADER_UNIFORM_INT, 1);
 
     rlEnableVertexArray(gpu.vao);
     glDrawArrays(GL_POINTS, 0, gpu.vertexCount);
@@ -705,6 +722,7 @@ void ScanRenderer::drawTrajectories(
         rlSetUniform(locXzOn_, &intersectionOff, RL_SHADER_UNIFORM_INT, 1);
         rlSetUniform(locYzOn_, &intersectionOff, RL_SHADER_UNIFORM_INT, 1);
         rlSetUniform(locXyOn_, &intersectionOff, RL_SHADER_UNIFORM_INT, 1);
+        rlSetUniform(locClipPlaneCount_, &intersectionOff, RL_SHADER_UNIFORM_INT, 1);
     }
 
     for (size_t idx = 0; idx < pointClouds.size(); ++idx)

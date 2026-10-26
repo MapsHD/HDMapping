@@ -907,7 +907,7 @@ static const std::vector<ShortcutEntry> appShortcuts = { { "Normal keys", "A", "
                                                          { "", "L", "camera Left" },
                                                          { "", "Ctrl+L", "manual Loop closure" },
                                                          { "", "M", "" },
-                                                         { "", "Ctrl+M", "" },
+                                                         { "", "Ctrl+M", "Measure distance" },
                                                          { "", "N", "" },
                                                          { "", "Ctrl+N", "" },
                                                          { "", "O", "Ortographic view" },
@@ -1024,11 +1024,50 @@ struct TranslateTool
 };
 TranslateTool translate_tool;
 
+bool is_measure_gui = false;
+
+struct Measurement
+{
+    Eigen::Vector3d a;
+    Eigen::Vector3d b;
+};
+struct MeasureTool
+{
+    bool picking = false;
+    std::vector<Measurement> measurements;
+    bool has_pending = false;
+    Eigen::Vector3d pending = Eigen::Vector3d::Zero();
+    int selected = -1;
+    float pick_radius_m = 0.05f;
+    int max_click_drag_px = 3;
+    bool press_pending = false;
+    int press_x = 0;
+    int press_y = 0;
+};
+MeasureTool measure_tool;
+
+bool is_section_gui = false;
+
+struct SectionPlane
+{
+    bool used = true;
+    bool flip = false;
+    Eigen::Affine3d pose = Eigen::Affine3d::Identity();
+};
+struct SectionTool
+{
+    bool enabled = true;
+    bool initialized = false;
+    SectionPlane planes[2];
+    int gizmo_plane = -1;
+    float display_half_size = 10.0f;
+};
+SectionTool section_tool;
+
 bool fillInSession = true;
 
 TLSRegistration tls_registration;
 ObservationPicking observation_picking;
-std::vector<Eigen::Vector3d> picked_points;
 
 bool new_loop_closure_index = false;
 int num_edge_extended_before = 0;
@@ -1123,6 +1162,11 @@ double compute_rms(bool initial, Session& session, ObservationPicking& observati
 void reset_poses(Session& session);
 void translate_gui();
 void draw_translate_preview();
+void measure_gui();
+void draw_measure_preview();
+void renderMeasureLabel();
+void section_gui();
+void draw_section_preview();
 
 ///////////////////////////////////////////////////////////////////////////////////
 
@@ -4333,6 +4377,349 @@ void renderControlPointsLabels(const ControlPoints& control_points, const PointC
     }
 }
 
+int sectionClipPlanes(Eigen::Vector4d out[2])
+{
+    if (!is_section_gui || !section_tool.enabled || !section_tool.initialized)
+        return 0;
+
+    int count = 0;
+    for (const auto& plane : section_tool.planes)
+    {
+        if (!plane.used)
+            continue;
+        const Eigen::Vector3d n = plane.pose.linear().col(2).normalized() * (plane.flip ? -1.0 : 1.0);
+        out[count++] = Eigen::Vector4d(n.x(), n.y(), n.z(), -n.dot(plane.pose.translation()));
+    }
+    return count;
+}
+
+bool pickCloudPoint(int x, int y, Eigen::Vector3d& out)
+{
+    const LaserBeam beam = GetLaserBeam(x, y);
+    const Eigen::Vector3d dir = beam.direction.normalized();
+    const double radius_sq = static_cast<double>(measure_tool.pick_radius_m) * measure_tool.pick_radius_m;
+
+    Eigen::Vector4d clip_planes[2];
+    const int clip_count = sectionClipPlanes(clip_planes);
+
+    double best_depth = std::numeric_limits<double>::max();
+    bool found = false;
+
+    for (const auto& pc : session.point_clouds_container.point_clouds)
+    {
+        if (!pc.visible)
+            continue;
+
+        const Eigen::Affine3d& pose = session.point_clouds_container.show_with_initial_pose ? pc.m_initial_pose : pc.m_pose;
+
+        for (const auto& p_local : pc.points_local)
+        {
+            if (clip_count > 0)
+            {
+                const Eigen::Vector3d p_clip = pc.m_pose * p_local;
+                bool kept = true;
+                for (int i = 0; i < clip_count && kept; i++)
+                    kept = clip_planes[i].head<3>().dot(p_clip) + clip_planes[i].w() >= 0.0;
+                if (!kept)
+                    continue;
+            }
+
+            const Eigen::Vector3d p = pose * p_local;
+            const Eigen::Vector3d to_p = p - beam.position;
+            const double depth = to_p.dot(dir);
+            if ((!app_state.camera.isOrtho && depth <= 0.0) || depth >= best_depth)
+                continue;
+
+            if ((to_p - depth * dir).squaredNorm() > radius_sq)
+                continue;
+
+            best_depth = depth;
+            out = p;
+            found = true;
+        }
+    }
+
+    return found;
+}
+
+void measure_gui()
+{
+    ImGui::Begin("Measure distance", &is_measure_gui);
+
+    if (ImGui::Checkbox("Pick points", &measure_tool.picking))
+    {
+        measure_tool.press_pending = false;
+        SetMouseCursor(measure_tool.picking ? MOUSE_CURSOR_CROSSHAIR : MOUSE_CURSOR_DEFAULT);
+    }
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Left click (without dragging) on the point cloud to place a point;\nevery 2 points add a new measurement");
+    ImGui::SameLine();
+    if (ImGui::Button("Clear all"))
+    {
+        measure_tool.measurements.clear();
+        measure_tool.has_pending = false;
+        measure_tool.selected = -1;
+    }
+
+    ImGui::PushItemWidth(ImGuiNumberWidth);
+    ImGui::SliderFloat("Pick radius [m]", &measure_tool.pick_radius_m, 0.01f, 0.1f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
+    ImGui::PopItemWidth();
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Max distance between the click ray and the snapped point");
+
+    Eigen::Vector4d clip_planes[2];
+    if (sectionClipPlanes(clip_planes) > 0)
+        ImGui::TextColored(orangeBorder, "Section view active: only points inside the section are picked");
+
+    ImGui::Separator();
+
+    if (measure_tool.has_pending)
+    {
+        const Eigen::Vector3d& p = measure_tool.pending;
+        ImGui::Text("First point: %.3f %.3f %.3f - pick the second one", p.x(), p.y(), p.z());
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Cancel"))
+            measure_tool.has_pending = false;
+    }
+
+    int to_delete = -1;
+    if (ImGui::BeginTable("measurements", 5, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit))
+    {
+        ImGui::TableSetupColumn("#");
+        ImGui::TableSetupColumn("3D [m]");
+        ImGui::TableSetupColumn("XY [m]");
+        ImGui::TableSetupColumn("dZ [m]");
+        ImGui::TableSetupColumn("");
+        ImGui::TableHeadersRow();
+
+        for (int i = 0; i < static_cast<int>(measure_tool.measurements.size()); i++)
+        {
+            const Eigen::Vector3d d = measure_tool.measurements[i].b - measure_tool.measurements[i].a;
+            ImGui::PushID(i);
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            if (ImGui::Selectable(std::to_string(i + 1).c_str(), measure_tool.selected == i, ImGuiSelectableFlags_SpanAllColumns))
+                measure_tool.selected = (measure_tool.selected == i) ? -1 : i;
+            ImGui::TableSetColumnIndex(1);
+            ImGui::Text("%.3f", d.norm());
+            ImGui::TableSetColumnIndex(2);
+            ImGui::Text("%.3f", d.head<2>().norm());
+            ImGui::TableSetColumnIndex(3);
+            ImGui::Text("%.3f", d.z());
+            ImGui::TableSetColumnIndex(4);
+            if (ImGui::SmallButton("X"))
+                to_delete = i;
+            ImGui::PopID();
+        }
+        ImGui::EndTable();
+    }
+
+    if (to_delete >= 0)
+    {
+        measure_tool.measurements.erase(measure_tool.measurements.begin() + to_delete);
+        if (measure_tool.selected == to_delete)
+            measure_tool.selected = -1;
+        else if (measure_tool.selected > to_delete)
+            measure_tool.selected--;
+    }
+
+    if (measure_tool.selected >= 0)
+    {
+        const Measurement& m = measure_tool.measurements[measure_tool.selected];
+        ImGui::Separator();
+        ImGui::Text("#%d P1: %.3f %.3f %.3f", measure_tool.selected + 1, m.a.x(), m.a.y(), m.a.z());
+        ImGui::Text("#%d P2: %.3f %.3f %.3f", measure_tool.selected + 1, m.b.x(), m.b.y(), m.b.z());
+    }
+
+    ImGui::End();
+}
+
+void draw_measure_preview()
+{
+    if (!is_measure_gui)
+        return;
+
+    auto toV3 = [](const Eigen::Vector3d& v)
+    {
+        return Vector3{ static_cast<float>(v.x()), static_cast<float>(v.y()), static_cast<float>(v.z()) };
+    };
+
+    for (int i = 0; i < static_cast<int>(measure_tool.measurements.size()); i++)
+    {
+        const Measurement& m = measure_tool.measurements[i];
+        const Color col = (i == measure_tool.selected) ? YELLOW : MAGENTA;
+        DrawSphere(toV3(m.a), 0.05f, col);
+        DrawSphere(toV3(m.b), 0.05f, col);
+        DrawLine3D(toV3(m.a), toV3(m.b), col);
+    }
+
+    if (measure_tool.has_pending)
+        DrawSphere(toV3(measure_tool.pending), 0.05f, MAGENTA);
+}
+
+void renderMeasureLabel()
+{
+    if (!is_measure_gui)
+        return;
+
+    ImGuiIO& io = ImGui::GetIO();
+    for (int i = 0; i < static_cast<int>(measure_tool.measurements.size()); i++)
+    {
+        const Measurement& m = measure_tool.measurements[i];
+        const Eigen::Vector3d mid = 0.5 * (m.a + m.b);
+        const Color col = (i == measure_tool.selected) ? YELLOW : MAGENTA;
+        drawOutlinedText(
+            TextFormat("#%d: %.3f m", i + 1, (m.b - m.a).norm()), worldToScreen(mid, io.DisplaySize.x, io.DisplaySize.y), 20, col);
+    }
+}
+
+void section_gui()
+{
+    if (!section_tool.initialized)
+    {
+        section_tool.initialized = true;
+        const Vector3& c = app_state.camera.euler.rotationCenter;
+        for (int i = 0; i < 2; i++)
+        {
+            SectionPlane& plane = section_tool.planes[i];
+            plane.flip = (i == 1);
+            plane.pose.translation() = Eigen::Vector3d(c.x, c.y, c.z + (i == 0 ? -0.25 : 0.25));
+        }
+    }
+
+    ImGui::Begin("Section view", &is_section_gui);
+
+    ImGui::Checkbox("Enabled", &section_tool.enabled);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Hide points outside the section (also ignored when measuring)");
+    ImGui::SameLine();
+    ImGui::RadioButton("No gizmo", &section_tool.gizmo_plane, -1);
+
+    ImGui::Separator();
+    for (int i = 0; i < 2; i++)
+    {
+        SectionPlane& plane = section_tool.planes[i];
+        ImGui::PushID(i);
+
+        ImGui::Checkbox("", &plane.used);
+        ImGui::SameLine();
+        ImGui::Text("Plane %d", i + 1);
+        ImGui::SameLine();
+        ImGui::RadioButton("Gizmo", &section_tool.gizmo_plane, i);
+        ImGui::SameLine();
+        ImGui::Checkbox("Flip", &plane.flip);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Swap which side of the plane is kept");
+        ImGui::SameLine();
+        if (ImGui::Button("Level"))
+            plane.pose.linear() = Eigen::Matrix3d::Identity();
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Make the plane horizontal again (keeps its position)");
+
+        Eigen::Vector3d origin = plane.pose.translation();
+        if (ImGui::InputScalarN("Origin [m]", ImGuiDataType_Double, origin.data(), 3, nullptr, nullptr, "%.3f"))
+            plane.pose.translation() = origin;
+
+        const Eigen::Vector3d n = plane.pose.linear().col(2).normalized() * (plane.flip ? -1.0 : 1.0);
+        ImGui::Text("Kept side normal: %.3f %.3f %.3f", n.x(), n.y(), n.z());
+
+        ImGui::PopID();
+    }
+
+    ImGui::PushItemWidth(ImGuiNumberWidth);
+    ImGui::InputFloat("Plane display size [m]", &section_tool.display_half_size);
+    ImGui::PopItemWidth();
+    if (section_tool.display_half_size < 0.1f)
+        section_tool.display_half_size = 0.1f;
+
+    ImGui::End();
+}
+
+void draw_section_preview()
+{
+    if (!is_section_gui)
+        return;
+
+    const Color plane_colors[2] = { ORANGE, SKYBLUE };
+    const double s = section_tool.display_half_size;
+
+    for (int i = 0; i < 2; i++)
+    {
+        const SectionPlane& plane = section_tool.planes[i];
+        if (!plane.used)
+            continue;
+
+        auto toV3 = [](const Eigen::Vector3d& v)
+        {
+            return Vector3{ static_cast<float>(v.x()), static_cast<float>(v.y()), static_cast<float>(v.z()) };
+        };
+        const Eigen::Vector3d o = plane.pose.translation();
+        const Eigen::Vector3d ex = plane.pose.linear().col(0).normalized() * s;
+        const Eigen::Vector3d ey = plane.pose.linear().col(1).normalized() * s;
+        const Eigen::Vector3d n = plane.pose.linear().col(2).normalized() * (plane.flip ? -1.0 : 1.0);
+        const Vector3 c[4] = { toV3(o - ex - ey), toV3(o + ex - ey), toV3(o + ex + ey), toV3(o - ex + ey) };
+        const Color col = plane_colors[i];
+
+        rlDrawRenderBatchActive();
+        rlDisableBackfaceCulling();
+        rlDisableDepthMask();
+        rlBegin(RL_QUADS);
+        rlColor4ub(col.r, col.g, col.b, 40);
+        for (const auto& v : c)
+            rlVertex3f(v.x, v.y, v.z);
+        rlEnd();
+        rlDrawRenderBatchActive();
+        rlEnableDepthMask();
+        rlEnableBackfaceCulling();
+
+        for (int k = 0; k < 4; k++)
+            DrawLine3D(c[k], c[(k + 1) % 4], col);
+        DrawLine3D(toV3(o), toV3(o + n * (0.1 * s)), col);
+    }
+
+    const int gi = section_tool.gizmo_plane;
+    if (gi < 0 || gi > 1 || !section_tool.planes[gi].used)
+        return;
+
+    Eigen::Affine3d& pose = section_tool.planes[gi].pose;
+    float m[16];
+    const Eigen::Matrix4f mf = pose.matrix().cast<float>();
+    std::copy(mf.data(), mf.data() + 16, m);
+
+    ImGuiIO& io = ImGui::GetIO();
+    ImGuizmo::BeginFrame();
+    ImGuizmo::Enable(true);
+    ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
+    ImGuizmo::PushID("section_plane");
+
+    bool changed;
+    if (!app_state.camera.isOrtho)
+    {
+        Matrix projMat = rlGetMatrixProjection();
+        Matrix modelMat = rlGetMatrixModelview();
+        float projection[16] = { projMat.m0, projMat.m1, projMat.m2,  projMat.m3,  projMat.m4,  projMat.m5,  projMat.m6,  projMat.m7,
+                                 projMat.m8, projMat.m9, projMat.m10, projMat.m11, projMat.m12, projMat.m13, projMat.m14, projMat.m15 };
+        float modelview[16] = { modelMat.m0, modelMat.m1, modelMat.m2,  modelMat.m3,  modelMat.m4,  modelMat.m5,  modelMat.m6,  modelMat.m7,
+                                modelMat.m8, modelMat.m9, modelMat.m10, modelMat.m11, modelMat.m12, modelMat.m13, modelMat.m14, modelMat.m15 };
+        changed = ImGuizmo::Manipulate(modelview, projection, ImGuizmo::TRANSLATE | ImGuizmo::ROTATE, ImGuizmo::LOCAL, m, nullptr);
+    }
+    else
+    {
+        changed = ImGuizmo::Manipulate(
+            app_state.camera.orthoGizmoView,
+            app_state.camera.orthoProjection,
+            ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z,
+            ImGuizmo::WORLD,
+            m,
+            nullptr);
+    }
+
+    ImGuizmo::PopID();
+
+    if (changed)
+        pose.matrix() = Eigen::Map<const Eigen::Matrix4f>(m).cast<double>();
+}
+
 void display()
 {
     // Safety net: rebuilds any scan whose m_pose no longer matches its
@@ -4341,6 +4728,9 @@ void display()
     // Gui() -- which can move point cloud poses through paths that don't
     // individually call scan_renderer.rebuild()).
     scan_renderer.syncPoses(session.point_clouds_container.point_clouds);
+
+    Eigen::Vector4d clip_planes[2];
+    scan_renderer.setClipPlanes(clip_planes, sectionClipPlanes(clip_planes));
 
     ImGuiIO& io = ImGui::GetIO();
     // GetRenderWidth/Height(), not io.DisplaySize: the GL viewport must be
@@ -4728,11 +5118,6 @@ void display()
                     rlEnd();
                 }
             }
-
-            for (auto p : picked_points)
-            {
-                DrawSphere(Vector3{ static_cast<float>(p.x()), static_cast<float>(p.y()), static_cast<float>(p.z()) }, 0.05f, MAGENTA);
-            }
         }
         else
         {
@@ -4819,6 +5204,9 @@ void display()
 
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_L, false))
         is_loop_closure_gui = !is_loop_closure_gui;
+
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_M, false))
+        is_measure_gui = !is_measure_gui;
 
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_O, false))
         openSession();
@@ -5653,6 +6041,14 @@ void display()
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Define new coordinate frame from 3 picked points and transform all clouds");
 
+                ImGui::MenuItem("Measure distance", "Ctrl+M", &is_measure_gui);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Pick 2 points on the point cloud and measure the distance between them");
+
+                ImGui::MenuItem("Section view", nullptr, &is_section_gui);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Cut the point cloud with 2 planes and keep only the section between them");
+
                 ImGui::EndMenu();
             }
 
@@ -6112,11 +6508,27 @@ void display()
         SetMouseCursor(MOUSE_CURSOR_DEFAULT);
     }
 
+    if (is_section_gui)
+        section_gui();
+
+    if (is_measure_gui)
+    {
+        measure_gui();
+    }
+    else if (measure_tool.picking)
+    {
+        measure_tool.picking = false;
+        measure_tool.press_pending = false;
+        SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+    }
+
     raylib_widgets::showEulerCenterOfRotationWindow(cor_gui, app_state.camera, xText, yText, zText);
 
     raylib_widgets::ShowInfoWindow(app_state.info_gui, infoLines, appShortcuts, HDMAPPING_CONFIGURE_PROJECT_VERSION, __DATE__);
 
     draw_translate_preview();
+    draw_measure_preview();
+    draw_section_preview();
 
     // 3D drawing is done -- switch to the 2D screen-space projection the
     // mini-compass (DrawLineEx/DrawText) and rlImGuiEnd()'s UI render both
@@ -6130,6 +6542,8 @@ void display()
         renderGroundControlPointsLabels(session.ground_control_points, session.point_clouds_container);
 
     renderControlPointsLabels(session.control_points, session.point_clouds_container);
+
+    renderMeasureLabel();
 
     if (app_state.compass_ruler)
         drawMiniCompassWithRuler();
@@ -6385,6 +6799,42 @@ void mouse(int glut_button, int state, int x, int y)
             app_state.mouse_old_x = x;
             app_state.mouse_old_y = y;
             return;
+        }
+
+        if (glut_button == GLUT_LEFT_BUTTON && measure_tool.picking && !io.KeyCtrl && !io.KeyShift)
+        {
+            if (state == GLUT_DOWN)
+            {
+                measure_tool.press_pending = true;
+                measure_tool.press_x = x;
+                measure_tool.press_y = y;
+            }
+            else if (state == GLUT_UP && measure_tool.press_pending)
+            {
+                measure_tool.press_pending = false;
+                if (std::abs(x - measure_tool.press_x) <= measure_tool.max_click_drag_px &&
+                    std::abs(y - measure_tool.press_y) <= measure_tool.max_click_drag_px)
+                {
+                    Eigen::Vector3d p;
+                    if (pickCloudPoint(x, y, p))
+                    {
+                        if (!measure_tool.has_pending)
+                        {
+                            measure_tool.pending = p;
+                            measure_tool.has_pending = true;
+                        }
+                        else
+                        {
+                            measure_tool.measurements.push_back({ measure_tool.pending, p });
+                            measure_tool.has_pending = false;
+                            measure_tool.selected = static_cast<int>(measure_tool.measurements.size()) - 1;
+                        }
+                        spdlog::info("Measure point: {}, {}, {}", p.x(), p.y(), p.z());
+                    }
+                    else
+                        spdlog::info("Measure: no visible point under cursor");
+                }
+            }
         }
 
         if ((glut_button == GLUT_MIDDLE_BUTTON || glut_button == GLUT_LEFT_BUTTON) && state == GLUT_DOWN && (io.KeyCtrl || io.KeyShift))

@@ -130,6 +130,9 @@ public:
         float intersectionWidth = 0.1f,
         bool useInitialPose = false) const;
 
+    static constexpr int kMaxClipPlanes = 6;
+    void setClipPlanes(const Eigen::Vector4d* planes, int count);
+
     // Number of glDrawArrays calls draw() issued the last time it ran (one
     // per visible scan) -- raylib/rlgl don't expose a draw-call counter for
     // custom, non-batched GL calls like these (rlgl's own internal
@@ -305,6 +308,10 @@ private:
     int locYzOn_ = -1;
     int locXyOn_ = -1;
     int locIntersectionWidth_ = -1;
+    int locClipPlaneCount_ = -1;
+    int locClipPlanes_ = -1;
+    float clipPlanes_[kMaxClipPlanes * 4] = {};
+    int clipPlaneCount_ = 0;
     mutable int lastDrawCallCount_ = 0;
     mutable int lastVertexCount_ = 0;
 };

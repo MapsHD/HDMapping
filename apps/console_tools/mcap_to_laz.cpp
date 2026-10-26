@@ -18,6 +18,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <limits>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -86,8 +87,9 @@ namespace
 
     void print_usage(const char* argv0)
     {
-        spdlog::error("Usage: {} <input{}> <output_session_dir> [options]", argv0, kInputExtension);
-        spdlog::error("  input{}  {}", kInputExtension, kInputDescription);
+        spdlog::error("Usage: {} <input{}> [<input{}> ...] <output_session_dir> [options]", argv0, kInputExtension, kInputExtension);
+        spdlog::error("  input{}  {}; several inputs (e.g. the parts of a split", kInputExtension, kInputDescription);
+        spdlog::error("               recording) are read in the order given into one session");
         spdlog::error("  output_session_dir  written as mandeye lidarNNNN.laz + imuNNNN.csv chunk pairs,");
         spdlog::error("                      ready to open in lidar_odometry_step_1");
         spdlog::error("Options:");
@@ -177,8 +179,10 @@ namespace
     // Streams point clouds into lidarNNNN.laz, starting a new chunk whenever the
     // message crosses a time-bin boundary. Returns the bin of each chunk written, in
     // chunk-index order, so the IMU pass can route samples to the same chunks.
+    // Several readers are one continuous stream: the bin grid is absolute, so a bin
+    // that straddles two input files stays a single chunk.
     bool write_lidar_chunks(
-        BagReader& reader,
+        std::vector<std::unique_ptr<BagReader>>& readers,
         rosbags::MandeyeSessionWriter& writer,
         double chunk_seconds,
         std::vector<int64_t>& chunk_bins,
@@ -224,8 +228,13 @@ namespace
             ++stats.lidar_messages;
         };
 
-        if (!reader.read(callbacks))
-            return false;
+        for (auto& reader : readers)
+        {
+            if (!reader->read(callbacks))
+                return false;
+            if (!ok)
+                return false;
+        }
         if (!writer.endChunk())
             return false;
         return ok;
@@ -287,14 +296,13 @@ int main(const int argc, const char** argv)
         return EXIT_FAILURE;
     }
 
-    const std::string mcap_path = argv[1];
-    std::string session_dir;
+    std::vector<std::string> positionals;
     rosbags::McapReaderOptions options;
     double chunk_seconds = 20.0;
     bool list_only = false;
     ImuTransform imu_transform;
 
-    for (int i = 2; i < argc; ++i)
+    for (int i = 1; i < argc; ++i)
     {
         const std::string arg = argv[i];
         const bool hasValue = i + 1 < argc;
@@ -378,8 +386,8 @@ int main(const int argc, const char** argv)
                 return EXIT_FAILURE;
             }
         }
-        else if (!arg.starts_with("--") && session_dir.empty())
-            session_dir = arg;
+        else if (!arg.starts_with("--"))
+            positionals.push_back(arg);
         else
         {
             spdlog::error("Unrecognized argument '{}'", arg);
@@ -388,55 +396,106 @@ int main(const int argc, const char** argv)
         }
     }
 
-    if (fs::path(mcap_path).extension() != kInputExtension)
+    // Every positional is an input except the last, the session dir (with --list,
+    // all of them are inputs).
+    std::string session_dir;
+    if (!list_only)
     {
-        spdlog::error("Invalid extension for input file {} - expected {}", mcap_path, kInputExtension);
-        return EXIT_FAILURE;
+        if (positionals.size() < 2)
+        {
+            spdlog::error("Missing <output_session_dir>");
+            print_usage(argv[0]);
+            return EXIT_FAILURE;
+        }
+        session_dir = positionals.back();
+        positionals.pop_back();
     }
-    if (!fs::exists(mcap_path))
+    if (positionals.empty())
     {
-        spdlog::error("Input file {} does not exist", mcap_path);
-        return EXIT_FAILURE;
-    }
-    if (!list_only && session_dir.empty())
-    {
-        spdlog::error("Missing <output_session_dir>");
         print_usage(argv[0]);
         return EXIT_FAILURE;
     }
+    for (const auto& input : positionals)
+    {
+        if (fs::path(input).extension() != kInputExtension)
+        {
+            spdlog::error("Invalid extension for input file {} - expected {}", input, kInputExtension);
+            return EXIT_FAILURE;
+        }
+        if (!fs::exists(input))
+        {
+            spdlog::error("Input file {} does not exist", input);
+            return EXIT_FAILURE;
+        }
+    }
 
-    BagReader reader(mcap_path, options);
+    std::vector<std::unique_ptr<BagReader>> readers;
+    for (const auto& input : positionals)
+        readers.push_back(std::make_unique<BagReader>(input, options));
     if (list_only)
-        return list_channels(reader);
-
-    if (!reader.isOpen())
     {
-        spdlog::error("Cannot read {}: {}", mcap_path, reader.error());
-        spdlog::error("Run with --list to see the file's channels.");
-        return EXIT_FAILURE;
+        int rc = EXIT_SUCCESS;
+        for (size_t k = 0; k < readers.size(); ++k)
+        {
+            spdlog::info("{}:", positionals[k]);
+            if (list_channels(*readers[k]) != EXIT_SUCCESS)
+                rc = EXIT_FAILURE;
+        }
+        return rc;
     }
 
-    const auto& topics = reader.topics();
-    if (topics.lidar.empty())
+    for (size_t k = 0; k < readers.size(); ++k)
     {
-        spdlog::error("No sensor_msgs/msg/PointCloud2 topic found in {}", mcap_path);
-        return EXIT_FAILURE;
+        if (!readers[k]->isOpen())
+        {
+            spdlog::error("Cannot read {}: {}", positionals[k], readers[k]->error());
+            spdlog::error("Run with --list to see the file's channels.");
+            return EXIT_FAILURE;
+        }
+        if (readers[k]->topics().lidar.empty())
+        {
+            spdlog::error("No sensor_msgs/msg/PointCloud2 topic found in {}", positionals[k]);
+            return EXIT_FAILURE;
+        }
+        // One session is one sensor: auto-detection must land on the same topics in every input.
+        const auto& t = readers[k]->topics();
+        const auto& first = readers.front()->topics();
+        if (t.lidar != first.lidar || t.imu != first.imu)
+        {
+            spdlog::error(
+                "{} resolves to lidar='{}' imu='{}' but {} to lidar='{}' imu='{}' - pass --lidar-topic/--imu-topic",
+                positionals[k],
+                t.lidar,
+                t.imu,
+                positionals.front(),
+                first.lidar,
+                first.imu);
+            return EXIT_FAILURE;
+        }
     }
+    if (readers.size() > 1)
+        spdlog::info("Reading {} inputs in the order given", readers.size());
+
+    const auto& topics = readers.front()->topics();
     spdlog::info(
         "Reading lidar='{}' (layout: {}) imu='{}' sn='{}'",
         topics.lidar,
         rosbags::pc2PresetName(options.lidar_preset),
         topics.imu.empty() ? "<none>" : topics.imu,
         topics.sn.empty() ? "<none>" : topics.sn);
-    if (!reader.timeOrdered())
-        spdlog::warn("{} has no message indexes - reading in file order instead of log-time order", mcap_path);
+    for (size_t k = 0; k < readers.size(); ++k)
+        if (!readers[k]->timeOrdered())
+            spdlog::warn("{} has no message indexes - reading in file order instead of log-time order", positionals[k]);
 
     std::vector<rosbags::McapImuSample> imu;
     std::string serial_number;
-    if (!topics.imu.empty() && !collect_imu(reader, imu, serial_number))
+    for (size_t k = 0; k < readers.size() && !topics.imu.empty(); ++k)
     {
-        spdlog::error("Failed reading IMU stream: {}", reader.error());
-        return EXIT_FAILURE;
+        if (!collect_imu(*readers[k], imu, serial_number))
+        {
+            spdlog::error("Failed reading IMU stream of {}: {}", positionals[k], readers[k]->error());
+            return EXIT_FAILURE;
+        }
     }
     if (!serial_number.empty())
         spdlog::info("Bag serial number: {}", serial_number);
@@ -452,16 +511,21 @@ int main(const int argc, const char** argv)
 
     std::vector<int64_t> chunk_bins;
     ImportStats stats;
-    if (!write_lidar_chunks(reader, writer, chunk_seconds, chunk_bins, stats))
+    if (!write_lidar_chunks(readers, writer, chunk_seconds, chunk_bins, stats))
     {
-        spdlog::error("Failed writing lidar chunks: {}", writer.error().empty() ? reader.error() : writer.error());
+        std::string why = writer.error();
+        for (const auto& reader : readers)
+            if (why.empty())
+                why = reader->error();
+        spdlog::error("Failed writing lidar chunks: {}", why);
         return EXIT_FAILURE;
     }
     // Emitted before the empty check on purpose: a forced --lidar-type that the
     // file disagrees with is the likeliest reason for decoding nothing at all, so
     // the explanation has to come out even on the failure path.
-    if (!reader.lidarLayoutWarning().empty())
-        spdlog::warn("PointCloud2 decoding: {}", reader.lidarLayoutWarning());
+    for (size_t k = 0; k < readers.size(); ++k)
+        if (!readers[k]->lidarLayoutWarning().empty())
+            spdlog::warn("PointCloud2 decoding ({}): {}", positionals[k], readers[k]->lidarLayoutWarning());
 
     if (chunk_bins.empty())
     {
@@ -485,7 +549,9 @@ int main(const int argc, const char** argv)
         writer.imuSamplesWritten());
 
     if (stats.out_of_order)
-        spdlog::warn("Point cloud messages were not in ascending time order - chunk boundaries may not be monotonic");
+        spdlog::warn(
+            "Point cloud messages were not in ascending time order - chunk boundaries may not be monotonic{}",
+            readers.size() > 1 ? " (are the inputs given in recording order?)" : "");
 
     // lidar_odometry_step_1's load_data() needs more than two input files and then
     // discards the first chunk's points outright, so a session of one or two

@@ -344,13 +344,16 @@ std::vector<std::tuple<std::pair<double, double>, Eigen::Vector3f, Eigen::Vector
 //! @param ommit_points_with_timestamp_equals_zero - if true, points with timestamp == 0 will be omited
 //! @param filter_threshold_xy - threshold for filtering points in xy plane
 //! @param calibrations - map of calibrations for each scanner key is scanner id.
+//! @param rings - if not null, receives each returned point's laser ring, read from the
+//! uint16 LAS extra-bytes attribute "ring" (0 for every point when the file has none)
 //! @return vector of points of @ref Point3Di type
 std::vector<Point3Di> load_point_cloud(
     const std::string& lazFile,
     bool ommit_points_with_timestamp_equals_zero,
     double filter_threshold_xy_inner,
     double filter_threshold_xy_outer,
-    const std::unordered_map<int, Eigen::Affine3d>& calibrations);
+    const std::unordered_map<int, Eigen::Affine3d>& calibrations,
+    std::vector<uint16_t>* rings = nullptr);
 
 bool save_poses(const std::string& file_name, const std::vector<Eigen::Affine3d>& m_poses, const std::vector<std::string>& filenames);
 

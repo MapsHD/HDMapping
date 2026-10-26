@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <iomanip>
 #include <limits>
@@ -35,6 +36,7 @@ struct MandeyeSessionWriter::Impl
 	std::string error;
 	bool open = false;
 	bool withRgb = false;
+	bool withRing = false;
 
 	laszip_POINTER writer = nullptr;
 	laszip_point* point = nullptr;
@@ -51,11 +53,12 @@ struct MandeyeSessionWriter::Impl
 	}
 };
 
-MandeyeSessionWriter::MandeyeSessionWriter(const std::filesystem::path& dir, bool with_rgb)
+MandeyeSessionWriter::MandeyeSessionWriter(const std::filesystem::path& dir, bool with_rgb, bool with_ring)
 	: impl_(std::make_unique<Impl>())
 {
 	impl_->dir = dir;
 	impl_->withRgb = with_rgb;
+	impl_->withRing = with_ring;
 
 	std::error_code ec;
 	std::filesystem::create_directories(dir, ec);
@@ -126,6 +129,15 @@ bool MandeyeSessionWriter::beginChunk(int index)
 	header->y_offset = 0.0;
 	header->z_offset = 0.0;
 
+	if(impl_->withRing)
+	{
+		// LAS_ATTRIBUTE_U16 = 2 in laszip's 0-based attribute type codes. The
+		// attribute adds the extra-bytes VLR; the record grows by its 2 bytes.
+		if(laszip_add_attribute(impl_->writer, 2, kSessionRingAttribute, "laser ring index", 1.0, 0.0))
+			return impl_->fail("failed to add the ring attribute for " + path.string());
+		header->point_data_record_length += 2;
+	}
+
 	if(laszip_open_writer(impl_->writer, path.string().c_str(), /*compress=*/1))
 		return impl_->fail("failed to open laszip writer for " + path.string());
 
@@ -171,6 +183,12 @@ bool MandeyeSessionWriter::addPoints(const std::vector<McapPoint>& points, const
 		// user_data is always 0 -- and it must be written, because a session with a
 		// non-zero id but no matching calibration entry has its points dropped.
 		impl_->point->user_data = 0;
+		if(impl_->withRing)
+		{
+			if(impl_->point->num_extra_bytes < 2)
+				return impl_->fail("laszip point has no room for the ring attribute");
+			std::memcpy(impl_->point->extra_bytes, &p.ring, 2);
+		}
 
 		laszip_F64 coordinates[3] = {p.x, p.y, p.z};
 		if(laszip_set_coordinates(impl_->writer, coordinates))

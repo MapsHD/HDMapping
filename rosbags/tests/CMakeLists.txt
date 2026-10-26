@@ -3,13 +3,14 @@ cmake_minimum_required(VERSION 4.0.0)
 project(hdmapping_rosbags_tests)
 
 # Unit tests for rosbags/ (LAZ/IMU <-> MCAP/ROS2-bag support code, both
-# directions, and the Ouster pcap reader). Uses doctest, same as shared/tests -- see that CMakeLists.txt for
+# directions, the ROS1 bag reader/writer and the Ouster pcap reader). Uses doctest, same as shared/tests -- see that CMakeLists.txt for
 # why. Only McapWriter.cpp defines MCAP_IMPLEMENTATION; McapReader.cpp relies on
 # it being linked in alongside.
 add_executable(hdmapping_rosbags_tests
     test_mcap_writer.cpp
     test_mcap_reader.cpp
     test_ouster_pcap_reader.cpp
+    test_ros1_bag.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../McapWriter.h
     ${CMAKE_CURRENT_SOURCE_DIR}/../McapWriter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../McapReader.h
@@ -18,6 +19,8 @@ add_executable(hdmapping_rosbags_tests
     ${CMAKE_CURRENT_SOURCE_DIR}/../MandeyeSessionWriter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../OusterPcapReader.h
     ${CMAKE_CURRENT_SOURCE_DIR}/../OusterPcapReader.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../Ros1Bag.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/../Ros1Bag.cpp
 )
 
 target_include_directories(hdmapping_rosbags_tests PRIVATE
@@ -27,7 +30,8 @@ target_include_directories(hdmapping_rosbags_tests PRIVATE
     ${THIRDPARTY_DIRECTORY}/json/include
 )
 
-target_link_libraries(hdmapping_rosbags_tests PRIVATE mcap ${PLATFORM_LASZIP_LIB})
+find_package(BZip2 REQUIRED)
+target_link_libraries(hdmapping_rosbags_tests PRIVATE mcap BZip2::BZip2 ${PLATFORM_LASZIP_LIB})
 
 if (MSVC)
     target_compile_definitions(hdmapping_rosbags_tests PRIVATE _USE_MATH_DEFINES)

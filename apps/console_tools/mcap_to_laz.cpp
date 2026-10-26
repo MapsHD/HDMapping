@@ -1,5 +1,7 @@
 // MCAP/ROS2-bag -> mandeye session directory importer: the inverse of
-// laz_to_mcap.
+// laz_to_mcap. Built a second time as bag_to_laz (HDMAPPING_IMPORT_ROS1_BAG),
+// which reads a ROS1 bag through rosbags/Ros1Bag instead -- the inverse of
+// laz_to_bag. Everything after the reader is shared.
 //
 // Deliberately does not link lidar_odometry_utils.cpp. Nothing here needs
 // load_point_cloud()/load_imu(); reading is handled by rosbags/McapReader and
@@ -7,6 +9,9 @@
 // core/TBB/glm/toml++/vqf.
 #include "MandeyeSessionWriter.h"
 #include "McapReader.h"
+#if defined(HDMAPPING_IMPORT_ROS1_BAG)
+#include "Ros1Bag.h"
+#endif
 
 #include <algorithm>
 #include <cmath>
@@ -23,6 +28,50 @@ namespace fs = std::filesystem;
 namespace
 {
 
+#if defined(HDMAPPING_IMPORT_ROS1_BAG)
+    using BagReader = rosbags::Ros1BagFileReader;
+    constexpr const char* kInputExtension = ".bag";
+    constexpr const char* kInputDescription = "a ROS1 bag (format 2.0; uncompressed, bz2 or lz4 chunks)";
+#else
+    using BagReader = rosbags::McapFileReader;
+    constexpr const char* kInputExtension = ".mcap";
+    constexpr const char* kInputDescription = "a ros2msg/CDR MCAP bag, e.g. one written by laz_to_mcap";
+#endif
+
+    // Standard gravity, the g HDMapping's IMU csv is scaled in.
+    constexpr double kStandardGravity = 9.80665;
+
+    // What the importer does to every IMU sample before it reaches the csv:
+    // rotate it into the lidar frame (the frame HDMapping assumes the IMU is in)
+    // and bring acceleration to g.
+    struct ImuTransform
+    {
+        double qx = 0.0, qy = 0.0, qz = 0.0, qw = 1.0; // IMU frame -> lidar frame
+        double acc_scale = 1.0; // 1 for a bag already in g, 1/9.80665 for m/s^2
+    };
+
+    void rotate(const ImuTransform& q, float& x, float& y, float& z)
+    {
+        // v' = v + 2w (u x v) + 2 u x (u x v), u = (qx, qy, qz)
+        const double vx = x, vy = y, vz = z;
+        const double cx = q.qy * vz - q.qz * vy, cy = q.qz * vx - q.qx * vz, cz = q.qx * vy - q.qy * vx;
+        x = static_cast<float>(vx + 2.0 * (q.qw * cx + q.qy * cz - q.qz * cy));
+        y = static_cast<float>(vy + 2.0 * (q.qw * cy + q.qz * cx - q.qx * cz));
+        z = static_cast<float>(vz + 2.0 * (q.qw * cz + q.qx * cy - q.qy * cx));
+    }
+
+    void apply_imu_transform(const ImuTransform& t, std::vector<rosbags::McapImuSample>& samples)
+    {
+        for (auto& s : samples)
+        {
+            rotate(t, s.gyro_x, s.gyro_y, s.gyro_z);
+            rotate(t, s.acc_x, s.acc_y, s.acc_z);
+            s.acc_x = static_cast<float>(s.acc_x * t.acc_scale);
+            s.acc_y = static_cast<float>(s.acc_y * t.acc_scale);
+            s.acc_z = static_cast<float>(s.acc_z * t.acc_scale);
+        }
+    }
+
     // Absolute time grid, matching MessageSplitter in laz_to_mcap.cpp: a timestamp t
     // belongs to bin floor(t / chunk_seconds). Because the grid is absolute rather
     // than relative to the first message, lidar and IMU bin identically without the
@@ -37,8 +86,8 @@ namespace
 
     void print_usage(const char* argv0)
     {
-        spdlog::error("Usage: {} <input.mcap> <output_session_dir> [options]", argv0);
-        spdlog::error("  input.mcap          a ros2msg/CDR MCAP bag, e.g. one written by laz_to_mcap");
+        spdlog::error("Usage: {} <input{}> <output_session_dir> [options]", argv0, kInputExtension);
+        spdlog::error("  input{}  {}", kInputExtension, kInputDescription);
         spdlog::error("  output_session_dir  written as mandeye lidarNNNN.laz + imuNNNN.csv chunk pairs,");
         spdlog::error("                      ready to open in lidar_odometry_step_1");
         spdlog::error("Options:");
@@ -52,14 +101,19 @@ namespace
         spdlog::error("                           correct for any bag that fills them in, including laz_to_mcap's.");
         spdlog::error("                           A preset forces that driver's layout for bags whose field array is");
         spdlog::error("                           missing or wrong, and warns if it disagrees with what the file says.");
+        spdlog::error("  --imu-rotation qx qy qz qw  rotates IMU samples into the lidar frame (R_lidar_imu as a");
+        spdlog::error("                           quaternion; default: identity, i.e. the IMU is in the lidar frame)");
+        spdlog::error("  --imu-acc-unit <g|ms2>   unit of the bag's IMU acceleration (default: g, copied as is;");
+        spdlog::error("                           ms2 = m/s^2 as sensor_msgs/Imu defines it, divided by 9.80665)");
         spdlog::error("  --list                   print the file's channels and exit");
         spdlog::error("");
+        spdlog::error("The lidar ring, when the bag has one, is kept as the LAS extra-bytes attribute 'ring'.");
         spdlog::error("Single-lidar bags only: one PointCloud2 topic in, one point cloud stream out. No");
         spdlog::error("calibration.json or .sn file is written, so lidar_odometry_step_1 applies no");
         spdlog::error("extrinsics to the result.");
     }
 
-    int list_channels(const rosbags::McapFileReader& reader)
+    int list_channels(const BagReader& reader)
     {
         const auto& channels = reader.channels();
         if (channels.empty())
@@ -94,9 +148,9 @@ namespace
     // full stream is small -- 200 Hz for an hour is ~700k samples -- and buffering it
     // lets each chunk's csv be written in one shot after the lidar pass has decided
     // where the chunk boundaries fall.
-    bool collect_imu(rosbags::McapFileReader& reader, std::vector<rosbags::McapImuSample>& out, std::string& serial_number)
+    bool collect_imu(BagReader& reader, std::vector<rosbags::McapImuSample>& out, std::string& serial_number)
     {
-        rosbags::McapFileReader::Callbacks callbacks;
+        BagReader::Callbacks callbacks;
         callbacks.onImu = [&](const rosbags::McapImuSample& sample)
         {
             out.push_back(sample);
@@ -124,7 +178,7 @@ namespace
     // message crosses a time-bin boundary. Returns the bin of each chunk written, in
     // chunk-index order, so the IMU pass can route samples to the same chunks.
     bool write_lidar_chunks(
-        rosbags::McapFileReader& reader,
+        BagReader& reader,
         rosbags::MandeyeSessionWriter& writer,
         double chunk_seconds,
         std::vector<int64_t>& chunk_bins,
@@ -134,7 +188,7 @@ namespace
         int64_t current_bin = 0;
         double last_stamp = -std::numeric_limits<double>::infinity();
 
-        rosbags::McapFileReader::Callbacks callbacks;
+        BagReader::Callbacks callbacks;
         callbacks.onPointCloud = [&](uint64_t /*log_time_ns*/, std::vector<rosbags::McapPoint>&& points)
         {
             if (!ok || points.empty())
@@ -238,6 +292,7 @@ int main(const int argc, const char** argv)
     rosbags::McapReaderOptions options;
     double chunk_seconds = 20.0;
     bool list_only = false;
+    ImuTransform imu_transform;
 
     for (int i = 2; i < argc; ++i)
     {
@@ -284,6 +339,45 @@ int main(const int argc, const char** argv)
                 return EXIT_FAILURE;
             }
         }
+        else if (arg == "--imu-rotation" && i + 4 < argc)
+        {
+            try
+            {
+                imu_transform.qx = std::stod(argv[++i]);
+                imu_transform.qy = std::stod(argv[++i]);
+                imu_transform.qz = std::stod(argv[++i]);
+                imu_transform.qw = std::stod(argv[++i]);
+            } catch (const std::exception&)
+            {
+                spdlog::error("Invalid --imu-rotation (expected four numbers qx qy qz qw)");
+                return EXIT_FAILURE;
+            }
+            const double n = std::sqrt(
+                imu_transform.qx * imu_transform.qx + imu_transform.qy * imu_transform.qy + imu_transform.qz * imu_transform.qz +
+                imu_transform.qw * imu_transform.qw);
+            if (!std::isfinite(n) || std::abs(n - 1.0) > 1e-3)
+            {
+                spdlog::error("Invalid --imu-rotation (not a unit quaternion, norm {:.6f})", n);
+                return EXIT_FAILURE;
+            }
+            imu_transform.qx /= n;
+            imu_transform.qy /= n;
+            imu_transform.qz /= n;
+            imu_transform.qw /= n;
+        }
+        else if (arg == "--imu-acc-unit" && hasValue)
+        {
+            const std::string unit = argv[++i];
+            if (unit == "g")
+                imu_transform.acc_scale = 1.0;
+            else if (unit == "ms2")
+                imu_transform.acc_scale = 1.0 / kStandardGravity;
+            else
+            {
+                spdlog::error("Unknown --imu-acc-unit '{}' (expected g|ms2)", unit);
+                return EXIT_FAILURE;
+            }
+        }
         else if (!arg.starts_with("--") && session_dir.empty())
             session_dir = arg;
         else
@@ -294,9 +388,9 @@ int main(const int argc, const char** argv)
         }
     }
 
-    if (fs::path(mcap_path).extension() != ".mcap")
+    if (fs::path(mcap_path).extension() != kInputExtension)
     {
-        spdlog::error("Invalid extension for input file {} - expected .mcap", mcap_path);
+        spdlog::error("Invalid extension for input file {} - expected {}", mcap_path, kInputExtension);
         return EXIT_FAILURE;
     }
     if (!fs::exists(mcap_path))
@@ -311,7 +405,7 @@ int main(const int argc, const char** argv)
         return EXIT_FAILURE;
     }
 
-    rosbags::McapFileReader reader(mcap_path, options);
+    BagReader reader(mcap_path, options);
     if (list_only)
         return list_channels(reader);
 
@@ -346,9 +440,10 @@ int main(const int argc, const char** argv)
     }
     if (!serial_number.empty())
         spdlog::info("Bag serial number: {}", serial_number);
+    apply_imu_transform(imu_transform, imu);
     spdlog::info("Read {} IMU sample(s)", imu.size());
 
-    rosbags::MandeyeSessionWriter writer(session_dir);
+    rosbags::MandeyeSessionWriter writer(session_dir, /*with_rgb=*/false, /*with_ring=*/true);
     if (!writer.isOpen())
     {
         spdlog::error("Cannot write session directory: {}", writer.error());

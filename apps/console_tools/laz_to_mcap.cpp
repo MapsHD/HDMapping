@@ -1,4 +1,6 @@
-// Standalone mandeye session directory -> MCAP/ROS2-bag exporter.
+// Standalone mandeye session directory -> MCAP/ROS2-bag exporter. Built a
+// second time as laz_to_bag (HDMAPPING_EXPORT_ROS1_BAG), which writes a ROS1 bag
+// through rosbags/Ros1Bag instead -- same layouts, topics and message split.
 //
 // Reuses load_point_cloud()/load_imu() (lidar_odometry_utils.cpp) -- the
 // same LAZ/IMU-csv parsing lidar_odometry_step_1 itself uses -- rather than
@@ -7,6 +9,9 @@
 // entirely) that would silently drop data for a lossless exporter.
 #include "McapWriter.h"
 #include "lidar_odometry_utils.h"
+#if defined(HDMAPPING_EXPORT_ROS1_BAG)
+#include "Ros1Bag.h"
+#endif
 
 #include <algorithm>
 #include <cmath>
@@ -24,6 +29,17 @@ using ImuData = std::vector<std::tuple<std::pair<double, double>, Eigen::Vector3
 
 namespace
 {
+
+#if defined(HDMAPPING_EXPORT_ROS1_BAG)
+    using BagWriter = rosbags::Ros1BagFileWriter;
+    constexpr const char* kOutputExtension = ".bag";
+#else
+    using BagWriter = rosbags::McapFileWriter;
+    constexpr const char* kOutputExtension = ".mcap";
+#endif
+
+    // Standard gravity: the session's IMU csv is in g, sensor_msgs/Imu wants m/s^2.
+    constexpr double kStandardGravity = 9.80665;
 
     bool check_path_ext(const std::string& path, const char* ext)
     {
@@ -43,25 +59,38 @@ namespace
         return s;
     }
 
-    std::vector<rosbags::McapPoint> to_mcap_points(const std::vector<Point3Di>& points)
+    // `rings` is parallel to `points` (load_point_cloud()'s ring output). The result
+    // is sorted by timestamp, ties by ring: the order in which a spinning lidar
+    // fires, and the order every PointCloud2 layout's relative time is taken in.
+    std::vector<rosbags::McapPoint> to_mcap_points(const std::vector<Point3Di>& points, const std::vector<uint16_t>& rings)
     {
         std::vector<rosbags::McapPoint> out;
         out.reserve(points.size());
-        for (const auto& p : points)
+        for (size_t i = 0; i < points.size(); ++i)
         {
+            const auto& p = points[i];
             rosbags::McapPoint mp{};
             mp.x = static_cast<float>(p.point.x());
             mp.y = static_cast<float>(p.point.y());
             mp.z = static_cast<float>(p.point.z());
             mp.intensity = p.intensity;
+            mp.ring = i < rings.size() ? rings[i] : 0;
             mp.laser_id = p.lidarid;
             mp.timestamp = p.timestamp;
             out.push_back(mp);
         }
+        std::stable_sort(
+            out.begin(),
+            out.end(),
+            [](const rosbags::McapPoint& a, const rosbags::McapPoint& b)
+            {
+                return a.timestamp < b.timestamp || (a.timestamp == b.timestamp && a.ring < b.ring);
+            });
         return out;
     }
 
-    std::vector<rosbags::McapImuSample> to_mcap_imu(const ImuData& imu_data)
+    // `acc_scale` brings the csv's acceleration to the unit written (1 keeps g).
+    std::vector<rosbags::McapImuSample> to_mcap_imu(const ImuData& imu_data, double acc_scale)
     {
         std::vector<rosbags::McapImuSample> out;
         out.reserve(imu_data.size());
@@ -72,23 +101,12 @@ namespace
             s.gyro_x = gyr.x();
             s.gyro_y = gyr.y();
             s.gyro_z = gyr.z();
-            s.acc_x = acc.x();
-            s.acc_y = acc.y();
-            s.acc_z = acc.z();
+            s.acc_x = static_cast<float>(acc.x() * acc_scale);
+            s.acc_y = static_cast<float>(acc.y() * acc_scale);
+            s.acc_z = static_cast<float>(acc.z() * acc_scale);
             out.push_back(s);
         }
         return out;
-    }
-
-    void sort_points_by_timestamp(std::vector<Point3Di>& points)
-    {
-        std::sort(
-            points.begin(),
-            points.end(),
-            [](const Point3Di& a, const Point3Di& b)
-            {
-                return a.timestamp < b.timestamp;
-            });
     }
 
     void sort_imu_by_timestamp(ImuData& imu)
@@ -111,7 +129,7 @@ namespace
     class MessageSplitter
     {
     public:
-        MessageSplitter(rosbags::McapFileWriter& writer, double msg_hz)
+        MessageSplitter(BagWriter& writer, double msg_hz)
             : writer_(writer)
             , msg_hz_(msg_hz)
         {
@@ -119,7 +137,7 @@ namespace
 
         // `points` must be sorted by timestamp, and successive calls must be in
         // timestamp order too (session chunks are processed oldest-first).
-        void add(const std::vector<Point3Di>& points)
+        void add(const std::vector<rosbags::McapPoint>& points)
         {
             if (msg_hz_ <= 0.0)
             {
@@ -149,19 +167,18 @@ namespace
         }
 
     private:
-        void write(const std::vector<Point3Di>& points)
+        void write(const std::vector<rosbags::McapPoint>& points)
         {
             if (points.empty())
                 return;
-            const auto mcap_points = to_mcap_points(points);
-            const uint64_t stamp_ns = static_cast<uint64_t>(mcap_points.front().timestamp * 1e9);
-            writer_.writePointCloud(stamp_ns, mcap_points);
+            const uint64_t stamp_ns = static_cast<uint64_t>(points.front().timestamp * 1e9);
+            writer_.writePointCloud(stamp_ns, points);
             ++messages_;
         }
 
-        rosbags::McapFileWriter& writer_;
+        BagWriter& writer_;
         double msg_hz_;
-        std::vector<Point3Di> pending_;
+        std::vector<rosbags::McapPoint> pending_;
         int64_t current_bin_ = 0;
         size_t messages_ = 0;
     };
@@ -315,7 +332,7 @@ namespace
 
     void print_usage(const char* argv0)
     {
-        spdlog::error("Usage: {} <session_dir> <output.mcap> [options]", argv0);
+        spdlog::error("Usage: {} <session_dir> <output{}> [options]", argv0, kOutputExtension);
         spdlog::error("  session_dir  a mandeye recording folder of lidarNNNN.laz + imuNNNN.csv chunk");
         spdlog::error("               pairs (matched by filename's last 4 digits); every chunk becomes");
         spdlog::error("               its own /lidar_points message, IMU samples are merged into one stream");
@@ -324,20 +341,43 @@ namespace
         spdlog::error("  --imu-topic <name>      IMU topic (default: /imu)");
         spdlog::error("  --sn-topic <name>       serial-number string topic (default: /lidar_sn)");
         spdlog::error("  --frame-id <name>       frame_id written into message headers (default: lidar)");
-        spdlog::error("  --lidar-type <type>     PointCloud2 field layout: generic|velodyne|ouster|hesai (default: generic)");
+        spdlog::error("  --lidar-type <type>     PointCloud2 field layout: generic|velodyne|ouster|hesai|canonical");
+        spdlog::error("                          (default: generic); canonical = x y z intensity ring time(float32) t,");
+        spdlog::error("                          the benchmark's canonical spinning-lidar bag");
+        spdlog::error("  --imu-acc-unit <g|ms2>  unit IMU acceleration is written in (default: g, the session's own,");
+        spdlog::error("                          copied as is; ms2 = m/s^2 as sensor_msgs/Imu defines it)");
         spdlog::error("  --msg_hz <float>        message rate: points are split into one PointCloud2 per");
         spdlog::error("                          1/hz seconds (default: 10; 0 = one message per input file/chunk)");
         spdlog::error("  --calibration <file>    MLvxCalib calibration.json/.mjc (multi-LiVoX extrinsics + IMU");
         spdlog::error("                          selection); session_dir auto-detects this if omitted");
         spdlog::error("  --sn <file>             MLvxCalib .sn file (sensor id -> serial number); session_dir");
         spdlog::error("                          auto-detects this if omitted. Must be given together with --calibration");
+        spdlog::error("The lidar ring is read from the LAS extra-bytes attribute 'ring' when the session has it");
+        spdlog::error("(mcap_to_laz and bag_to_laz write it), otherwise every point's ring is 0.");
     }
+
+    // The ROS1 bag writer finishes its index explicitly so a write error is not lost
+    // in a destructor; MCAP finishes on destruction.
+    bool finish(rosbags::McapFileWriter&)
+    {
+        return true;
+    }
+#if defined(HDMAPPING_EXPORT_ROS1_BAG)
+    bool finish(rosbags::Ros1BagFileWriter& writer)
+    {
+        if (writer.close())
+            return true;
+        spdlog::error("Failed to finish the bag: {}", writer.error());
+        return false;
+    }
+#endif
 
     int run_session_directory(
         const std::string& dir_path,
         const std::string& mcap_path,
         const rosbags::McapWriterOptions& options,
         double msg_hz,
+        double acc_scale,
         std::string calibration_path,
         std::string sn_path)
     {
@@ -360,15 +400,17 @@ namespace
         }
         const Calibration calib = load_calibration(calibration_path, sn_path);
 
-        rosbags::McapFileWriter writer(mcap_path, options);
+        BagWriter writer(mcap_path, options);
         if (!writer.isOpen())
         {
-            spdlog::error("Failed to open output mcap file {}", mcap_path);
+            spdlog::error("Failed to open output file {}", mcap_path);
             return EXIT_FAILURE;
         }
 
         size_t total_points = 0;
+        size_t points_with_ring = 0;
         ImuData all_imu;
+        std::vector<uint16_t> rings;
         MessageSplitter splitter(writer, msg_hz);
         for (size_t i = 0; i < chunks.size(); ++i)
         {
@@ -377,10 +419,11 @@ namespace
                 /*ommit_points_with_timestamp_equals_zero=*/false,
                 /*filter_threshold_xy_inner=*/0.0,
                 /*filter_threshold_xy_outer=*/std::numeric_limits<double>::max(),
-                /*calibrations=*/calib.per_sensor);
-            sort_points_by_timestamp(points);
+                /*calibrations=*/calib.per_sensor,
+                /*rings=*/&rings);
             total_points += points.size();
-            splitter.add(points);
+            points_with_ring += static_cast<size_t>(std::count_if(rings.begin(), rings.end(), [](uint16_t r) { return r != 0; }));
+            splitter.add(to_mcap_points(points, rings));
             spdlog::info("[{}/{}] {}: {} points", i + 1, chunks.size(), chunks[i].laz, points.size());
 
             if (!chunks[i].imu.empty())
@@ -395,14 +438,18 @@ namespace
             total_points,
             chunks.size(),
             splitter.messages_written());
+        if (points_with_ring == 0 && total_points > 0)
+            spdlog::info("No point has a ring (the session has no 'ring' attribute, or every ring is 0)");
 
         if (!all_imu.empty())
         {
             sort_imu_by_timestamp(all_imu);
-            writer.writeImu(to_mcap_imu(all_imu));
+            writer.writeImu(to_mcap_imu(all_imu, acc_scale));
             spdlog::info("Loaded {} IMU samples across matched chunk(s)", all_imu.size());
         }
 
+        if (!finish(writer))
+            return EXIT_FAILURE;
         spdlog::info("Wrote {}", mcap_path);
         return EXIT_SUCCESS;
     }
@@ -423,6 +470,7 @@ int main(const int argc, const char** argv)
     std::string sn_path;
     rosbags::McapWriterOptions options;
     double msg_hz = 10.0;
+    double acc_scale = 1.0;
 
     for (int i = 3; i < argc; ++i)
     {
@@ -469,9 +517,24 @@ int main(const int argc, const char** argv)
                 options.lidar_layout = rosbags::PointCloudLayout::Ouster;
             else if (type == "hesai")
                 options.lidar_layout = rosbags::PointCloudLayout::Hesai;
+            else if (type == "canonical")
+                options.lidar_layout = rosbags::PointCloudLayout::Canonical;
             else
             {
-                spdlog::error("Unknown --lidar-type '{}' (expected generic|velodyne|ouster|hesai)", type);
+                spdlog::error("Unknown --lidar-type '{}' (expected generic|velodyne|ouster|hesai|canonical)", type);
+                return EXIT_FAILURE;
+            }
+        }
+        else if (arg == "--imu-acc-unit" && hasValue)
+        {
+            const std::string unit = argv[++i];
+            if (unit == "g")
+                acc_scale = 1.0;
+            else if (unit == "ms2")
+                acc_scale = kStandardGravity;
+            else
+            {
+                spdlog::error("Unknown --imu-acc-unit '{}' (expected g|ms2)", unit);
                 return EXIT_FAILURE;
             }
         }
@@ -483,9 +546,9 @@ int main(const int argc, const char** argv)
         }
     }
 
-    if (!check_path_ext(mcap_path, ".mcap"))
+    if (!check_path_ext(mcap_path, kOutputExtension))
     {
-        spdlog::error("Invalid extension for output file {} - expected .mcap", mcap_path);
+        spdlog::error("Invalid extension for output file {} - expected {}", mcap_path, kOutputExtension);
         return EXIT_FAILURE;
     }
     if (!fs::exists(input_path))
@@ -504,5 +567,5 @@ int main(const int argc, const char** argv)
         return EXIT_FAILURE;
     }
 
-    return run_session_directory(input_path, mcap_path, options, msg_hz, calibration_path, sn_path);
+    return run_session_directory(input_path, mcap_path, options, msg_hz, acc_scale, calibration_path, sn_path);
 }

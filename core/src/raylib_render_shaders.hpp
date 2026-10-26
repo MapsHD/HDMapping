@@ -55,6 +55,8 @@ uniform int xzOn;
 uniform int yzOn;
 uniform int xyOn;
 uniform float intersectionWidth;
+uniform int clipPlaneCount;
+uniform vec4 clipPlanes[6];
 in float fragIntensity;
 in vec3 fragWorldPos;
 out vec4 finalColor;
@@ -69,6 +71,11 @@ void main()
         if (yzOn != 0 && abs(fragWorldPos.x) < intersectionWidth) inSlab = true;
         if (xyOn != 0 && abs(fragWorldPos.z) < intersectionWidth) inSlab = true;
         if (!inSlab) discard;
+    }
+
+    for (int i = 0; i < clipPlaneCount; ++i)
+    {
+        if (dot(clipPlanes[i].xyz, fragWorldPos) + clipPlanes[i].w < 0.0) discard;
     }
 
     if (colorMode == 1)

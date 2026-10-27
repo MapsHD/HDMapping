@@ -4702,8 +4702,10 @@ void draw_section_preview()
         Matrix modelMat = rlGetMatrixModelview();
         float projection[16] = { projMat.m0, projMat.m1, projMat.m2,  projMat.m3,  projMat.m4,  projMat.m5,  projMat.m6,  projMat.m7,
                                  projMat.m8, projMat.m9, projMat.m10, projMat.m11, projMat.m12, projMat.m13, projMat.m14, projMat.m15 };
-        float modelview[16] = { modelMat.m0, modelMat.m1, modelMat.m2,  modelMat.m3,  modelMat.m4,  modelMat.m5,  modelMat.m6,  modelMat.m7,
-                                modelMat.m8, modelMat.m9, modelMat.m10, modelMat.m11, modelMat.m12, modelMat.m13, modelMat.m14, modelMat.m15 };
+        float modelview[16] = {
+            modelMat.m0, modelMat.m1, modelMat.m2,  modelMat.m3,  modelMat.m4,  modelMat.m5,  modelMat.m6,  modelMat.m7,
+            modelMat.m8, modelMat.m9, modelMat.m10, modelMat.m11, modelMat.m12, modelMat.m13, modelMat.m14, modelMat.m15
+        };
         changed = ImGuizmo::Manipulate(modelview, projection, ImGuizmo::TRANSLATE | ImGuizmo::ROTATE, ImGuizmo::LOCAL, m, nullptr);
     }
     else

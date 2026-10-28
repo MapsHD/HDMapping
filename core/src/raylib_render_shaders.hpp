@@ -16,20 +16,27 @@ namespace raylib_render_shaders
     // pointColor (0, the original app's only mode) and the ScanColorMode
     // gradients (1/2/3), matching the enum's Intensity/Elevation/Distance
     // ordering exactly (see ScanRenderer::draw()'s static_cast below).
+    // model displaces the cached world-space points to the pose actually shown
+    // (identity for a plain draw; a pose delta for drawCachedWithTransform() or
+    // useInitialPose). It is applied before fragWorldPos, not folded into mvp, so
+    // the intersection slab and the Elevation/Distance gradients follow the
+    // displaced points instead of the pose they were cached at.
     inline constexpr const char* kPointVS = R"(
 #version 330
 in vec3 vertexPosition;
 in float vertexIntensity;
 uniform mat4 mvp;
+uniform mat4 model;
 uniform float pointSize;
 out float fragIntensity;
 out vec3 fragWorldPos;
 void main()
 {
-    gl_Position = mvp * vec4(vertexPosition, 1.0);
+    vec4 worldPos = model * vec4(vertexPosition, 1.0);
+    gl_Position = mvp * worldPos;
     gl_PointSize = pointSize;
     fragIntensity = vertexIntensity;
-    fragWorldPos = vertexPosition;
+    fragWorldPos = worldPos.xyz;
 }
 )";
 

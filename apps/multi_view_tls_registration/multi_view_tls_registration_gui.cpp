@@ -205,6 +205,11 @@ inline AppStateBase app_state;
 // showEulerCenterOfRotationWindow() in display() below.
 bool cor_gui = false;
 
+// Control Points editing shows only the active (index_pose) scan; when set,
+// all other scans are drawn too, flat gray, as context for finding the CP
+// location (issue #436). Display-only -- CP picking still uses the active scan.
+bool cp_show_all_scans = false;
+
 bool scroll_hint_enabled = true;
 bool scroll_hint_active = false;
 int scroll_hint_count = 0;
@@ -4109,6 +4114,32 @@ void renderControlPoints(const ControlPoints& control_points, PointClouds& point
 
     if (control_points.is_imgui && control_points.index_pose >= 0 && static_cast<size_t>(control_points.index_pose) < pointClouds.size())
     {
+        if (cp_show_all_scans)
+        {
+            const Color contextColor{ 90, 90, 90, 255 };
+            for (size_t i = 0; i < pointClouds.size(); ++i)
+            {
+                if (static_cast<int>(i) == control_points.index_pose)
+                {
+                    continue;
+                }
+                scan_renderer.drawCachedWithTransform(
+                    i,
+                    Eigen::Affine3d::Identity(),
+                    contextColor,
+                    static_cast<float>(app_state.point_size),
+                    ScanColorMode::Flat,
+                    0.f,
+                    1.f,
+                    Eigen::Vector3d::Zero(),
+                    1.f,
+                    point_clouds_container.xz_intersection,
+                    point_clouds_container.yz_intersection,
+                    point_clouds_container.xy_intersection,
+                    static_cast<float>(point_clouds_container.intersection_width));
+            }
+        }
+
         std::vector<bool> wasVisible(pointClouds.size());
         for (size_t i = 0; i < pointClouds.size(); ++i)
         {
@@ -4904,10 +4935,25 @@ void display()
     ShowMainDockSpace();
 
     if (session.control_points.is_imgui)
+    {
         session.control_points.imgui(
             session.point_clouds_container,
             Eigen::Vector3f(
                 app_state.camera.euler.rotationCenter.x, app_state.camera.euler.rotationCenter.y, app_state.camera.euler.rotationCenter.z));
+
+        // Appends to the same "Control Point" window ControlPoints::imgui() just built.
+        if (session.control_points.is_imgui)
+        {
+            if (ImGui::Begin("Control Point", &session.control_points.is_imgui))
+            {
+                ImGui::Separator();
+                ImGui::Checkbox("Show all scans (gray)", &cp_show_all_scans);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Off: only the active scan. On: all scans as context; CP picking still uses the active scan");
+            }
+            ImGui::End();
+        }
+    }
 
     if (session.ground_control_points.is_imgui)
         session.ground_control_points.imgui(session.point_clouds_container);

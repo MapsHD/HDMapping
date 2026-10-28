@@ -198,12 +198,17 @@ disable_target_warnings(Fusion)
 
 # CPack configuration
 set(CPACK_PACKAGE_NAME "hd_mapping")
-set(CPACK_PACKAGE_VERSION "${HDMAPPING_VERSION_MAJOR}.${HDMAPPING_VERSION_MINOR}.${HDMAPPING_VERSION_PATCH}")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+# Package only the applications, not the headers, static libs and CMake configs
+# that bundled third-party subprojects (eigen, glew, raylib, ...) install.
+set(CPACK_INSTALL_CMAKE_PROJECTS "${CMAKE_BINARY_DIR};${PROJECT_NAME};${HDMAPPING_INSTALL_COMPONENT};/")
 
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "HD Mapping debian package for Mandeye")
 set(CPACK_PACKAGE_CONTACT "januszbedkowski@gmail.com")
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Janusz Bedkowski <januszbedkowski@gmail.com>")
-set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.28), libstdc++6 (>= 8.3.0), freeglut3-dev, libeigen3-dev, liblaszip-dev")
+# Derive runtime dependencies (libglut, liblaszip, libtbb, libopencv-*, ...)
+# from the packaged binaries instead of listing them by hand.
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
 if(WIN32)
     set(CPACK_GENERATOR "ZIP")
 else()

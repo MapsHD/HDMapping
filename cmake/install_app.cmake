@@ -6,6 +6,9 @@ include_guard()
 set(HDMAPPING_BINARY_PREFIX "hdmapping-" CACHE STRING
     "Prefix applied to installed executable names")
 
+# Install component holding the applications; CPack packages only this one.
+set(HDMAPPING_INSTALL_COMPONENT "applications")
+
 # hdmapping_install_app(<target>...)
 #
 # Installs each target into <prefix>/bin as "${HDMAPPING_BINARY_PREFIX}<name>",
@@ -18,7 +21,7 @@ set(HDMAPPING_BINARY_PREFIX "hdmapping-" CACHE STRING
 # binary verbatim, so the installed executable keeps the build-tree RUNPATH
 # (build/3rdparty/LASzip/lib) instead of having it stripped, and would resolve
 # the bundled liblaszip.so from the build directory rather than the system
-# liblaszip that CPACK_DEBIAN_PACKAGE_DEPENDS declares. So install(TARGETS)
+# liblaszip the DEB depends on. So install(TARGETS)
 # stays responsible for the copy (and its RPATH rewriting), and the file is
 # renamed immediately afterwards by an install-time script.
 #
@@ -32,7 +35,7 @@ function(hdmapping_install_app)
             message(FATAL_ERROR "hdmapping_install_app: no such target '${target_name}'")
         endif()
 
-        install(TARGETS ${target_name} RUNTIME DESTINATION bin)
+        install(TARGETS ${target_name} RUNTIME DESTINATION bin COMPONENT ${HDMAPPING_INSTALL_COMPONENT})
 
         # Declared after the install(TARGETS) above and in the same directory,
         # so it runs after it.
@@ -45,6 +48,6 @@ function(hdmapping_install_app)
                 file(RENAME \"\${_hdmapping_plain}\" \"\${_hdmapping_prefixed}\")
                 message(STATUS \"Installing: \${_hdmapping_prefixed}\")
             endif()
-        ")
+        " COMPONENT ${HDMAPPING_INSTALL_COMPONENT})
     endforeach()
 endfunction()

@@ -2609,12 +2609,13 @@ void exportInMemoryPointClouds(const fs::path& dir, bool visible_only)
     }
 }
 
-std::string saveSession()
+std::string saveSession(std::string output_file_name = "")
 {
-    const std::string output_file_name =
-        mandeye::fd::SaveFileDialog("Save session as", mandeye::fd::Session_filter, ".mjs", session_file_name);
-
-    if (output_file_name.size() > 0)
+    if (output_file_name.empty())
+    {
+        output_file_name = mandeye::fd::SaveFileDialog("Save session as", mandeye::fd::Session_filter, ".mjs", session_file_name);
+    }
+    if (!output_file_name.empty())
     {
         spdlog::info("Session file to save: '{}'", output_file_name);
 
@@ -2789,6 +2790,8 @@ void finalizeScanSession(const std::string& sourceDir, bool fillInSession)
                     outfile.close();
                 }
             }
+            // call 2nd time to update filename of copied LAZes
+            saveSession(output_file_name);
 
             [[maybe_unused]] pfd::message message(
                 "Information",

@@ -2045,7 +2045,7 @@ void display()
         endPoints();
     }
 
-    if (show_trajectory_as_axes)
+    if (!loRunning && show_trajectory_as_axes)
     {
         rlBegin(RL_LINES);
         for (const auto& wd : worker_data)
@@ -2068,7 +2068,7 @@ void display()
         rlEnd();
     }
 
-    if (show_prediction_vectors)
+    if (!loRunning && show_prediction_vectors)
     {
         // Depth test state applies when the batch is drawn, so flush around the toggle. Line widths
         // other than 1 aren't supported by the core-profile context, so these are drawn 1 px wide.
@@ -2092,7 +2092,7 @@ void display()
         rlEnableDepthTest();
     }
 
-    if (intermediate_trajectory_prediction_axes)
+    if (!loRunning && intermediate_trajectory_prediction_axes)
     {
         rlBegin(RL_LINES);
         for (const auto& wd : worker_data)
@@ -2121,7 +2121,7 @@ void display()
         rlEnd();
     }
 
-    if (show_trajectory)
+    if (!loRunning && show_trajectory)
     {
         color3f(0, 1, 1);
         beginPoints(3);
@@ -2274,7 +2274,7 @@ void display()
     }
 
     //
-    if (worker_data.size() > 0)
+    if (!loRunning && worker_data.size() > 0)
     {
         if (index_begin < worker_data.size())
         {
@@ -2642,7 +2642,7 @@ void display()
         }
     }
 
-    if (initial_transformation_gizmo)
+    if (!loRunning && initial_transformation_gizmo)
     {
         ImGuiIO& io = ImGui::GetIO();
         // ImGuizmo -----------------------------------------------
@@ -2682,7 +2682,7 @@ void display()
         params.m_g(3, 3) = m_gizmo[15];
     }
 
-    if (gizmo_stretch_interval)
+    if (!loRunning && gizmo_stretch_interval)
     {
         ImGuiIO& io = ImGui::GetIO();
         // ImGuizmo -----------------------------------------------
@@ -2722,7 +2722,7 @@ void display()
         stretch_gizmo_m(3, 3) = m_gizmo[15];
     }
 
-    if (is_settings_gui)
+    if (!loRunning && is_settings_gui)
     {
         lastPar = 0;
 

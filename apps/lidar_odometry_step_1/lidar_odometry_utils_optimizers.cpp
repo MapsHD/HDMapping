@@ -2248,6 +2248,7 @@ bool process_worker_step_update_rgd_after(
 
         if (params.reference_points.size() == 0)
         {
+            std::scoped_lock lock(params.mutex_buckets_indoor, params.mutex_buckets_outdoor);
             params.buckets_indoor.clear();
             params.buckets_outdoor.clear();
         }

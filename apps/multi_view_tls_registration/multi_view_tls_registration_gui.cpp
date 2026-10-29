@@ -3756,7 +3756,19 @@ void renderLoopClosure(
                              static_cast<unsigned char>(pointClouds[idx].render_color[2] * 255.f),
                              255 };
                 scan_renderer.drawCachedWithTransform(
-                    static_cast<size_t>(idx), delta, c, static_cast<float>(pointClouds[idx].point_size), ScanColorMode::Flat);
+                    static_cast<size_t>(idx),
+                    delta,
+                    c,
+                    static_cast<float>(pointClouds[idx].point_size),
+                    ScanColorMode::Flat,
+                    0.f,
+                    1.f,
+                    Eigen::Vector3d::Zero(),
+                    1.f,
+                    point_clouds_container.xz_intersection,
+                    point_clouds_container.yz_intersection,
+                    point_clouds_container.xy_intersection,
+                    static_cast<float>(point_clouds_container.intersection_width));
             }
         }
     }

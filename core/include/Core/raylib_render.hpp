@@ -113,8 +113,9 @@ public:
     // useInitialPose draws every scan at its m_initial_pose instead of its
     // current m_pose (ports the legacy PointCloud::render()'s
     // show_with_initial_pose branch). The cached GPU buffers stay baked at
-    // m_pose; the per-scan delta (m_initial_pose * m_pose^-1) is folded into
-    // the MVP, the same trick drawCachedWithTransform() uses to preview a pose.
+    // m_pose; the per-scan delta (m_initial_pose * m_pose^-1) is applied in
+    // the vertex shader, the same trick drawCachedWithTransform() uses to
+    // preview a pose, so the slab filter and gradients follow the shown pose.
     void draw(
         const std::vector<PointCloud>& pointClouds,
         float pointSize,
@@ -198,8 +199,9 @@ public:
     // re-upload -- displaced by an extra transform on top of the pose it
     // was cached at. extraTransform is the delta from the scan's current
     // m_pose to the desired preview pose (i.e. previewPose * m_pose.inverse());
-    // it's folded into the MVP matrix for this draw call rather than applied
-    // to the points themselves. For overlays that need to preview a scan at
+    // it's applied in the vertex shader for this draw call rather than to the
+    // cached points themselves, ahead of the slab filter and Elevation/Distance
+    // gradients, so both follow the preview pose. For overlays that need to preview a scan at
     // a pose other than its stored one without paying for a CPU retransform
     // every frame (e.g. a loop-closure edge's in-progress relative pose, or a
     // gizmo-drag preview). colorMode selects the shader's gradient exactly as
@@ -297,6 +299,7 @@ private:
     Shader shader_{};
     bool shaderValid_ = false;
     int locMVP_ = -1;
+    int locModel_ = -1;
     int locPointSize_ = -1;
     int locColor_ = -1;
     int locColorMode_ = -1;

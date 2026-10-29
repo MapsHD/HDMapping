@@ -49,6 +49,7 @@ void ScanRenderer::init()
     if (shaderValid_)
     {
         locMVP_ = rlGetLocationUniform(shader_.id, "mvp");
+        locModel_ = rlGetLocationUniform(shader_.id, "model");
         locPointSize_ = rlGetLocationUniform(shader_.id, "pointSize");
         locColor_ = rlGetLocationUniform(shader_.id, "pointColor");
         locColorMode_ = rlGetLocationUniform(shader_.id, "colorMode");
@@ -198,8 +199,8 @@ void ScanRenderer::syncPoses(const std::vector<PointCloud>& pointClouds)
 namespace
 {
     // Defined lower down with the other file-local helpers; forward declared
-    // here so draw()/drawTrajectories() can fold a per-scan initial-pose delta
-    // into the MVP.
+    // here so draw()/drawTrajectories() can set a per-scan initial-pose delta
+    // as the shader's model matrix.
     Matrix toRaylibMatrix(const Eigen::Affine3d& t);
 } // namespace
 
@@ -234,6 +235,7 @@ void ScanRenderer::draw(
 
     rlEnableShader(shader_.id);
     rlSetUniformMatrix(locMVP_, mvp);
+    rlSetUniformMatrix(locModel_, MatrixIdentity());
     rlSetUniform(locPointSize_, &pointSize, RL_SHADER_UNIFORM_FLOAT, 1);
     rlSetUniform(locElevMin_, &elevationMin, RL_SHADER_UNIFORM_FLOAT, 1);
     rlSetUniform(locElevMax_, &elevationMax, RL_SHADER_UNIFORM_FLOAT, 1);
@@ -281,14 +283,14 @@ void ScanRenderer::draw(
         }
 
         // Points are cached in world space at m_pose (see rebuild()); to show
-        // them at m_initial_pose instead, prepend the delta
-        // (m_initial_pose * m_pose^-1) to the shared MVP for this scan only --
-        // same technique as drawCachedWithTransform(). With useInitialPose off
-        // the MVP set once above is left untouched.
+        // them at m_initial_pose instead, set the delta
+        // (m_initial_pose * m_pose^-1) as this scan's model matrix -- same
+        // technique as drawCachedWithTransform(). With useInitialPose off the
+        // identity model set once above is left untouched.
         if (useInitialPose)
         {
             const Eigen::Affine3d delta = pc.m_initial_pose * pc.m_pose.inverse();
-            rlSetUniformMatrix(locMVP_, MatrixMultiply(toRaylibMatrix(delta), mvp));
+            rlSetUniformMatrix(locModel_, toRaylibMatrix(delta));
         }
 
         float color[4];
@@ -334,11 +336,6 @@ void ScanRenderer::draw(
             lastVertexCount_ += drawCount;
         }
         rlDisableVertexArray();
-    }
-
-    if (useInitialPose)
-    {
-        rlSetUniformMatrix(locMVP_, mvp); // undo the last scan's per-scan fold
     }
 
     rlDisableShader();
@@ -437,17 +434,16 @@ void ScanRenderer::drawCachedWithTransform(
 
     rlDrawRenderBatchActive();
 
-    Matrix mvpBase = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection());
-    // MatrixMultiply(A, B) composes as "apply A, then B" (see draw()'s own
-    // modelview-then-projection use above) -- so this applies the delta
-    // transform to the cached points first, then the normal view/projection.
-    Matrix mvp = MatrixMultiply(toRaylibMatrix(extraTransform), mvpBase);
+    Matrix mvp = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection());
 
     float colorF[4] = { color.r / 255.f, color.g / 255.f, color.b / 255.f, color.a / 255.f };
     int colorModeInt = static_cast<int>(colorMode);
 
     rlEnableShader(shader_.id);
     rlSetUniformMatrix(locMVP_, mvp);
+    // The delta goes in the model matrix, not the MVP, so the slab filter and
+    // gradients see the displaced positions (see kPointVS).
+    rlSetUniformMatrix(locModel_, toRaylibMatrix(extraTransform));
     rlSetUniform(locPointSize_, &pointSize, RL_SHADER_UNIFORM_FLOAT, 1);
     rlSetUniform(locColor_, colorF, RL_SHADER_UNIFORM_VEC4, 1);
     rlSetUniform(locColorMode_, &colorModeInt, RL_SHADER_UNIFORM_INT, 1);
@@ -532,6 +528,7 @@ void ScanRenderer::drawPoints(const PointsGPU& gpu, Color color, float pointSize
 
     rlEnableShader(shader_.id);
     rlSetUniformMatrix(locMVP_, mvp);
+    rlSetUniformMatrix(locModel_, MatrixIdentity());
     rlSetUniform(locColorMode_, &colorModeFlat, RL_SHADER_UNIFORM_INT, 1);
     rlSetUniform(locColor_, colorF, RL_SHADER_UNIFORM_VEC4, 1);
     rlSetUniform(locPointSize_, &pointSize, RL_SHADER_UNIFORM_FLOAT, 1);
@@ -706,15 +703,12 @@ void ScanRenderer::drawTrajectories(
         return;
     }
 
-    // Hoisted out of the `if (shaderValid_)` block below so the per-scan
-    // initial-pose MVP fold in the draw loop can use it as the base.
-    const Matrix mvp = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection());
-
     if (shaderValid_)
     {
         rlDrawRenderBatchActive();
         rlEnableShader(shader_.id);
-        rlSetUniformMatrix(locMVP_, mvp);
+        rlSetUniformMatrix(locMVP_, MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection()));
+        rlSetUniformMatrix(locModel_, MatrixIdentity());
         int colorModeFlat = 0;
         rlSetUniform(locColorMode_, &colorModeFlat, RL_SHADER_UNIFORM_INT, 1);
         // Explicitly off -- see drawCachedWithTransform()'s comment on why.
@@ -734,8 +728,8 @@ void ScanRenderer::drawTrajectories(
         }
 
         // Same initial-pose handling as draw(): the trajectory GPU buffer is
-        // cached at m_pose, so fold (m_initial_pose * m_pose^-1) into the MVP
-        // for the polyline; the CPU-side overlays just use shownPose directly.
+        // cached at m_pose, so set (m_initial_pose * m_pose^-1) as the model
+        // matrix for the polyline; the CPU-side overlays just use shownPose directly.
         const Eigen::Affine3d& shownPose = useInitialPose ? pc.m_initial_pose : pc.m_pose;
 
         if (visibleImuDiff)
@@ -766,7 +760,7 @@ void ScanRenderer::drawTrajectories(
                 if (useInitialPose)
                 {
                     const Eigen::Affine3d delta = pc.m_initial_pose * pc.m_pose.inverse();
-                    rlSetUniformMatrix(locMVP_, MatrixMultiply(toRaylibMatrix(delta), mvp));
+                    rlSetUniformMatrix(locModel_, toRaylibMatrix(delta));
                 }
                 float colorF[4] = { pc.traj_color[0], pc.traj_color[1], pc.traj_color[2], 1.0f };
                 rlSetUniform(locColor_, colorF, RL_SHADER_UNIFORM_VEC4, 1);
@@ -777,7 +771,7 @@ void ScanRenderer::drawTrajectories(
                 rlDisableVertexArray();
                 if (useInitialPose)
                 {
-                    rlSetUniformMatrix(locMVP_, mvp); // restore for the next scan
+                    rlSetUniformMatrix(locModel_, MatrixIdentity()); // restore for the next scan
                 }
             }
         }

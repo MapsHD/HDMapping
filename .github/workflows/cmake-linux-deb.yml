@@ -7,6 +7,8 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  release:
+    types: [ published ]
 
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
@@ -18,6 +20,8 @@ jobs:
     # You can convert this to a matrix build if you need cross-platform coverage.
     # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
 
     steps:
     - name: Load repository cache
@@ -42,7 +46,7 @@ jobs:
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
       # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBUILD_WITH_UTILITY_APPLICATION=ON -DBUILD_WITH_BUNDLED_FREEGLUT=0 -DBUILD_WITH_BUNDLED_EIGEN=0 -DBUILD_WITH_BUNDLED_LIBLASZIP=0 -DBUILD_TESTING=ON -DCPACK_PACKAGE_FILE_NAME=hd_mapping-${{env.VERSION}}-amd64
+      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBUILD_WITH_UTILITY_APPLICATION=ON -DBUILD_WITH_BUNDLED_FREEGLUT=0 -DBUILD_WITH_BUNDLED_EIGEN=0 -DBUILD_WITH_BUNDLED_LIBLASZIP=0 -DBUILD_WITH_BUNDLED_ONETBB=0 -DBUILD_TESTING=ON -DCPACK_PACKAGE_FILE_NAME=hd_mapping-${{env.VERSION}}-amd64
   
     - name: Build
       # Build your program with the given configuration
@@ -59,3 +63,9 @@ jobs:
       with:
         name: hd_mapping-deb-${{env.VERSION}}
         path: ${{github.workspace}}/build/*.deb
+
+    - name: Attach to GitHub release
+      if: github.event_name == 'release'
+      uses: softprops/action-gh-release@v2
+      with:
+        files: ${{github.workspace}}/build/*.deb

@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cmath>
 #include <filesystem>
+#include <functional>
 #include <iostream>
 #include <map>
 #include <memory>
@@ -71,6 +72,9 @@ struct LidarOdometryParams
     // runtime state of the two options above, not parameters (not saved to the parameter file)
     std::shared_ptr<RawCloudLoader> raw_cloud_loader;
     PointsGlobalSpill* points_global_spill = nullptr;
+
+    // Optional GUI observer, called by the producer only at safe trajectory boundaries.
+    std::function<void(const std::vector<WorkerData>&, bool)> publish_trajectory;
 
     // filter points
     double filter_threshold_xy_inner = 0.3; // filtering points during load

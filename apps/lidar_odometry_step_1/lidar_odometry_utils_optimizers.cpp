@@ -2248,6 +2248,7 @@ bool process_worker_step_update_rgd_after(
 
         if (params.reference_points.size() == 0)
         {
+            std::scoped_lock lock(params.mutex_buckets_indoor, params.mutex_buckets_outdoor);
             params.buckets_indoor.clear();
             params.buckets_outdoor.clear();
         }
@@ -2438,6 +2439,8 @@ static bool compute_step_2_impl(
     spdlog::stopwatch stopwatch_worker;
     if (initialize_lidar_odometry(worker_data, params, ts_failure, loProgress, pause, debugMsg, lookup_stats))
     {
+        if (params.publish_trajectory)
+            params.publish_trajectory(worker_data, true);
         for (int i = 0; i < worker_data.size(); i++)
         {
             HDMAP_ZONE_BEGIN(before_iter, "before_iterations");
@@ -2451,6 +2454,8 @@ static bool compute_step_2_impl(
 
             if (pause)
             {
+                if (params.publish_trajectory)
+                    params.publish_trajectory(worker_data, true);
                 parked.store(true);
                 while (pause)
                 {
@@ -2498,6 +2503,9 @@ static bool compute_step_2_impl(
                 ts_failure,
                 intermediate_points);
             const double elapsed_seconds_process_worker_step_2 = stopwatch_worker_process_worker_step_2.elapsed().count();
+
+            if (params.publish_trajectory)
+                params.publish_trajectory(worker_data, false);
 
             auto tmp_worker_data = worker_data[i].intermediate_trajectory;
 
@@ -2629,6 +2637,9 @@ static bool compute_step_2_impl(
                 }
             }
             HDMAP_ZONE_END(propagate_traj);
+
+            if (params.publish_trajectory)
+                params.publish_trajectory(worker_data, false);
 
             HDMAP_ZONE_BEGIN(transform_pts, "transform_points_global");
             for (int j = 0; j < intermediate_points.size(); j++)

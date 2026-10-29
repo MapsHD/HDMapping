@@ -168,6 +168,31 @@ int lastPar = 1;
 
 std::vector<WorkerData> worker_data;
 
+// Only display fields are copied; raw IMU, timestamps and point-cache paths stay with the worker.
+std::mutex trajectory_preview_mutex;
+std::shared_ptr<const std::vector<WorkerData>> trajectory_preview;
+
+void publish_trajectory_preview(const std::vector<WorkerData>& source, bool force)
+{
+    static auto last_update = std::chrono::steady_clock::time_point{}; // single producer, GUI only while the worker is stopped
+    const auto now = std::chrono::steady_clock::now();
+    if (!force && now - last_update < std::chrono::milliseconds(100))
+        return;
+    auto preview = std::make_shared<std::vector<WorkerData>>(source.size());
+    for (size_t i = 0; i < source.size(); ++i)
+    {
+        (*preview)[i].intermediate_trajectory = source[i].intermediate_trajectory;
+        (*preview)[i].intermediate_trajectory_prediction = source[i].intermediate_trajectory_prediction;
+        (*preview)[i].imu_prediction_vector = source[i].imu_prediction_vector;
+    }
+    std::shared_ptr<const std::vector<WorkerData>> published = std::move(preview);
+    {
+        std::scoped_lock lock(trajectory_preview_mutex);
+        trajectory_preview.swap(published);
+    } // the previous snapshot is released outside the lock
+    last_update = now;
+}
+
 std::string working_directory = "";
 bool initial_transformation_gizmo = false;
 
@@ -654,6 +679,7 @@ void step1(const std::string& input_folder_name, const std::atomic<bool>& loPaus
             {
                 release_raw_clouds(pointsPerFile, params); // nothing after step 1 reads them
                 step_1_done = true;
+                publish_trajectory_preview(worker_data, true);
             }
             else
                 std::cerr << "Lidar odometry step 1 failed (see the messages above)" << std::endl;
@@ -674,7 +700,9 @@ void step1(const std::string& input_folder_name, const std::atomic<bool>& loPaus
 void step2(const std::atomic<bool>& loPause)
 {
     double ts_failure = 0.0;
-    if (compute_step_2(worker_data, params, ts_failure, loProgress, loPause, full_debug_messages, loParked))
+    const bool success = compute_step_2(worker_data, params, ts_failure, loProgress, loPause, full_debug_messages, loParked);
+    publish_trajectory_preview(worker_data, true);
+    if (success)
         step_2_done = true;
     else
     {
@@ -1953,6 +1981,14 @@ void display()
     if (loQuitting && (loParked || !loRunning))
         quit_abandoned_run();
 
+    const auto preview = [] // retain an immutable snapshot for this whole frame
+    {
+        std::scoped_lock lock(trajectory_preview_mutex);
+        return trajectory_preview;
+    }();
+    static const std::vector<WorkerData> empty_preview;
+    const auto& display_workers = !loRunning ? worker_data : preview ? *preview : empty_preview;
+
     ImGuiIO& io = ImGui::GetIO();
     rlViewport(0, 0, GetRenderWidth(), GetRenderHeight());
 
@@ -2048,7 +2084,7 @@ void display()
     if (show_trajectory_as_axes)
     {
         rlBegin(RL_LINES);
-        for (const auto& wd : worker_data)
+        for (const auto& wd : display_workers)
         {
             for (const auto& it : wd.intermediate_trajectory)
             {
@@ -2075,7 +2111,7 @@ void display()
         rlDrawRenderBatchActive();
         rlDisableDepthTest();
         rlBegin(RL_LINES);
-        for (const auto& wd : worker_data)
+        for (const auto& wd : display_workers)
         {
             if (wd.intermediate_trajectory.empty() || wd.imu_prediction_vector.norm() < 1e-6)
                 continue;
@@ -2095,7 +2131,7 @@ void display()
     if (intermediate_trajectory_prediction_axes)
     {
         rlBegin(RL_LINES);
-        for (const auto& wd : worker_data)
+        for (const auto& wd : display_workers)
         {
             if (wd.intermediate_trajectory.empty() || wd.intermediate_trajectory_prediction.empty())
                 continue;
@@ -2125,7 +2161,7 @@ void display()
     {
         color3f(0, 1, 1);
         beginPoints(3);
-        for (const auto& wd : worker_data)
+        for (const auto& wd : display_workers)
         {
             for (const auto& it : wd.intermediate_trajectory)
                 pointVertex3f(it(0, 3), it(1, 3), it(2, 3));
@@ -2134,9 +2170,9 @@ void display()
 
         rlBegin(RL_LINES);
         rlColor3f(1, 0, 0);
-        if (worker_data.size() > 0)
+        if (display_workers.size() > 0)
         {
-            const auto& wd = worker_data[worker_data.size() - 1];
+            const auto& wd = display_workers[display_workers.size() - 1];
             if (wd.intermediate_trajectory.size() > 0)
             {
                 const auto& it = wd.intermediate_trajectory[wd.intermediate_trajectory.size() - 1];
@@ -2274,15 +2310,15 @@ void display()
     }
 
     //
-    if (worker_data.size() > 0)
+    if (display_workers.size() > 0)
     {
-        if (index_begin < worker_data.size())
+        if (index_begin < display_workers.size())
         {
             rlBegin(RL_LINES);
             rlColor3f(1, 1, 0);
-            if (worker_data[index_begin].intermediate_trajectory.size() > 0)
+            if (display_workers[index_begin].intermediate_trajectory.size() > 0)
             {
-                auto p = worker_data[index_begin].intermediate_trajectory[0].translation();
+                auto p = display_workers[index_begin].intermediate_trajectory[0].translation();
                 rlVertex3f(p.x() - 1, p.y(), p.z());
                 rlVertex3f(p.x() + 1, p.y(), p.z());
 
@@ -2295,13 +2331,13 @@ void display()
             rlEnd();
         }
 
-        if (index_end < worker_data.size())
+        if (index_end < display_workers.size())
         {
             rlBegin(RL_LINES);
             rlColor3f(0, 1, 1);
-            if (worker_data[index_end].intermediate_trajectory.size() > 0)
+            if (display_workers[index_end].intermediate_trajectory.size() > 0)
             {
-                auto p = worker_data[index_end].intermediate_trajectory[0].translation();
+                auto p = display_workers[index_end].intermediate_trajectory[0].translation();
                 rlVertex3f(p.x() - 1, p.y(), p.z());
                 rlVertex3f(p.x() + 1, p.y(), p.z());
 
@@ -2642,7 +2678,7 @@ void display()
         }
     }
 
-    if (initial_transformation_gizmo)
+    if (!loRunning && initial_transformation_gizmo)
     {
         ImGuiIO& io = ImGui::GetIO();
         // ImGuizmo -----------------------------------------------
@@ -2682,7 +2718,7 @@ void display()
         params.m_g(3, 3) = m_gizmo[15];
     }
 
-    if (gizmo_stretch_interval)
+    if (!loRunning && gizmo_stretch_interval)
     {
         ImGuiIO& io = ImGui::GetIO();
         // ImGuizmo -----------------------------------------------
@@ -2722,7 +2758,7 @@ void display()
         stretch_gizmo_m(3, 3) = m_gizmo[15];
     }
 
-    if (is_settings_gui)
+    if (!loRunning && is_settings_gui)
     {
         lastPar = 0;
 
@@ -2900,6 +2936,7 @@ int main(int argc, char* argv[])
         {
             std::cout << argv[0] << " input_folder parameters(*.toml) output_folder" << std::endl;
 
+            params.publish_trajectory = publish_trajectory_preview;
             initGL(&argc, argv, winTitle, display, mouse);
 
 #ifdef _WIN32

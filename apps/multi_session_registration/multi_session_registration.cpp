@@ -43,6 +43,7 @@
 
 #endif
 
+#include "multi_session_edges.h"
 #include "multi_session_factor_graph.h"
 #include "raylib_utils.h"
 
@@ -1822,84 +1823,6 @@ void generate_loop_closures(const std::vector<Session>& sessions, std::vector<Ed
     } // for(int i1 = 0; i1 < sessions.size(); i1++)
 }
 
-void icp_all_edges(std::vector<Session>& sessions, std::vector<Edge>& edges, float sr)
-{
-    std::cout << "icp_all_edges" << std::endl;
-
-    int number_of_iterations = 10;
-
-    for (size_t index_active_edge = 0; index_active_edge < edges.size(); index_active_edge++)
-    {
-        PairWiseICP icp;
-        auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-
-        std::vector<Eigen::Vector3d> source;
-        auto& e = edges[index_active_edge];
-        for (int i = -num_edge_extended_before; i <= num_edge_extended_after; i++)
-        {
-            int index_src = e.index_to + i;
-            if (index_src >= 0 &&
-                index_src < sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds.size())
-            {
-                Eigen::Affine3d m_src =
-                    sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds.at(index_src).m_pose;
-                for (int k = 0; k <
-                     sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[index_src].points_local.size();
-                     k++)
-                {
-                    Eigen::Vector3d p_g = m_src *
-                        sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[index_src].points_local[k];
-                    source.push_back(p_g);
-                }
-                // point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
-            }
-        }
-        std::vector<Eigen::Vector3d> target;
-
-        for (int i = -num_edge_extended_before; i <= num_edge_extended_after; i++)
-        {
-            int index_trg = e.index_from + i;
-            if (index_trg >= 0 &&
-                index_trg < sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds.size())
-            {
-                Eigen::Affine3d m_trg =
-                    sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds.at(index_trg).m_pose;
-                for (int k = 0; k < sessions[edges[index_active_edge].index_session_from]
-                                        .point_clouds_container.point_clouds[index_trg]
-                                        .points_local.size();
-                     k++)
-                {
-                    Eigen::Vector3d p_g = m_trg *
-                        sessions[edges[index_active_edge].index_session_from]
-                            .point_clouds_container.point_clouds[index_trg]
-                            .points_local[k];
-                    target.push_back(p_g);
-                }
-                // point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
-            }
-        }
-
-        Eigen::Affine3d m_src_inv =
-            sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[e.index_to].m_pose.inverse();
-
-        for (auto& p : source)
-        {
-            p = m_src_inv * p;
-        }
-
-        Eigen::Affine3d m_trg_inv =
-            sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[e.index_from].m_pose.inverse();
-
-        for (auto& p : target)
-        {
-            p = m_trg_inv * p;
-        }
-
-        if (icp.compute(source, target, sr, number_of_iterations, m_pose))
-            edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
-    }
-}
-
 void settings_gui()
 {
     if (ImGui::Begin("Settings", &is_settings_gui))
@@ -2348,7 +2271,7 @@ void settings_gui()
 
                     if (ImGui::Button("ICP all edges"))
                     {
-                        icp_all_edges(sessions, edges, search_radius);
+                        icp_all_edges(sessions, edges, search_radius, num_edge_extended_before, num_edge_extended_after);
                     }
                     ImGui::SameLine();
                     ImGui::InputDouble("search_radius", &search_radius);

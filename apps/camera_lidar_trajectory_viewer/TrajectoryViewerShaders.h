@@ -70,7 +70,7 @@ uniform int colorMode;
 uniform int selectedCamera;   // -1 = show all, else keep only points from this image
 uniform float depthColorMax;  // m: colorMode 4 maps 0..this onto the jet colormap
 out vec4 finalColor;
-)") + raylib_widgets::kJetColormapGLSL +
+)") + raylib_widgets::kColormapsGLSL +
         R"(
 vec3 hsv2rgb(vec3 c) {
     vec4 K = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);

@@ -38,16 +38,16 @@
 // ============================================================================
 // ScanRenderer -- GPU (rlgl-based) rendering of Core::PointCloud scans.
 // ============================================================================
-// Per-point GPU color modes for ScanRenderer::draw() -- jet-colormap
+// Per-point GPU color modes for ScanRenderer::draw() -- colormap
 // gradients computed in the shader from data already on the GPU (per-point
 // intensity, or world-space position for Elevation/Distance), rather than
 // per-scan flat colors.
 enum class ScanColorMode
 {
     Flat, // pc.render_color, uniform per scan (the original app's only mode)
-    Intensity, // jet colormap by normalized LAS/LAZ intensity
-    Elevation, // jet colormap by world-space Z, normalized over [elevationMin, elevationMax]
-    Distance, // jet colormap by distance from distanceCenter, normalized over [0, distanceMax]
+    Intensity, // colormap by normalized LAS/LAZ intensity
+    Elevation, // colormap by world-space Z, normalized over [elevationMin, elevationMax]
+    Distance, // colormap by distance from distanceCenter, normalized over [0, distanceMax]
     FlatIntensity, // pc.render_color shaded by normalized intensity (keeps per-scan colors distinguishable)
 };
 
@@ -85,7 +85,7 @@ public:
     void syncPoses(const std::vector<PointCloud>& pointClouds);
 
     // colorMode switches every scan from its flat render_color to a
-    // per-point jet-colormap gradient (see ScanColorMode). Intensity is
+    // per-point colormap gradient (see ScanColorMode). Intensity is
     // normalized per scan at rebuild() time (raw intensity range varies by
     // sensor); Elevation/Distance are normalized using the elevationMin/Max
     // and distanceCenter/distanceMax parameters, which the caller computes
@@ -133,6 +133,11 @@ public:
 
     static constexpr int kMaxClipPlanes = 6;
     void setClipPlanes(const Eigen::Vector4d* planes, int count);
+
+    void setColormap(int colormap)
+    {
+        colormap_ = colormap;
+    }
 
     // Number of glDrawArrays calls draw() issued the last time it ran (one
     // per visible scan) -- raylib/rlgl don't expose a draw-call counter for
@@ -303,6 +308,7 @@ private:
     int locPointSize_ = -1;
     int locColor_ = -1;
     int locColorMode_ = -1;
+    int locColormap_ = -1;
     int locElevMin_ = -1;
     int locElevMax_ = -1;
     int locDistCenter_ = -1;
@@ -315,6 +321,7 @@ private:
     int locClipPlanes_ = -1;
     float clipPlanes_[kMaxClipPlanes * 4] = {};
     int clipPlaneCount_ = 0;
+    int colormap_ = 0;
     mutable int lastDrawCallCount_ = 0;
     mutable int lastVertexCount_ = 0;
 };

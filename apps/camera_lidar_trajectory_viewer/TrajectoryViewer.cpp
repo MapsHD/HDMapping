@@ -1318,7 +1318,7 @@ static void loadCloud(AppState& s)
 }
 
 //! Small CPU jet colormap approximation, matching the GLSL one used by the
-//! GPU point renderer's Intensity color mode (raylib_widgets::kJetColormapGLSL)
+//! GPU point renderer's Intensity color mode (raylib_widgets::kColormapsGLSL)
 //! closely enough for a visual reference image. Returns BGR (OpenCV order).
 static cv::Vec3b jetColorBGR(float t)
 {

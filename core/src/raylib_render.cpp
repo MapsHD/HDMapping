@@ -53,6 +53,7 @@ void ScanRenderer::init()
         locPointSize_ = rlGetLocationUniform(shader_.id, "pointSize");
         locColor_ = rlGetLocationUniform(shader_.id, "pointColor");
         locColorMode_ = rlGetLocationUniform(shader_.id, "colorMode");
+        locColormap_ = rlGetLocationUniform(shader_.id, "colormap");
         locElevMin_ = rlGetLocationUniform(shader_.id, "elevMin");
         locElevMax_ = rlGetLocationUniform(shader_.id, "elevMax");
         locDistCenter_ = rlGetLocationUniform(shader_.id, "distCenter");
@@ -237,6 +238,7 @@ void ScanRenderer::draw(
     rlSetUniformMatrix(locMVP_, mvp);
     rlSetUniformMatrix(locModel_, MatrixIdentity());
     rlSetUniform(locPointSize_, &pointSize, RL_SHADER_UNIFORM_FLOAT, 1);
+    rlSetUniform(locColormap_, &colormap_, RL_SHADER_UNIFORM_INT, 1);
     rlSetUniform(locElevMin_, &elevationMin, RL_SHADER_UNIFORM_FLOAT, 1);
     rlSetUniform(locElevMax_, &elevationMax, RL_SHADER_UNIFORM_FLOAT, 1);
     float distCenterF[3] = { static_cast<float>(distanceCenter.x()),
@@ -447,6 +449,7 @@ void ScanRenderer::drawCachedWithTransform(
     rlSetUniform(locPointSize_, &pointSize, RL_SHADER_UNIFORM_FLOAT, 1);
     rlSetUniform(locColor_, colorF, RL_SHADER_UNIFORM_VEC4, 1);
     rlSetUniform(locColorMode_, &colorModeInt, RL_SHADER_UNIFORM_INT, 1);
+    rlSetUniform(locColormap_, &colormap_, RL_SHADER_UNIFORM_INT, 1);
     rlSetUniform(locElevMin_, &elevationMin, RL_SHADER_UNIFORM_FLOAT, 1);
     rlSetUniform(locElevMax_, &elevationMax, RL_SHADER_UNIFORM_FLOAT, 1);
     float distCenterF[3] = { static_cast<float>(distanceCenter.x()),

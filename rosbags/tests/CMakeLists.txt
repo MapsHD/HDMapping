@@ -30,8 +30,7 @@ target_include_directories(hdmapping_rosbags_tests PRIVATE
     ${THIRDPARTY_DIRECTORY}/json/include
 )
 
-find_package(BZip2 REQUIRED)
-target_link_libraries(hdmapping_rosbags_tests PRIVATE mcap BZip2::BZip2 ${PLATFORM_LASZIP_LIB})
+target_link_libraries(hdmapping_rosbags_tests PRIVATE mcap ros1bag_compression ${PLATFORM_LASZIP_LIB})
 
 if (MSVC)
     target_compile_definitions(hdmapping_rosbags_tests PRIVATE _USE_MATH_DEFINES)

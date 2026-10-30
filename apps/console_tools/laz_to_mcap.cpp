@@ -422,7 +422,13 @@ namespace
                 /*calibrations=*/calib.per_sensor,
                 /*rings=*/&rings);
             total_points += points.size();
-            points_with_ring += static_cast<size_t>(std::count_if(rings.begin(), rings.end(), [](uint16_t r) { return r != 0; }));
+            points_with_ring += static_cast<size_t>(std::count_if(
+                rings.begin(),
+                rings.end(),
+                [](uint16_t r)
+                {
+                    return r != 0;
+                }));
             splitter.add(to_mcap_points(points, rings));
             spdlog::info("[{}/{}] {}: {} points", i + 1, chunks.size(), chunks[i].laz, points.size());
 

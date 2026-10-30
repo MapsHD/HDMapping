@@ -1,7 +1,7 @@
 #include "Ros1Bag.h"
 
+#if !defined(MCAP_COMPRESSION_NO_LZ4) // same switch as the mcap target: no compression libraries on Windows
 #include <bzlib.h>
-#if !defined(MCAP_COMPRESSION_NO_LZ4)
 #include <lz4frame.h>
 #endif
 
@@ -261,6 +261,7 @@ bool decompress(const std::string& compression, const std::vector<uint8_t>& in, 
 		out = in;
 		return true;
 	}
+#if !defined(MCAP_COMPRESSION_NO_LZ4)
 	if(compression == "bz2")
 	{
 		unsigned int dst = static_cast<unsigned int>(out_size);
@@ -278,7 +279,6 @@ bool decompress(const std::string& compression, const std::vector<uint8_t>& in, 
 		}
 		return true;
 	}
-#if !defined(MCAP_COMPRESSION_NO_LZ4) // same switch as the mcap target: no liblz4 on Windows
 	if(compression == "lz4")
 	{
 		LZ4F_dctx* ctx = nullptr;

@@ -117,68 +117,64 @@ endif()
 
 # bag_to_laz / laz_to_bag: the ROS1 bag twins of mcap_to_laz / laz_to_mcap,
 # built from the same sources with a define that swaps the reader (writer) for
-# rosbags/Ros1Bag -- no ROS installation needed. Reading bz2 chunks needs
-# libbz2 (liblz4 comes with the mcap target), so both are skipped without it.
-find_package(BZip2)
-if (BZip2_FOUND)
-    add_executable(
-            bag_to_laz mcap_to_laz.cpp
-            ${REPOSITORY_DIRECTORY}/rosbags/Ros1Bag.h ${REPOSITORY_DIRECTORY}/rosbags/Ros1Bag.cpp
-            ${REPOSITORY_DIRECTORY}/rosbags/McapWriter.h ${REPOSITORY_DIRECTORY}/rosbags/McapWriter.cpp
-            ${REPOSITORY_DIRECTORY}/rosbags/MandeyeSessionWriter.h ${REPOSITORY_DIRECTORY}/rosbags/MandeyeSessionWriter.cpp
-    )
-    target_compile_definitions(bag_to_laz PRIVATE HDMAPPING_IMPORT_ROS1_BAG)
-    target_include_directories(
-            bag_to_laz
-            PRIVATE ${REPOSITORY_DIRECTORY}/rosbags
-            ${LASZIP_INCLUDE_DIR}/LASzip/include)
-    target_link_libraries(
-            bag_to_laz
-            PRIVATE
-            mcap
-            BZip2::BZip2
-            spdlog::spdlog
-            ${PLATFORM_LASZIP_LIB}
-            ${PLATFORM_MISCELLANEOUS_LIBS})
+# rosbags/Ros1Bag -- no ROS installation needed. Reading compressed chunks needs
+# ros1bag_compression and mcap (see cmake/dependencies.cmake); on Windows only
+# uncompressed bags are read.
+add_executable(
+        bag_to_laz mcap_to_laz.cpp
+        ${REPOSITORY_DIRECTORY}/rosbags/Ros1Bag.h ${REPOSITORY_DIRECTORY}/rosbags/Ros1Bag.cpp
+        ${REPOSITORY_DIRECTORY}/rosbags/McapWriter.h ${REPOSITORY_DIRECTORY}/rosbags/McapWriter.cpp
+        ${REPOSITORY_DIRECTORY}/rosbags/MandeyeSessionWriter.h ${REPOSITORY_DIRECTORY}/rosbags/MandeyeSessionWriter.cpp
+)
+target_compile_definitions(bag_to_laz PRIVATE HDMAPPING_IMPORT_ROS1_BAG)
+target_include_directories(
+        bag_to_laz
+        PRIVATE ${REPOSITORY_DIRECTORY}/rosbags
+        ${LASZIP_INCLUDE_DIR}/LASzip/include)
+target_link_libraries(
+        bag_to_laz
+        PRIVATE
+        mcap
+        ros1bag_compression
+        spdlog::spdlog
+        ${PLATFORM_LASZIP_LIB}
+        ${PLATFORM_MISCELLANEOUS_LIBS})
 
-    add_executable(
-            laz_to_bag laz_to_mcap.cpp
-            ${REPOSITORY_DIRECTORY}/apps/lidar_odometry_step_1/lidar_odometry_utils.h
-            ${REPOSITORY_DIRECTORY}/apps/lidar_odometry_step_1/lidar_odometry_utils.cpp
-            ${REPOSITORY_DIRECTORY}/rosbags/Ros1Bag.h ${REPOSITORY_DIRECTORY}/rosbags/Ros1Bag.cpp
-            ${REPOSITORY_DIRECTORY}/rosbags/McapWriter.h ${REPOSITORY_DIRECTORY}/rosbags/McapWriter.cpp
-    )
-    target_compile_definitions(laz_to_bag PRIVATE HDMAPPING_EXPORT_ROS1_BAG)
-    target_include_directories(
-            laz_to_bag
-            PRIVATE ${REPOSITORY_DIRECTORY}/apps/lidar_odometry_step_1
-            ${REPOSITORY_DIRECTORY}/core/include
-            ${REPOSITORY_DIRECTORY}/rosbags
-            ${THIRDPARTY_DIRECTORY} # csv.hpp (used by load_imu)
-            ${THIRDPARTY_DIRECTORY}/glm
-            ${EIGEN3_INCLUDE_DIR}
-            ${THIRDPARTY_DIRECTORY}/tomlplusplus/include
-            ${THIRDPARTY_DIRECTORY}/json/include
-            ${LASZIP_INCLUDE_DIR}/LASzip/include
-            ${THIRDPARTY_DIRECTORY}/observation_equations/codes
-            ${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp)
-    target_link_libraries(
-            laz_to_bag
-            PRIVATE
-            mcap
-            BZip2::BZip2
-            unordered_dense::unordered_dense
-            spdlog::spdlog
-            ${PLATFORM_LASZIP_LIB}
-            ${PLATFORM_MISCELLANEOUS_LIBS}
-            ${CORE_LIBRARIES})
+add_executable(
+        laz_to_bag laz_to_mcap.cpp
+        ${REPOSITORY_DIRECTORY}/apps/lidar_odometry_step_1/lidar_odometry_utils.h
+        ${REPOSITORY_DIRECTORY}/apps/lidar_odometry_step_1/lidar_odometry_utils.cpp
+        ${REPOSITORY_DIRECTORY}/rosbags/Ros1Bag.h ${REPOSITORY_DIRECTORY}/rosbags/Ros1Bag.cpp
+        ${REPOSITORY_DIRECTORY}/rosbags/McapWriter.h ${REPOSITORY_DIRECTORY}/rosbags/McapWriter.cpp
+)
+target_compile_definitions(laz_to_bag PRIVATE HDMAPPING_EXPORT_ROS1_BAG)
+target_include_directories(
+        laz_to_bag
+        PRIVATE ${REPOSITORY_DIRECTORY}/apps/lidar_odometry_step_1
+        ${REPOSITORY_DIRECTORY}/core/include
+        ${REPOSITORY_DIRECTORY}/rosbags
+        ${THIRDPARTY_DIRECTORY} # csv.hpp (used by load_imu)
+        ${THIRDPARTY_DIRECTORY}/glm
+        ${EIGEN3_INCLUDE_DIR}
+        ${THIRDPARTY_DIRECTORY}/tomlplusplus/include
+        ${THIRDPARTY_DIRECTORY}/json/include
+        ${LASZIP_INCLUDE_DIR}/LASzip/include
+        ${THIRDPARTY_DIRECTORY}/observation_equations/codes
+        ${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp)
+target_link_libraries(
+        laz_to_bag
+        PRIVATE
+        mcap
+        ros1bag_compression
+        unordered_dense::unordered_dense
+        spdlog::spdlog
+        ${PLATFORM_LASZIP_LIB}
+        ${PLATFORM_MISCELLANEOUS_LIBS}
+        ${CORE_LIBRARIES})
 
-    if (MSVC)
-        target_compile_options(bag_to_laz PRIVATE /bigobj)
-        target_compile_options(laz_to_bag PRIVATE /bigobj)
-    endif()
-else()
-    message(STATUS "bag_to_laz and laz_to_bag skipped: libbz2 not found")
+if (MSVC)
+    target_compile_options(bag_to_laz PRIVATE /bigobj)
+    target_compile_options(laz_to_bag PRIVATE /bigobj)
 endif()
 
 # ouster_pcap_to_laz: Ouster pcap + metadata JSON -> mandeye session directory.

@@ -4,6 +4,7 @@
 // ROS1 serialization of sensor_msgs/PointCloud2 and sensor_msgs/Imu.
 //
 // Reader: chunk compression none, bz2 and lz4 (roslz4 writes LZ4 frames).
+// On Windows only uncompressed chunks are read (MCAP_COMPRESSION_NO_LZ4).
 // Writer: uncompressed chunks with per-chunk index records and a full index
 // section, so `rosbag info`, `rosbag play` and the Python rosbags package all
 // read the result.

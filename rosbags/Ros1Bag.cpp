@@ -410,16 +410,37 @@ bool Ros1BagReader::readIndex()
 	HeaderFields header;
 	std::vector<uint8_t> data;
 	std::string err;
+	std::map<uint32_t, uint64_t> message_counts;
 	while(readRecord(file_, header, data, err))
 	{
 		uint8_t op = 0;
-		if(fieldAs(header, "op", op) && op == kOpConnection)
+		if(!fieldAs(header, "op", op))
+			continue;
+		if(op == kOpConnection)
 		{
 			bool ok = false;
 			const auto c = connectionFromRecord(header, data, ok);
 			if(ok)
 				connections_[c.id] = c;
 		}
+		else if(op == kOpChunkInfo)
+		{
+			ByteReader r{data.data(), data.size()};
+			while(r.i < data.size())
+			{
+				const uint32_t conn = r.get<uint32_t>();
+				const uint32_t count = r.get<uint32_t>();
+				if(!r.ok)
+					break;
+				message_counts[conn] += count;
+			}
+		}
+	}
+	for(const auto& [conn, count] : message_counts)
+	{
+		const auto it = connections_.find(conn);
+		if(it != connections_.end())
+			it->second.message_count = count;
 	}
 	file_.clear();
 	file_.seekg(resume);
@@ -889,9 +910,11 @@ Ros1BagFileReader::Ros1BagFileReader(const std::filesystem::path& path, const Mc
 	for(const auto& [id, c] : reader_.connections())
 	{
 		// One topic can be recorded through several connections (publishers).
-		const bool seen = std::any_of(channels_.begin(), channels_.end(), [&](const ChannelInfo& ch) { return ch.topic == c.topic; });
-		if(!seen)
-			channels_.push_back({c.topic, c.type, "ros1", 0});
+		const auto channel = std::find_if(channels_.begin(), channels_.end(), [&](const ChannelInfo& ch) { return ch.topic == c.topic; });
+		if(channel == channels_.end())
+			channels_.push_back({c.topic, c.type, "ros1", c.message_count});
+		else
+			channel->message_count += c.message_count;
 	}
 	if(channels_.empty())
 	{

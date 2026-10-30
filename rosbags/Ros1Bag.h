@@ -36,6 +36,7 @@ struct Ros1Connection
 	std::string type; // e.g. sensor_msgs/PointCloud2
 	std::string md5sum;
 	std::string message_definition;
+	uint64_t message_count{}; // from the chunk info records of the index section; 0 for an unindexed bag
 };
 
 class Ros1BagReader

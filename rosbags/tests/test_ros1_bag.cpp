@@ -119,50 +119,53 @@ TEST_CASE("Ros1Bag: writer output reads back message for message across chunks")
         REQUIRE(writer.close());
     }
 
-    rosbags::Ros1BagReader reader(path);
-    REQUIRE(reader.isOpen());
-    // Connections come from the index section, before any message is read.
-    REQUIRE(reader.connections().size() == 2);
-    CHECK(reader.connections().at(0).topic == "/lidar/pointcloud");
-    CHECK(reader.connections().at(0).md5sum == rosbags::kRos1PointCloud2Md5);
-    CHECK(reader.connections().at(1).type == rosbags::kRos1ImuType);
-    CHECK(reader.connections().at(1).message_definition == rosbags::kRos1ImuDefinition);
+    {
+        // Scoped so the reader closes the file before fs::remove (Windows).
+        rosbags::Ros1BagReader reader(path);
+        REQUIRE(reader.isOpen());
+        // Connections come from the index section, before any message is read.
+        REQUIRE(reader.connections().size() == 2);
+        CHECK(reader.connections().at(0).topic == "/lidar/pointcloud");
+        CHECK(reader.connections().at(0).md5sum == rosbags::kRos1PointCloud2Md5);
+        CHECK(reader.connections().at(1).type == rosbags::kRos1ImuType);
+        CHECK(reader.connections().at(1).message_definition == rosbags::kRos1ImuDefinition);
 
-    size_t n_cloud = 0, n_imu = 0;
-    uint64_t last_cloud_time = 0;
-    const bool ok = reader.forEachMessage(
-        [&](const rosbags::Ros1Connection& c, uint64_t time_ns, const uint8_t* data, size_t size)
-        {
-            const std::vector<uint8_t> bytes(data, data + size);
-            if (c.topic == "/lidar/pointcloud")
+        size_t n_cloud = 0, n_imu = 0;
+        uint64_t last_cloud_time = 0;
+        const bool ok = reader.forEachMessage(
+            [&](const rosbags::Ros1Connection& c, uint64_t time_ns, const uint8_t* data, size_t size)
             {
-                REQUIRE(n_cloud < clouds.size());
-                CHECK(bytes == clouds[n_cloud]);
-                CHECK(time_ns == t0 + n_cloud * 100'000'000ULL);
-                last_cloud_time = time_ns;
-                ++n_cloud;
-            }
-            else
-            {
-                REQUIRE(n_imu < imus.size());
-                CHECK(bytes == imus[n_imu]);
-                ++n_imu;
-            }
-            return true;
-        });
-    CHECK(ok);
-    CHECK(n_cloud == clouds.size());
-    CHECK(n_imu == imus.size());
-    CHECK(last_cloud_time == t0 + 19 * 100'000'000ULL);
+                const std::vector<uint8_t> bytes(data, data + size);
+                if (c.topic == "/lidar/pointcloud")
+                {
+                    REQUIRE(n_cloud < clouds.size());
+                    CHECK(bytes == clouds[n_cloud]);
+                    CHECK(time_ns == t0 + n_cloud * 100'000'000ULL);
+                    last_cloud_time = time_ns;
+                    ++n_cloud;
+                }
+                else
+                {
+                    REQUIRE(n_imu < imus.size());
+                    CHECK(bytes == imus[n_imu]);
+                    ++n_imu;
+                }
+                return true;
+            });
+        CHECK(ok);
+        CHECK(n_cloud == clouds.size());
+        CHECK(n_imu == imus.size());
+        CHECK(last_cloud_time == t0 + 19 * 100'000'000ULL);
 
-    // Stopping early is honoured.
-    size_t seen = 0;
-    CHECK(reader.forEachMessage(
-        [&](const rosbags::Ros1Connection&, uint64_t, const uint8_t*, size_t)
-        {
-            return ++seen < 5;
-        }));
-    CHECK(seen == 5);
+        // Stopping early is honoured.
+        size_t seen = 0;
+        CHECK(reader.forEachMessage(
+            [&](const rosbags::Ros1Connection&, uint64_t, const uint8_t*, size_t)
+            {
+                return ++seen < 5;
+            }));
+        CHECK(seen == 5);
+    }
 
     fs::remove(path);
 }
@@ -174,9 +177,12 @@ TEST_CASE("Ros1Bag: reader rejects a file that is not a ROS1 bag")
         std::ofstream f(path, std::ios::binary);
         f << "#ROSBAG V1.2\nnot a bag";
     }
-    rosbags::Ros1BagReader reader(path);
-    CHECK_FALSE(reader.isOpen());
-    CHECK_FALSE(reader.error().empty());
+    {
+        // Scoped so the reader closes the file before fs::remove (Windows).
+        rosbags::Ros1BagReader reader(path);
+        CHECK_FALSE(reader.isOpen());
+        CHECK_FALSE(reader.error().empty());
+    }
     fs::remove(path);
 }
 
@@ -216,48 +222,53 @@ TEST_CASE("Ros1BagFileWriter -> Ros1BagFileReader: canonical layout and IMU roun
         REQUIRE(writer.close());
     }
 
-    // Topics are auto-detected by type, as for MCAP.
-    rosbags::Ros1BagFileReader reader(path);
-    REQUIRE_MESSAGE(reader.isOpen(), reader.error());
-    CHECK(reader.topics().lidar == "/lidar/pointcloud");
-    CHECK(reader.topics().imu == "/lidar/imu");
-    CHECK(reader.topics().lidar_schema == rosbags::LidarSchema::PointCloud2);
-    CHECK(reader.channels().size() == 2); // no empty /lidar_sn topic
+    {
+        // Scoped so the reader closes the file before fs::remove (Windows).
+        // Topics are auto-detected by type, as for MCAP.
+        rosbags::Ros1BagFileReader reader(path);
+        REQUIRE_MESSAGE(reader.isOpen(), reader.error());
+        CHECK(reader.topics().lidar == "/lidar/pointcloud");
+        CHECK(reader.topics().imu == "/lidar/imu");
+        CHECK(reader.topics().lidar_schema == rosbags::LidarSchema::PointCloud2);
+        CHECK(reader.channels().size() == 2); // no empty /lidar_sn topic
+        for (const auto& channel : reader.channels())
+            CHECK(channel.message_count == (channel.topic == "/lidar/pointcloud" ? clouds.size() : imu.size()));
 
-    std::vector<std::vector<rosbags::McapPoint>> got;
-    std::vector<rosbags::McapImuSample> got_imu;
-    rosbags::Ros1BagFileReader::Callbacks callbacks;
-    callbacks.onPointCloud = [&](uint64_t, std::vector<rosbags::McapPoint>&& points)
-    {
-        got.push_back(std::move(points));
-    };
-    callbacks.onImu = [&](const rosbags::McapImuSample& s)
-    {
-        got_imu.push_back(s);
-    };
-    REQUIRE(reader.read(callbacks));
-    CHECK(reader.lidarLayoutWarning().empty());
-
-    REQUIRE(got.size() == clouds.size());
-    for (size_t c = 0; c < clouds.size(); ++c)
-    {
-        REQUIRE(got[c].size() == clouds[c].size());
-        for (size_t i = 0; i < clouds[c].size(); ++i)
+        std::vector<std::vector<rosbags::McapPoint>> got;
+        std::vector<rosbags::McapImuSample> got_imu;
+        rosbags::Ros1BagFileReader::Callbacks callbacks;
+        callbacks.onPointCloud = [&](uint64_t, std::vector<rosbags::McapPoint>&& points)
         {
-            CHECK(got[c][i].x == clouds[c][i].x);
-            CHECK(got[c][i].intensity == clouds[c][i].intensity);
-            CHECK(got[c][i].ring == clouds[c][i].ring);
-            // decodePc2Points() takes the float32 `time` (seconds since the first point), which
-            // resolves well below a microsecond over a 0.1 ms spread.
-            CHECK(got[c][i].timestamp == doctest::Approx(clouds[c][i].timestamp).epsilon(1e-12));
+            got.push_back(std::move(points));
+        };
+        callbacks.onImu = [&](const rosbags::McapImuSample& s)
+        {
+            got_imu.push_back(s);
+        };
+        REQUIRE(reader.read(callbacks));
+        CHECK(reader.lidarLayoutWarning().empty());
+
+        REQUIRE(got.size() == clouds.size());
+        for (size_t c = 0; c < clouds.size(); ++c)
+        {
+            REQUIRE(got[c].size() == clouds[c].size());
+            for (size_t i = 0; i < clouds[c].size(); ++i)
+            {
+                CHECK(got[c][i].x == clouds[c][i].x);
+                CHECK(got[c][i].intensity == clouds[c][i].intensity);
+                CHECK(got[c][i].ring == clouds[c][i].ring);
+                // decodePc2Points() takes the float32 `time` (seconds since the first point), which
+                // resolves well below a microsecond over a 0.1 ms spread.
+                CHECK(got[c][i].timestamp == doctest::Approx(clouds[c][i].timestamp).epsilon(1e-12));
+            }
         }
-    }
-    REQUIRE(got_imu.size() == imu.size());
-    for (size_t k = 0; k < imu.size(); ++k)
-    {
-        CHECK(got_imu[k].gyro_x == imu[k].gyro_x);
-        CHECK(got_imu[k].acc_z == imu[k].acc_z);
-        CHECK(got_imu[k].timestamp == doctest::Approx(imu[k].timestamp).epsilon(1e-12));
+        REQUIRE(got_imu.size() == imu.size());
+        for (size_t k = 0; k < imu.size(); ++k)
+        {
+            CHECK(got_imu[k].gyro_x == imu[k].gyro_x);
+            CHECK(got_imu[k].acc_z == imu[k].acc_z);
+            CHECK(got_imu[k].timestamp == doctest::Approx(imu[k].timestamp).epsilon(1e-12));
+        }
     }
 
     fs::remove(path);
@@ -304,24 +315,27 @@ TEST_CASE("Ros1BagFileReader: livox_ros_driver CustomMsg becomes points with rin
         REQUIRE(writer.close());
     }
 
-    rosbags::Ros1BagFileReader reader(path);
-    REQUIRE_MESSAGE(reader.isOpen(), reader.error());
-    CHECK(reader.topics().lidar == "/livox/lidar");
-    CHECK(reader.topics().lidar_schema == rosbags::LidarSchema::LivoxCustomMsg);
-    std::vector<rosbags::McapPoint> points;
-    rosbags::Ros1BagFileReader::Callbacks callbacks;
-    callbacks.onPointCloud = [&](uint64_t, std::vector<rosbags::McapPoint>&& p)
     {
-        points = std::move(p);
-    };
-    REQUIRE(reader.read(callbacks));
-    REQUIRE(points.size() == 3);
-    for (uint32_t i = 0; i < 3; ++i)
-    {
-        CHECK(points[i].x == 1.0f + i);
-        CHECK(points[i].ring == i);
-        CHECK(points[i].intensity == 10.0f * i);
-        CHECK(points[i].timestamp == doctest::Approx(1.7e9 + i * 1e-6).epsilon(1e-15));
+        // Scoped so the reader closes the file before fs::remove (Windows).
+        rosbags::Ros1BagFileReader reader(path);
+        REQUIRE_MESSAGE(reader.isOpen(), reader.error());
+        CHECK(reader.topics().lidar == "/livox/lidar");
+        CHECK(reader.topics().lidar_schema == rosbags::LidarSchema::LivoxCustomMsg);
+        std::vector<rosbags::McapPoint> points;
+        rosbags::Ros1BagFileReader::Callbacks callbacks;
+        callbacks.onPointCloud = [&](uint64_t, std::vector<rosbags::McapPoint>&& p)
+        {
+            points = std::move(p);
+        };
+        REQUIRE(reader.read(callbacks));
+        REQUIRE(points.size() == 3);
+        for (uint32_t i = 0; i < 3; ++i)
+        {
+            CHECK(points[i].x == 1.0f + i);
+            CHECK(points[i].ring == i);
+            CHECK(points[i].intensity == 10.0f * i);
+            CHECK(points[i].timestamp == doctest::Approx(1.7e9 + i * 1e-6).epsilon(1e-15));
+        }
     }
     fs::remove(path);
 }

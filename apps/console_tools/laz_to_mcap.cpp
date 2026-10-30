@@ -21,6 +21,8 @@
 
 #include <spdlog/spdlog.h>
 
+#include "console_progress.h"
+
 namespace fs = std::filesystem;
 
 // load_imu()'s return type spelled out (rather than the `Imu` alias, which
@@ -412,6 +414,7 @@ namespace
         ImuData all_imu;
         std::vector<uint16_t> rings;
         MessageSplitter splitter(writer, msg_hz);
+        const ConsoleProgress progress("Chunks", chunks.size());
         for (size_t i = 0; i < chunks.size(); ++i)
         {
             auto points = load_point_cloud(
@@ -430,7 +433,7 @@ namespace
                     return r != 0;
                 }));
             splitter.add(to_mcap_points(points, rings));
-            spdlog::info("[{}/{}] {}: {} points", i + 1, chunks.size(), chunks[i].laz, points.size());
+            spdlog::info("[{}] {}: {} points", progress.status(i + 1), chunks[i].laz, points.size());
 
             if (!chunks[i].imu.empty())
             {

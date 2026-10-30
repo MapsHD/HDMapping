@@ -18,6 +18,8 @@
 
 #include <spdlog/spdlog.h>
 
+#include "console_progress.h"
+
 namespace fs = std::filesystem;
 
 namespace
@@ -532,6 +534,10 @@ int main(const int argc, const char** argv)
         return true;
     };
 
+    std::error_code size_error;
+    const auto pcap_bytes = std::filesystem::file_size(pcap_path, size_error);
+    ConsoleProgress progress("Reading pcap (bytes)", size_error ? 0 : pcap_bytes);
+
     rosbags::OusterPcapReader::Callbacks callbacks;
     callbacks.onImu = [&](const rosbags::McapImuSample& sample)
     {
@@ -539,6 +545,7 @@ int main(const int argc, const char** argv)
     };
     callbacks.onPoints = [&](std::vector<rosbags::McapPoint>&& points, std::vector<Rgb>&& rgb)
     {
+        progress.update(reader.stats().bytes_read);
         if (!ok)
             return;
         const double stamp_s = points.front().timestamp;
@@ -568,6 +575,7 @@ int main(const int argc, const char** argv)
     };
 
     const bool read_ok = reader.read(callbacks);
+    progress.finish(reader.stats().bytes_read);
     if (ok && !held.empty()) // recording shorter than the colour fit window
         ok = fit_rgb_and_flush();
     if (!writer.endChunk())

@@ -12,6 +12,8 @@
 
 #include <spdlog/spdlog.h>
 
+#include "console_progress.h"
+
 namespace fs = std::filesystem;
 
 bool check_path_ext(const char* path, const char* ext)
@@ -229,6 +231,7 @@ bool convert_and_save(const char* from, const char* to)
     }
 
     // Write points
+    ConsoleProgress progress("Writing points", static_cast<uint64_t>(pcd_header.points));
     for (int i = 0; i < pcd_header.points; i++)
     {
         uint8_t* pointDataPtr = pointsBinary.data() + i * pcd_header.point_record_length;
@@ -275,7 +278,9 @@ bool convert_and_save(const char* from, const char* to)
             spdlog::error("Failed to write point {} to LAZ file {}", i, to);
             return false;
         }
+        progress.update(static_cast<uint64_t>(i) + 1);
     }
+    progress.finish(static_cast<uint64_t>(pcd_header.points));
 
     if (laszip_close_writer(laszip_writer))
     {

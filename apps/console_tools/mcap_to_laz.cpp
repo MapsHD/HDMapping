@@ -24,6 +24,8 @@
 
 #include <spdlog/spdlog.h>
 
+#include "console_progress.h"
+
 namespace fs = std::filesystem;
 
 namespace
@@ -140,6 +142,28 @@ namespace
         return EXIT_SUCCESS;
     }
 
+    /**
+     * @brief Counts the messages of a topic across all inputs, the total of a read's progress.
+     * @param readers The opened inputs.
+     * @param topic Topic to count.
+     * @return The message count, or 0 if any input has no count for the topic (MCAP without a statistics record).
+     */
+    uint64_t count_topic_messages(const std::vector<std::unique_ptr<BagReader>>& readers, const std::string& topic)
+    {
+        uint64_t total = 0;
+        for (const auto& reader : readers)
+        {
+            uint64_t in_reader = 0;
+            for (const auto& channel : reader->channels())
+                if (channel.topic == topic)
+                    in_reader += channel.message_count;
+            if (in_reader == 0)
+                return 0;
+            total += in_reader;
+        }
+        return total;
+    }
+
     struct ImportStats
     {
         size_t lidar_messages = 0;
@@ -150,12 +174,13 @@ namespace
     // full stream is small -- 200 Hz for an hour is ~700k samples -- and buffering it
     // lets each chunk's csv be written in one shot after the lidar pass has decided
     // where the chunk boundaries fall.
-    bool collect_imu(BagReader& reader, std::vector<rosbags::McapImuSample>& out, std::string& serial_number)
+    bool collect_imu(BagReader& reader, std::vector<rosbags::McapImuSample>& out, std::string& serial_number, ConsoleProgress& progress)
     {
         BagReader::Callbacks callbacks;
         callbacks.onImu = [&](const rosbags::McapImuSample& sample)
         {
             out.push_back(sample);
+            progress.update(out.size());
         };
         callbacks.onSn = [&](uint64_t, const std::string& sn)
         {
@@ -191,10 +216,13 @@ namespace
         bool ok = true;
         int64_t current_bin = 0;
         double last_stamp = -std::numeric_limits<double>::infinity();
+        ConsoleProgress progress("Reading lidar messages", count_topic_messages(readers, readers.front()->topics().lidar));
+        uint64_t messages_seen = 0;
 
         BagReader::Callbacks callbacks;
         callbacks.onPointCloud = [&](uint64_t /*log_time_ns*/, std::vector<rosbags::McapPoint>&& points)
         {
+            progress.update(++messages_seen);
             if (!ok || points.empty())
                 return;
 
@@ -235,6 +263,7 @@ namespace
             if (!ok)
                 return false;
         }
+        progress.finish(messages_seen);
         if (!writer.endChunk())
             return false;
         return ok;
@@ -278,11 +307,14 @@ namespace
             per_chunk[index].push_back(sample);
         }
 
+        ConsoleProgress progress("Writing IMU chunks", per_chunk.size());
         for (size_t i = 0; i < per_chunk.size(); ++i)
         {
             if (!writer.writeImuChunk(static_cast<int>(i), per_chunk[i]))
                 return false;
+            progress.update(i + 1);
         }
+        progress.finish(per_chunk.size());
         return true;
     }
 
@@ -489,9 +521,10 @@ int main(const int argc, const char** argv)
 
     std::vector<rosbags::McapImuSample> imu;
     std::string serial_number;
+    ConsoleProgress imu_progress("Reading IMU messages", topics.imu.empty() ? 0 : count_topic_messages(readers, topics.imu));
     for (size_t k = 0; k < readers.size() && !topics.imu.empty(); ++k)
     {
-        if (!collect_imu(*readers[k], imu, serial_number))
+        if (!collect_imu(*readers[k], imu, serial_number, imu_progress))
         {
             spdlog::error("Failed reading IMU stream of {}: {}", positionals[k], readers[k]->error());
             return EXIT_FAILURE;
@@ -499,6 +532,8 @@ int main(const int argc, const char** argv)
     }
     if (!serial_number.empty())
         spdlog::info("Bag serial number: {}", serial_number);
+    if (!topics.imu.empty())
+        imu_progress.finish(imu.size());
     apply_imu_transform(imu_transform, imu);
     spdlog::info("Read {} IMU sample(s)", imu.size());
 

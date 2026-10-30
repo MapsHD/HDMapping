@@ -757,6 +757,7 @@ void ScanRenderer::drawTrajectories(
 
             if (traj.vertexCount > 0)
             {
+                rlEnableShader(shader_.id);
                 if (useInitialPose)
                 {
                     const Eigen::Affine3d delta = pc.m_initial_pose * pc.m_pose.inverse();

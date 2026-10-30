@@ -47,6 +47,7 @@ void main()
 #version 330
 uniform vec4 pointColor;
 uniform int colorMode;
+uniform int colormap;
 uniform float elevMin;
 uniform float elevMax;
 uniform vec3 distCenter;
@@ -67,7 +68,7 @@ uniform vec4 clipPlanes[6];
 in float fragIntensity;
 in vec3 fragWorldPos;
 out vec4 finalColor;
-)") + raylib_widgets::kJetColormapGLSL +
+)") + raylib_widgets::kColormapsGLSL +
         R"(
 void main()
 {
@@ -87,17 +88,17 @@ void main()
 
     if (colorMode == 1)
     {
-        finalColor = vec4(jet(fragIntensity), pointColor.a);
+        finalColor = vec4(applyColormap(colormap, fragIntensity), pointColor.a);
     }
     else if (colorMode == 2)
     {
         float range = max(elevMax - elevMin, 1e-6);
-        finalColor = vec4(jet((fragWorldPos.z - elevMin) / range), pointColor.a);
+        finalColor = vec4(applyColormap(colormap, (fragWorldPos.z - elevMin) / range), pointColor.a);
     }
     else if (colorMode == 3)
     {
         float d = length(fragWorldPos - distCenter);
-        finalColor = vec4(jet(d / max(distMax, 1e-6)), pointColor.a);
+        finalColor = vec4(applyColormap(colormap, d / max(distMax, 1e-6)), pointColor.a);
     }
     else if (colorMode == 4)
     {

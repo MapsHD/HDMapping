@@ -119,6 +119,7 @@
 #include <RaylibWidgets/OrbitCamera.h>
 #include <RaylibWidgets/PointPicking.h>
 #include <RaylibWidgets/RayPlaneD.h>
+#include <RaylibWidgets/Shaders.h>
 #include <RaylibWidgets/ShortcutsTable.h>
 
 #ifdef _WIN32
@@ -1084,11 +1085,12 @@ int index_end = 0;
 
 ColorScheme csPointCloud = CS_GRAD_INTENS;
 ColorScheme csTrajectory = CS_SOLID;
+int pointCloudColormap = 0;
 
 // New (not in the original GLUT app): CS_GRAD_INTENS/CS_GRAD_ELEV/CS_GRAD_DIST
 // were declared in the original's ColorScheme enum but never actually wired
 // to a menu item or the renderer -- this hooks them up to scan_renderer's
-// per-point jet-colormap shader modes (see Core/raylib_render.hpp's
+// per-point colormap shader modes (see Core/raylib_render.hpp's
 // ScanColorMode), alongside the two modes (Solid/Random) the original did
 // implement.
 ScanColorMode scanColorModeFromScheme(ColorScheme cs)
@@ -6278,21 +6280,26 @@ void display()
                     // Gradient modes -- declared in ColorScheme since the
                     // original, but never actually wired to a menu item or
                     // the renderer there; hooked up here to
-                    // scan_renderer's per-point jet-colormap shader.
+                    // scan_renderer's per-point colormap shader.
                     if (ImGui::MenuItem("> By intensity (gradient)", nullptr, (csPointCloud == CS_GRAD_INTENS)))
                         csPointCloud = CS_GRAD_INTENS;
                     if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip("Per-point jet colormap from LAS/LAZ intensity");
+                        ImGui::SetTooltip("Per-point colormap from LAS/LAZ intensity");
 
                     if (ImGui::MenuItem("> By height (gradient)", nullptr, (csPointCloud == CS_GRAD_ELEV)))
                         csPointCloud = CS_GRAD_ELEV;
                     if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip("Per-point jet colormap from world Z, over the session's [z_min, z_max]");
+                        ImGui::SetTooltip("Per-point colormap from world Z, over the session's [z_min, z_max]");
 
                     if (ImGui::MenuItem("> By distance (gradient)", nullptr, (csPointCloud == CS_GRAD_DIST)))
                         csPointCloud = CS_GRAD_DIST;
                     if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip("Per-point jet colormap from distance to the rotation center");
+                        ImGui::SetTooltip("Per-point colormap from distance to the rotation center");
+
+                    ImGui::SetNextItemWidth(ImGuiNumberWidth);
+                    if (ImGui::Combo(
+                            "Colormap", &pointCloudColormap, raylib_widgets::kColormapNames, IM_ARRAYSIZE(raylib_widgets::kColormapNames)))
+                        scan_renderer.setColormap(pointCloudColormap);
 
                     ImGui::EndMenu();
                 }

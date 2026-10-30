@@ -98,7 +98,7 @@ uniform float maxDist;
 uniform float opacity;
 uniform sampler2D imageTex;
 out vec4 finalColor;
-)") + raylib_widgets::kJetColormapGLSL +
+)") + raylib_widgets::kColormapsGLSL +
         R"(
 void main() {
     if (colorMode == 3) {
@@ -213,7 +213,7 @@ uniform vec2 depthRange;
 uniform float opacity;
 uniform int colorMode;
 out vec4 finalColor;
-)") + raylib_widgets::kJetColormapGLSL +
+)") + raylib_widgets::kColormapsGLSL +
         R"(
 void main() {
     if (fragDepth < depthRange.x || fragDepth > depthRange.y) discard;

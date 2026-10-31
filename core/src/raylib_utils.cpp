@@ -91,11 +91,6 @@ namespace
 
     // beginPoints()/endPoints(): interleaved position + color, streamed through one dynamic VBO in
     // fixed-size chunks so the buffer stays small however many points a frame draws.
-    struct PointVertex
-    {
-        float x, y, z;
-        float r, g, b;
-    };
     constexpr size_t kPointChunk = size_t(1) << 20;
     std::vector<PointVertex> points;
     float points_size = 1.f;
@@ -106,9 +101,11 @@ namespace
         Shader shader{};
         int locMvp = -1;
         int locPointSize = -1;
+        int locTint = -1;
         unsigned int vao = 0;
         unsigned int vbo = 0;
     } point_gpu;
+    std::vector<raylib_widgets::PointBufferPart> ellipse_gpu;
 
     constexpr const char* kPointBatchVS = R"(
 #version 330
@@ -128,22 +125,30 @@ void main()
     constexpr const char* kPointBatchFS = R"(
 #version 330
 in vec3 fragColor;
+uniform vec4 tint;
 out vec4 finalColor;
 void main()
 {
-    finalColor = vec4(fragColor, 1.0);
+    finalColor = vec4(fragColor, 1.0) * tint;
 }
 )";
 
     // vertexColor is bound to rlgl's default color attribute location by LoadShaderFromMemory().
     constexpr int kPointColorLocation = RL_DEFAULT_SHADER_ATTRIB_LOCATION_COLOR;
 
-    void initPointBatch()
+    void initPointBatch(bool streaming = true)
     {
-        point_gpu.initialized = true;
-        point_gpu.shader = LoadShaderFromMemory(kPointBatchVS, kPointBatchFS);
-        point_gpu.locMvp = GetShaderLocation(point_gpu.shader, "mvp");
-        point_gpu.locPointSize = GetShaderLocation(point_gpu.shader, "pointSize");
+        if (!point_gpu.initialized)
+        {
+            point_gpu.initialized = true;
+            point_gpu.shader = LoadShaderFromMemory(kPointBatchVS, kPointBatchFS);
+            point_gpu.locMvp = GetShaderLocation(point_gpu.shader, "mvp");
+            point_gpu.locPointSize = GetShaderLocation(point_gpu.shader, "pointSize");
+            point_gpu.locTint = GetShaderLocation(point_gpu.shader, "tint");
+            glEnable(GL_PROGRAM_POINT_SIZE);
+        }
+        if (!streaming || point_gpu.vao)
+            return;
 
         point_gpu.vao = rlLoadVertexArray();
         rlEnableVertexArray(point_gpu.vao);
@@ -153,13 +158,11 @@ void main()
         rlSetVertexAttribute(kPointColorLocation, 3, RL_FLOAT, false, sizeof(PointVertex), 3 * sizeof(float));
         rlEnableVertexAttribute(kPointColorLocation);
         rlDisableVertexArray();
-
-        // Required for gl_PointSize (set from the vertex shader) to take effect, as in ScanRenderer::init().
-        glEnable(GL_PROGRAM_POINT_SIZE);
     }
 
     void releasePointBatch()
     {
+        unloadPointVertices(ellipse_gpu);
         if (!point_gpu.initialized)
             return;
         rlUnloadVertexArray(point_gpu.vao);
@@ -451,43 +454,51 @@ void drawMiniCompassWithRuler()
         raylib_widgets::CompassAxisLabels{ "X (long.)", "Y (lat.)", "Z (vert.)" });
 }
 
-void draw_ellipse(const Eigen::Matrix3d& covar, const Eigen::Vector3d& mean, Eigen::Vector3f color, float nstd)
+void draw_ellipse(const Eigen::Affine3d& transform, Eigen::Vector3f color)
 {
-    Eigen::LLT<Eigen::Matrix<double, 3, 3>> cholSolver(covar);
-    Eigen::Matrix3d transform = cholSolver.matrixL();
-
-    const double pi = 3.141592;
-    const double di = 0.02;
-    const double dj = 0.04;
-    const double du = di * 2 * pi;
-    const double dv = dj * pi;
-
-    rlBegin(RL_LINES);
-    rlColor3f(color.x(), color.y(), color.z());
-    for (double i = 0; i < 1.0; i += di) // horizontal
+    if (ellipse_gpu.empty())
     {
-        for (double j = 0; j < 1.0; j += dj) // vertical
+        std::vector<PointVertex> vertices;
+        const double pi = 3.141592;
+        const double di = 0.02;
+        const double dj = 0.04;
+        const double du = di * 2 * pi;
+        const double dv = dj * pi;
+
+        for (double i = 0; i < 1.0; i += di) // horizontal
         {
-            double u = i * 2 * pi; // 0     to  2pi
-            double v = (j - 0.5) * pi; //-pi/2 to pi/2
-
-            const Eigen::Vector3d pp[4] = { { cos(v) * cos(u), cos(v) * sin(u), sin(v) },
-                                            { cos(v) * cos(u + du), cos(v) * sin(u + du), sin(v) },
-                                            { cos(v + dv) * cos(u + du), cos(v + dv) * sin(u + du), sin(v + dv) },
-                                            { cos(v + dv) * cos(u), cos(v + dv) * sin(u), sin(v + dv) } };
-            Vector3 tp[4];
-            for (int k = 0; k < 4; k++)
-                tp[k] = toVec3(transform * (nstd * pp[k]) + mean);
-
-            // The cell's GL_LINE_LOOP, as 4 segments.
-            for (int k = 0; k < 4; k++)
+            for (double j = 0; j < 1.0; j += dj) // vertical
             {
-                rlVertex3f(tp[k].x, tp[k].y, tp[k].z);
-                rlVertex3f(tp[(k + 1) % 4].x, tp[(k + 1) % 4].y, tp[(k + 1) % 4].z);
+                double u = i * 2 * pi; // 0     to  2pi
+                double v = (j - 0.5) * pi; //-pi/2 to pi/2
+
+                const Eigen::Vector3d pp[4] = { { cos(v) * cos(u), cos(v) * sin(u), sin(v) },
+                                                { cos(v) * cos(u + du), cos(v) * sin(u + du), sin(v) },
+                                                { cos(v + dv) * cos(u + du), cos(v + dv) * sin(u + du), sin(v + dv) },
+                                                { cos(v + dv) * cos(u), cos(v + dv) * sin(u), sin(v + dv) } };
+                Vector3 tp[4];
+                for (int k = 0; k < 4; k++)
+                    tp[k] = toVec3(pp[k]);
+
+                // The cell's GL_LINE_LOOP, as 4 segments.
+                for (int k = 0; k < 4; k++)
+                {
+                    vertices.push_back({ tp[k].x, tp[k].y, tp[k].z, 1, 1, 1 });
+                    vertices.push_back({ tp[(k + 1) % 4].x, tp[(k + 1) % 4].y, tp[(k + 1) % 4].z, 1, 1, 1 });
+                }
             }
         }
+        uploadPointVertices(ellipse_gpu, vertices);
     }
-    rlEnd();
+    drawLineVertices(ellipse_gpu, transform, ColorFromNormalized(Vector4{ color.x(), color.y(), color.z(), 1 }));
+}
+
+void draw_ellipse(const Eigen::Matrix3d& covar, const Eigen::Vector3d& mean, Eigen::Vector3f color, float nstd)
+{
+    Eigen::Affine3d transform = Eigen::Affine3d::Identity();
+    transform.linear() = Eigen::LLT<Eigen::Matrix3d>(covar).matrixL().toDenseMatrix() * nstd;
+    transform.translation() = mean;
+    draw_ellipse(transform, color);
 }
 
 Eigen::Vector3d rayIntersection(const LaserBeam& laser_beam, const RegistrationPlaneFeature::Plane& plane)
@@ -602,7 +613,7 @@ void endPoints()
 {
     if (points.empty())
         return;
-    if (!point_gpu.initialized)
+    if (!point_gpu.vao)
         initPointBatch();
 
     // Lines queued so far must be drawn first, with the matrices they were queued under.
@@ -612,6 +623,8 @@ void endPoints()
     rlEnableShader(point_gpu.shader.id);
     rlSetUniformMatrix(point_gpu.locMvp, mvp);
     rlSetUniform(point_gpu.locPointSize, &points_size, RL_SHADER_UNIFORM_FLOAT, 1);
+    const float white[4] = { 1, 1, 1, 1 };
+    rlSetUniform(point_gpu.locTint, white, RL_SHADER_UNIFORM_VEC4, 1);
     rlEnableVertexArray(point_gpu.vao);
     for (size_t first = 0; first < points.size(); first += kPointChunk)
     {
@@ -622,6 +635,98 @@ void endPoints()
     rlDisableVertexArray();
     rlDisableShader();
     points.clear();
+}
+
+void unloadPointVertices(std::vector<raylib_widgets::PointBufferPart>& parts)
+{
+    for (const auto& part : parts)
+    {
+        rlUnloadVertexArray(part.vao);
+        rlUnloadVertexBuffer(part.vbo);
+    }
+    parts.clear();
+}
+
+void uploadPointVertices(std::vector<raylib_widgets::PointBufferPart>& parts, const std::vector<PointVertex>& vertices)
+{
+    const size_t count = (vertices.size() + kPointChunk - 1) / kPointChunk;
+    while (parts.size() > count)
+    {
+        rlUnloadVertexArray(parts.back().vao);
+        rlUnloadVertexBuffer(parts.back().vbo);
+        parts.pop_back();
+    }
+    parts.resize(count);
+    for (size_t i = 0; i < count; ++i)
+    {
+        auto& part = parts[i];
+        const size_t first = i * kPointChunk;
+        part.count = static_cast<int>(std::min(kPointChunk, vertices.size() - first));
+        const int bytes = part.count * sizeof(PointVertex);
+        int capacity = 0;
+        if (part.vbo)
+        {
+            rlEnableVertexBuffer(part.vbo);
+            glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &capacity);
+        }
+        if (capacity < bytes)
+        {
+            if (part.vao)
+            {
+                rlUnloadVertexArray(part.vao);
+                rlUnloadVertexBuffer(part.vbo);
+            }
+            part.vao = rlLoadVertexArray();
+            rlEnableVertexArray(part.vao);
+            part.vbo = rlLoadVertexBuffer(vertices.data() + first, bytes, true);
+            rlSetVertexAttribute(0, 3, RL_FLOAT, false, sizeof(PointVertex), 0);
+            rlEnableVertexAttribute(0);
+            rlSetVertexAttribute(kPointColorLocation, 3, RL_FLOAT, false, sizeof(PointVertex), 3 * sizeof(float));
+            rlEnableVertexAttribute(kPointColorLocation);
+            rlDisableVertexArray();
+        }
+        else
+            rlUpdateVertexBuffer(part.vbo, vertices.data() + first, bytes, 0);
+    }
+}
+
+namespace
+{
+    void drawVertices(
+        const std::vector<raylib_widgets::PointBufferPart>& parts, float size, const Eigen::Affine3d& transform, int primitive, Color tint)
+    {
+        if (parts.empty())
+            return;
+        initPointBatch(false);
+        rlDrawRenderBatchActive();
+        rlPushMatrix();
+        const Eigen::Matrix4f model = transform.matrix().cast<float>();
+        rlMultMatrixf(model.data());
+        const Matrix mvp = MatrixMultiply(rlGetMatrixTransform(), MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection()));
+        const float color[4] = { tint.r / 255.f, tint.g / 255.f, tint.b / 255.f, tint.a / 255.f };
+        rlEnableShader(point_gpu.shader.id);
+        rlSetUniformMatrix(point_gpu.locMvp, mvp);
+        rlSetUniform(point_gpu.locPointSize, &size, RL_SHADER_UNIFORM_FLOAT, 1);
+        rlSetUniform(point_gpu.locTint, color, RL_SHADER_UNIFORM_VEC4, 1);
+        for (const auto& part : parts)
+        {
+            rlEnableVertexArray(part.vao);
+            glDrawArrays(primitive, 0, part.count);
+        }
+        rlDisableVertexArray();
+        rlDisableShader();
+        rlPopMatrix();
+    }
+} // namespace
+
+void drawPointVertices(const std::vector<raylib_widgets::PointBufferPart>& parts, float size, const Eigen::Affine3d& transform)
+{
+    drawVertices(parts, size, transform, GL_POINTS, WHITE);
+}
+
+void drawLineVertices(const std::vector<raylib_widgets::PointBufferPart>& parts, const Eigen::Affine3d& transform, Color tint)
+{
+    drawVertices(parts, 1.f, transform, GL_LINES, tint);
 }
 
 float IntensityRange::normalize(float intensity) const

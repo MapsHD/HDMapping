@@ -17,10 +17,12 @@
 
 #include "lidar_odometry.h"
 #include "lidar_odometry_utils.h"
+#include "render_cache.h"
 
 #include <Core/export_laz.h>
 #include <Core/hash_utils.h>
 #include <Core/pfd_wrapper.hpp>
+#include <Core/raylib_render.hpp>
 #include <Core/raylib_utils.hpp>
 #include <Core/registration_plane_feature.h>
 #include <Core/session.h>
@@ -167,6 +169,12 @@ bool intensity_shading = true;
 int lastPar = 1;
 
 std::vector<WorkerData> worker_data;
+
+ScanRenderer trajectory_renderer;
+step1_render::TrajectoryCache trajectory_cache;
+step1_render::PointCache initial_point_cache, reference_point_cache;
+step1_render::BucketCache indoor_bucket_cache, outdoor_bucket_cache;
+bool trajectory_points_dirty = true; // GUI-thread edits; worker changes are identified by the published snapshot
 
 // Only display fields are copied; raw IMU, timestamps and point-cache paths stay with the worker.
 std::mutex trajectory_preview_mutex;
@@ -658,6 +666,7 @@ Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking& observ
 
 void step1(const std::string& input_folder_name, const std::atomic<bool>& loPause)
 {
+    trajectory_points_dirty = true;
     std::vector<std::string> input_file_names;
 
     std::cout << "Selected folder: '" << input_folder_name << std::endl;
@@ -1212,7 +1221,10 @@ void settings_gui()
         if (step_1_done && step_2_done)
         {
             if (ImGui::Button("Point cloud consistency and trajectory smoothness"))
+            {
                 run_consistency(worker_data, params);
+                trajectory_points_dirty = true;
+            }
             if (ImGui::IsItemHovered())
             {
                 ImGui::BeginTooltip();
@@ -1682,6 +1694,7 @@ void settings_gui()
                                         worker_data[i].intermediate_trajectory[j] = last_m;
                                     }
                                 }
+                                trajectory_points_dirty = true;
                             }
                         }
                     }
@@ -1960,34 +1973,19 @@ static void quit_abandoned_run()
     std::_Exit(0);
 }
 
-//! intensityRange() over the buckets' mean intensities; ray-marked buckets (number_of_points == -1) carry none.
-static IntensityRange bucketIntensityRange(const NDTBucketMapType& buckets)
-{
-    IntensityRange range;
-    bool first = true;
-    for (const auto& b : buckets)
-    {
-        if (b.second.number_of_points == -1)
-            continue;
-        range.min = first ? b.second.intensity : std::min(range.min, b.second.intensity);
-        range.max = first ? b.second.intensity : std::max(range.max, b.second.intensity);
-        first = false;
-    }
-    return range;
-}
-
 void display()
 {
     if (loQuitting && (loParked || !loRunning))
         quit_abandoned_run();
 
+    const bool trajectory_running = loRunning.load();
     const auto preview = [] // retain an immutable snapshot for this whole frame
     {
         std::scoped_lock lock(trajectory_preview_mutex);
         return trajectory_preview;
     }();
     static const std::vector<WorkerData> empty_preview;
-    const auto& display_workers = !loRunning ? worker_data : preview ? *preview : empty_preview;
+    const auto& display_workers = !trajectory_running ? worker_data : preview ? *preview : empty_preview;
 
     ImGuiIO& io = ImGui::GetIO();
     rlViewport(0, 0, GetRenderWidth(), GetRenderHeight());
@@ -2021,19 +2019,8 @@ void display()
     showAxes();
 
     if (show_initial_points)
-    {
-        const IntensityRange range = intensityRange(params.initial_points);
-        color3f(0.0f, 1.0f, 0.0f);
-        beginPoints(point_size);
-        for (const auto& p : params.initial_points)
-        {
-            if (intensity_shading)
-                color3fIntensityShaded(0.0f, 1.0f, 0.0f, p.intensity, range);
-            auto pp = params.m_g * p.point;
-            pointVertex3f(pp.x(), pp.y(), pp.z());
-        }
-        endPoints();
-    }
+        initial_point_cache.draw(
+            params.initial_points, params.initial_points_revision, 1, intensity_shading, Eigen::Vector3f(0, 1, 0), point_size, params.m_g);
 
 #if 0 // ToDo
     for (size_t i = 0; i < worker_data.size(); i++)
@@ -2068,106 +2055,21 @@ void display()
 #endif
 
     if (show_reference_points)
-    {
-        const IntensityRange range = intensityRange(params.reference_points, dec_reference_points);
-        color3f(1, 0, 0);
-        beginPoints(point_size);
-        for (size_t i = 0; i < params.reference_points.size(); i += dec_reference_points)
-        {
-            if (intensity_shading)
-                color3fIntensityShaded(1, 0, 0, params.reference_points[i].intensity, range);
-            pointVertex3f(params.reference_points[i].point.x(), params.reference_points[i].point.y(), params.reference_points[i].point.z());
-        }
-        endPoints();
-    }
+        reference_point_cache.draw(
+            params.reference_points,
+            params.reference_points_revision,
+            dec_reference_points,
+            intensity_shading,
+            Eigen::Vector3f(1, 0, 0),
+            point_size);
 
-    if (show_trajectory_as_axes)
-    {
-        rlBegin(RL_LINES);
-        for (const auto& wd : display_workers)
-        {
-            for (const auto& it : wd.intermediate_trajectory)
-            {
-                rlColor3f(1, 0, 0);
-                rlVertex3f(it(0, 3), it(1, 3), it(2, 3));
-                rlVertex3f(it(0, 3) + it(0, 0) * 0.1, it(1, 3) + it(1, 0) * 0.1, it(2, 3) + it(2, 0) * 0.1);
-
-                rlColor3f(0, 1, 0);
-                rlVertex3f(it(0, 3), it(1, 3), it(2, 3));
-                rlVertex3f(it(0, 3) + it(0, 1) * 0.1, it(1, 3) + it(1, 1) * 0.1, it(2, 3) + it(2, 1) * 0.1);
-
-                rlColor3f(0, 0, 1);
-                rlVertex3f(it(0, 3), it(1, 3), it(2, 3));
-                rlVertex3f(it(0, 3) + it(0, 2) * 0.1, it(1, 3) + it(1, 2) * 0.1, it(2, 3) + it(2, 2) * 0.1);
-            }
-        }
-        rlEnd();
-    }
-
-    if (show_prediction_vectors)
-    {
-        // Depth test state applies when the batch is drawn, so flush around the toggle. Line widths
-        // other than 1 aren't supported by the core-profile context, so these are drawn 1 px wide.
-        rlDrawRenderBatchActive();
-        rlDisableDepthTest();
-        rlBegin(RL_LINES);
-        for (const auto& wd : display_workers)
-        {
-            if (wd.intermediate_trajectory.empty() || wd.imu_prediction_vector.norm() < 1e-6)
-                continue;
-
-            Eigen::Vector3d start = wd.intermediate_trajectory.front().translation();
-            Eigen::Vector3d end = start + wd.imu_prediction_vector;
-
-            rlColor3f(1.0f, 0.0f, 1.0f); // magenta
-            rlVertex3f(start.x(), start.y(), start.z());
-            rlVertex3f(end.x(), end.y(), end.z());
-        }
-        rlEnd();
-        rlDrawRenderBatchActive();
-        rlEnableDepthTest();
-    }
-
-    if (intermediate_trajectory_prediction_axes)
-    {
-        rlBegin(RL_LINES);
-        for (const auto& wd : display_workers)
-        {
-            if (wd.intermediate_trajectory.empty() || wd.intermediate_trajectory_prediction.empty())
-                continue;
-
-            for (size_t i = 0; i < std::min(wd.intermediate_trajectory.size(), wd.intermediate_trajectory_prediction.size()); i++)
-            {
-                const auto& it = wd.intermediate_trajectory[i];
-                const auto& pred_axis = wd.intermediate_trajectory_prediction[i];
-
-                rlColor3f(1, 0, 0);
-                rlVertex3f(it(0, 3), it(1, 3), it(2, 3));
-                rlVertex3f(it(0, 3) + pred_axis(0, 0) * 0.05, it(1, 3) + pred_axis(1, 0) * 0.05, it(2, 3) + pred_axis(2, 0) * 0.05);
-
-                rlColor3f(0, 1, 0);
-                rlVertex3f(it(0, 3), it(1, 3), it(2, 3));
-                rlVertex3f(it(0, 3) + pred_axis(0, 1) * 0.05, it(1, 3) + pred_axis(1, 1) * 0.05, it(2, 3) + pred_axis(2, 1) * 0.05);
-
-                rlColor3f(0, 0, 1);
-                rlVertex3f(it(0, 3), it(1, 3), it(2, 3));
-                rlVertex3f(it(0, 3) + pred_axis(0, 2) * 0.05, it(1, 3) + pred_axis(1, 2) * 0.05, it(2, 3) + pred_axis(2, 2) * 0.05);
-            }
-        }
-        rlEnd();
-    }
+    const unsigned trajectory_options = (show_trajectory ? step1_render::Points : 0) | (show_trajectory_as_axes ? step1_render::Axes : 0) |
+        (show_prediction_vectors ? step1_render::Predictions : 0) |
+        (intermediate_trajectory_prediction_axes ? step1_render::PredictionAxes : 0);
+    trajectory_cache.draw(trajectory_renderer, display_workers, preview, trajectory_running, trajectory_points_dirty, trajectory_options);
 
     if (show_trajectory)
     {
-        color3f(0, 1, 1);
-        beginPoints(3);
-        for (const auto& wd : display_workers)
-        {
-            for (const auto& it : wd.intermediate_trajectory)
-                pointVertex3f(it(0, 3), it(1, 3), it(2, 3));
-        }
-        endPoints();
-
         rlBegin(RL_LINES);
         rlColor3f(1, 0, 0);
         if (display_workers.size() > 0)
@@ -2190,124 +2092,42 @@ void display()
         rlEnd();
     }
 
+    const unsigned indoor_flags =
+        (show_reference_buckets_indoor ? 1 : 0) | (show_normal_vectors_indoor ? 2 : 0) | (show_covs_indoor ? 4 : 0);
+    const unsigned outdoor_flags =
+        (show_reference_buckets_outdoor ? 1 : 0) | (show_normal_vectors_outdoor ? 2 : 0) | (show_covs_outdoor ? 4 : 0);
+    indoor_bucket_cache.prepare(
+        params.buckets_indoor,
+        params.mutex_buckets_indoor,
+        params.buckets_indoor_revision,
+        indoor_flags,
+        trajectory_running,
+        intensity_shading,
+        show_without_filtered_buckets,
+        Eigen::Vector3f(1, 0, 0),
+        Eigen::Vector3f(0, 1, 1));
+    outdoor_bucket_cache.prepare(
+        params.buckets_outdoor,
+        params.mutex_buckets_outdoor,
+        params.buckets_outdoor_revision,
+        outdoor_flags,
+        trajectory_running,
+        intensity_shading,
+        show_without_filtered_buckets,
+        Eigen::Vector3f(0, 0, 1),
+        Eigen::Vector3f(1, 0, 1));
     if (show_reference_buckets_indoor)
-    {
-        std::scoped_lock lock(params.mutex_buckets_indoor);
-        const IntensityRange range = bucketIntensityRange(params.buckets_indoor);
-        color3f(1, 0, 0);
-        beginPoints(1);
-        for (const auto& b : params.buckets_indoor)
-        {
-            if (b.second.number_of_points == -1)
-            {
-                color3f(0, 1, 1);
-            }
-            else if (intensity_shading)
-            {
-                color3fIntensityShaded(1, 0, 0, b.second.intensity, range);
-            }
-            else
-            {
-                color3f(1, 0, 0);
-            }
-            if (!show_without_filtered_buckets)
-            {
-                pointVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
-            }
-            else
-            {
-                if (b.second.number_of_hits < 20)
-                {
-                    pointVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
-                }
-            }
-        }
-        endPoints();
-    }
-
+        drawPointVertices(indoor_bucket_cache.points, 1);
     if (show_reference_buckets_outdoor)
-    {
-        std::scoped_lock lock2(params.mutex_buckets_outdoor);
-        const IntensityRange range = bucketIntensityRange(params.buckets_outdoor);
-        color3f(0, 0, 1);
-        beginPoints(1);
-        for (const auto& b : params.buckets_outdoor)
-        {
-            if (b.second.number_of_points == -1)
-            {
-                color3f(1, 0, 1);
-            }
-            else if (intensity_shading)
-            {
-                color3fIntensityShaded(0, 0, 1, b.second.intensity, range);
-            }
-            else
-            {
-                color3f(0, 0, 1);
-            }
-            // rlVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
-            if (!show_without_filtered_buckets)
-            {
-                pointVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
-            }
-            else
-            {
-                if (b.second.number_of_hits < 20)
-                {
-                    pointVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
-                }
-            }
-        }
-        endPoints();
-    }
-
-    if (show_normal_vectors_indoor)
-    {
-        std::scoped_lock lock2(params.mutex_buckets_indoor);
-        rlBegin(RL_LINES);
-        for (const auto& b : params.buckets_indoor)
-        {
-            rlColor3f(fabs(b.second.normal_vector.x()), fabs(b.second.normal_vector.y()), fabs(b.second.normal_vector.z()));
-
-            rlVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
-            rlVertex3f(
-                b.second.mean.x() + b.second.normal_vector.x(),
-                b.second.mean.y() + b.second.normal_vector.y(),
-                b.second.mean.z() + b.second.normal_vector.z());
-        }
-        rlEnd();
-    }
-
-    if (show_normal_vectors_outdoor)
-    {
-        std::scoped_lock lock2(params.mutex_buckets_outdoor);
-        rlBegin(RL_LINES);
-        for (const auto& b : params.buckets_outdoor)
-        {
-            rlColor3f(fabs(b.second.normal_vector.x()), fabs(b.second.normal_vector.y()), fabs(b.second.normal_vector.z()));
-
-            rlVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
-            rlVertex3f(
-                b.second.mean.x() + b.second.normal_vector.x(),
-                b.second.mean.y() + b.second.normal_vector.y(),
-                b.second.mean.z() + b.second.normal_vector.z());
-        }
-        rlEnd();
-    }
-
+        drawPointVertices(outdoor_bucket_cache.points, 1);
+    if (show_normal_vectors_indoor && (indoor_bucket_cache.built & 2))
+        drawLineVertices(indoor_bucket_cache.normals);
+    if (show_normal_vectors_outdoor && (outdoor_bucket_cache.built & 2))
+        drawLineVertices(outdoor_bucket_cache.normals);
     if (show_covs_indoor)
-    {
-        std::scoped_lock lock(params.mutex_buckets_indoor);
-        for (const auto& b : params.buckets_indoor)
-            draw_ellipse(b.second.cov, b.second.mean, Eigen::Vector3f(1.0f, 0.0f, 0.0f), 3);
-    }
-
+        indoor_bucket_cache.drawCovariances(Eigen::Vector3f(1, 0, 0));
     if (show_covs_outdoor)
-    {
-        std::scoped_lock lock2(params.mutex_buckets_outdoor);
-        for (const auto& b : params.buckets_outdoor)
-            draw_ellipse(b.second.cov, b.second.mean, Eigen::Vector3f(0.0f, 0.0f, 1.0f), 3);
-    }
+        outdoor_bucket_cache.drawCovariances(Eigen::Vector3f(0, 0, 1));
 
     //
     if (display_workers.size() > 0)
@@ -2938,6 +2758,7 @@ int main(int argc, char* argv[])
 
             params.publish_trajectory = publish_trajectory_preview;
             initGL(&argc, argv, winTitle, display, mouse);
+            trajectory_renderer.init();
 
 #ifdef _WIN32
             InitTaskbarProgress();
@@ -2945,6 +2766,12 @@ int main(int argc, char* argv[])
 
             mainLoop(confirm_close);
 
+            trajectory_cache.clear(trajectory_renderer);
+            unloadPointVertices(initial_point_cache.parts);
+            unloadPointVertices(reference_point_cache.parts);
+            indoor_bucket_cache.clear();
+            outdoor_bucket_cache.clear();
+            trajectory_renderer.shutdown();
             shutdownGL();
             on_exit();
         }

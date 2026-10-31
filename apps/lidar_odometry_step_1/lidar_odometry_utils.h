@@ -197,16 +197,20 @@ struct LidarOdometryParams
     // other
     Eigen::Affine3d m_g = Eigen::Affine3d::Identity();
     std::vector<Point3Di> initial_points;
+    uint64_t initial_points_revision = 0; // GUI thread
     double consecutive_distance = 0.0;
     std::vector<Point3Di> reference_points;
+    uint64_t reference_points_revision = 0; // GUI thread
     // NDTBucketMapType reference_buckets;
     double total_length_of_calculated_trajectory = 0.0;
 
     std::mutex mutex_buckets_indoor;
     NDTBucketMapType buckets_indoor;
+    uint64_t buckets_indoor_revision = 0; // protected by mutex_buckets_indoor
 
     std::mutex mutex_buckets_outdoor;
     NDTBucketMapType buckets_outdoor;
+    uint64_t buckets_outdoor_revision = 0; // protected by mutex_buckets_outdoor
 
 #if WITH_GUI == 1
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);

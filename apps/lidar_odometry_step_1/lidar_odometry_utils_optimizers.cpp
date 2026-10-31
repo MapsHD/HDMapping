@@ -1364,18 +1364,12 @@ void optimize_lidar_odometry(
         ir + 1, ir + 1, 1.0 / (lidar_odometry_motion_model_fix_origin_y_1_sigma_m * lidar_odometry_motion_model_fix_origin_y_1_sigma_m));
     tripletListP.emplace_back(
         ir + 2, ir + 2, 1.0 / (lidar_odometry_motion_model_fix_origin_z_1_sigma_m * lidar_odometry_motion_model_fix_origin_z_1_sigma_m));
-    tripletListP.emplace_back(
-        ir + 3,
-        ir + 3,
-        1.0 / (lidar_odometry_motion_model_fix_origin_om_1_sigma_deg * lidar_odometry_motion_model_fix_origin_om_1_sigma_deg));
-    tripletListP.emplace_back(
-        ir + 4,
-        ir + 4,
-        1.0 / (lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg * lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg));
-    tripletListP.emplace_back(
-        ir + 5,
-        ir + 5,
-        1.0 / (lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg * lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg));
+    const double sigma_fix_origin_om = lidar_odometry_motion_model_fix_origin_om_1_sigma_deg * DEG_TO_RAD;
+    const double sigma_fix_origin_fi = lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg * DEG_TO_RAD;
+    const double sigma_fix_origin_ka = lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg * DEG_TO_RAD;
+    tripletListP.emplace_back(ir + 3, ir + 3, 1.0 / (sigma_fix_origin_om * sigma_fix_origin_om));
+    tripletListP.emplace_back(ir + 4, ir + 4, 1.0 / (sigma_fix_origin_fi * sigma_fix_origin_fi));
+    tripletListP.emplace_back(ir + 5, ir + 5, 1.0 / (sigma_fix_origin_ka * sigma_fix_origin_ka));
 
     tripletListB.emplace_back(ir, 0, 0);
     tripletListB.emplace_back(ir + 1, 0, 0);

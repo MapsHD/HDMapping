@@ -1607,6 +1607,8 @@ bool initialize_lidar_odometry(
         {
             std::scoped_lock lock(params.mutex_buckets_indoor, params.mutex_buckets_outdoor);
 
+            ++params.buckets_indoor_revision;
+            ++params.buckets_outdoor_revision;
             update_rgd_hierarchy(
                 params.in_out_params_indoor,
                 params.buckets_indoor,
@@ -1620,6 +1622,7 @@ bool initialize_lidar_odometry(
         {
             std::scoped_lock lock(params.mutex_buckets_indoor, params.mutex_buckets_outdoor);
 
+            ++params.buckets_indoor_revision;
             update_rgd(params.in_out_params_indoor, params.buckets_indoor, pp, params.m_g.translation(), &lookup_stats.indoor_lookups);
         }
 
@@ -2243,6 +2246,8 @@ bool process_worker_step_update_rgd_after(
         if (params.reference_points.size() == 0)
         {
             std::scoped_lock lock(params.mutex_buckets_indoor, params.mutex_buckets_outdoor);
+            ++params.buckets_indoor_revision;
+            ++params.buckets_outdoor_revision;
             params.buckets_indoor.clear();
             params.buckets_outdoor.clear();
         }
@@ -2253,6 +2258,8 @@ bool process_worker_step_update_rgd_after(
             std::scoped_lock lock(params.mutex_buckets_indoor, params.mutex_buckets_outdoor);
             // the upstream decimate() below discards its result: the buffer is never decimated, so neither is this
             const Eigen::Vector3d viewport = worker_data.intermediate_trajectory[0].translation();
+            ++params.buckets_indoor_revision;
+            ++params.buckets_outdoor_revision;
             spill->reset(
                 [&](const std::vector<Point3Di>& chunk, bool ray_cast)
                 {
@@ -2290,6 +2297,8 @@ bool process_worker_step_update_rgd_after(
         {
             std::scoped_lock lock(params.mutex_buckets_indoor, params.mutex_buckets_outdoor);
 
+            ++params.buckets_indoor_revision;
+            ++params.buckets_outdoor_revision;
             update_rgd_hierarchy(
                 params.in_out_params_indoor,
                 params.buckets_indoor,
@@ -2303,6 +2312,7 @@ bool process_worker_step_update_rgd_after(
         {
             std::scoped_lock lock(params.mutex_buckets_indoor, params.mutex_buckets_outdoor);
 
+            ++params.buckets_indoor_revision;
             update_rgd(
                 params.in_out_params_indoor,
                 params.buckets_indoor,
@@ -2353,6 +2363,8 @@ bool process_worker_step_update_rgd_after(
                 return true;
             }
 
+            ++params.buckets_indoor_revision;
+            ++params.buckets_outdoor_revision;
             update_rgd_hierarchy(
                 params.in_out_params_indoor,
                 params.buckets_indoor,
@@ -2368,6 +2380,7 @@ bool process_worker_step_update_rgd_after(
         {
             std::scoped_lock lock(params.mutex_buckets_indoor, params.mutex_buckets_outdoor);
 
+            ++params.buckets_indoor_revision;
             update_rgd(
                 params.in_out_params_indoor,
                 params.buckets_indoor,

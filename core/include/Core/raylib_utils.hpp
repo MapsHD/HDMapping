@@ -20,6 +20,7 @@
 
 #include <RaylibWidgets/AppShell.h>
 #include <RaylibWidgets/OrbitCamera.h>
+#include <RaylibWidgets/PointBufferPart.h>
 #include <RaylibWidgets/ShortcutsTable.h>
 
 #include <string>
@@ -125,6 +126,23 @@ void endLineStrip();
 void beginPoints(float size);
 void pointVertex3f(float x, float y, float z);
 void endPoints();
+//! The same position/color vertex used by beginPoints()/endPoints().
+struct PointVertex
+{
+    float x, y, z;
+    float r, g, b;
+};
+//! Retained geometry using the existing point shader and raylib buffer parts. Upload only when data changes.
+void uploadPointVertices(std::vector<raylib_widgets::PointBufferPart>& parts, const std::vector<PointVertex>& vertices);
+void unloadPointVertices(std::vector<raylib_widgets::PointBufferPart>& parts);
+void drawPointVertices(
+    const std::vector<raylib_widgets::PointBufferPart>& parts, float size, const Eigen::Affine3d& transform = Eigen::Affine3d::Identity());
+void drawLineVertices(
+    const std::vector<raylib_widgets::PointBufferPart>& parts,
+    const Eigen::Affine3d& transform = Eigen::Affine3d::Identity(),
+    Color tint = WHITE);
+//! Draw a unit covariance mesh with a precomputed covariance/translation transform.
+void draw_ellipse(const Eigen::Affine3d& transform, Eigen::Vector3f color);
 //! Intensity range of a point set, for color3fIntensityShaded(). stride > 1 scans every stride-th point,
 //! matching a decimated draw loop.
 struct IntensityRange

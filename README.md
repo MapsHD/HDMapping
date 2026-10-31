@@ -3,6 +3,7 @@ This is open-source software for large-scale 3D mapping using an open-hardware h
 We provide an end-to-end mobile mapping framework that does not require any installation, including:
 
 - **HDMapping_LI0**: our implementation of LiDAR Inertial Odometry that outperforms the State of the Art [[movie]](https://youtu.be/UB-Hx7qgey8).
+- **HDMapping_LI0_BENCHMARK** [[HDMapping_LI0_BENCHMARK]](https://mapshd.github.io/benchmark_results/#oxford-spires-keble-college-02)
 - **HDMapping_Pose_GRAPH_SLAM** to create city-level maps.
 - **HDMapping_Georeferencing** (GNSS-RTK, Control Points, Ground Control Points, TLS, ALS).
 - **HDMapping_TLS** (Multi View Terrestrial Laser Scanner Registration)

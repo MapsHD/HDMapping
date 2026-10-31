@@ -80,6 +80,7 @@ struct OusterPcapReaderOptions
 
 struct OusterPcapStats
 {
+	uint64_t bytes_read = 0; // record headers and payloads consumed so far, for progress against the file size
 	uint64_t records = 0;
 	uint64_t lidar_packets = 0;
 	uint64_t imu_packets = 0;

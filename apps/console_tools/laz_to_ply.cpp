@@ -8,6 +8,8 @@
 
 #include <spdlog/spdlog.h>
 
+#include "console_progress.h"
+
 struct Point
 {
     float x = 0.0f;
@@ -54,6 +56,7 @@ bool convert_and_save(const char* from, const char* to)
 
     std::vector<Point> points(point_count);
 
+    ConsoleProgress progress("Reading points", static_cast<uint64_t>(point_count));
     laszip_I64 point_read_count = 0;
     while (point_read_count < point_count)
     {
@@ -69,7 +72,9 @@ bool convert_and_save(const char* from, const char* to)
         points[point_read_count].timestamp = static_cast<double>(point->gps_time);
 
         point_read_count++;
+        progress.update(static_cast<uint64_t>(point_read_count));
     }
+    progress.finish(static_cast<uint64_t>(point_read_count));
 
     if (laszip_close_reader(laszip_reader) || laszip_destroy(laszip_reader))
     {

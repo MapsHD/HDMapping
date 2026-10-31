@@ -216,6 +216,52 @@ TEST_CASE("McapFileWriter: PointCloud2 round-trip (Hesai layout, absolute timest
     fs::remove(path);
 }
 
+TEST_CASE("McapFileWriter: PointCloud2 round-trip (Canonical layout, float32 time and uint32 t)")
+{
+    const auto path = tempMcapPath("hdmapping_test_canonical.mcap");
+    const auto points = makePoints(200, 5000.0);
+
+    {
+        rosbags::McapWriterOptions options;
+        options.lidar_layout = rosbags::PointCloudLayout::Canonical;
+        rosbags::McapFileWriter writer(path, options);
+        REQUIRE(writer.isOpen());
+        writer.writePointCloud(static_cast<uint64_t>(points.front().timestamp * 1e9), points);
+    }
+
+    const auto clouds = readTopic<std::vector<rosbags::McapPoint>>(
+        path, "/lidar_points", [](const uint8_t* d, size_t n)
+        {
+            return rosbags::decodePc2(d, n);
+        });
+
+    REQUIRE(clouds.size() == 1);
+    const auto& decoded = clouds.front();
+    REQUIRE(decoded.size() == points.size());
+
+    for (size_t i = 0; i < points.size(); ++i)
+    {
+        CHECK(decoded[i].x == doctest::Approx(points[i].x));
+        CHECK(decoded[i].ring == points[i].ring);
+        CHECK(decoded[i].laser_id == 0); // Canonical layout has no laser_id field
+        CHECK(decoded[i].timestamp == doctest::Approx(points[i].timestamp).epsilon(1e-8));
+    }
+
+    // The field table is the point of this layout: float32 `time` (what FAST-LIO/LIO-SAM
+    // Velodyne point types match) and uint32 `t`, both relative to the first point.
+    const auto raw = readTopic<std::vector<uint8_t>>(
+        path, "/lidar_points", [](const uint8_t* d, size_t n)
+        {
+            return std::vector<uint8_t>(d, d + n);
+        });
+    REQUIRE(raw.size() == 1);
+    const std::string bytes(raw.front().begin(), raw.front().end());
+    for (const char* name : {"intensity", "ring", "time", "t"})
+        CHECK(bytes.find(name) != std::string::npos);
+
+    fs::remove(path);
+}
+
 TEST_CASE("McapFileWriter: IMU round-trip")
 {
     const auto path = tempMcapPath("hdmapping_test_imu.mcap");

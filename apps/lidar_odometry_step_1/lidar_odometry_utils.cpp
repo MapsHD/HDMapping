@@ -1,6 +1,7 @@
 #include "lidar_odometry_utils.h"
 #include "csv.hpp"
 #include <algorithm>
+#include <cstring>
 #include <filesystem>
 #include <regex>
 #include <tbb/parallel_for_each.h>
@@ -497,12 +498,44 @@ std::vector<std::tuple<std::pair<double, double>, Eigen::Vector3f, Eigen::Vector
     return all_data;
 }
 
+namespace
+{
+    // Byte offset of the uint16 LAS extra-bytes attribute `name` within a point's
+    // extra bytes, or -1 when the file does not describe one by that name and type.
+    int find_u16_extra_bytes_attribute(const laszip_header* header, const char* name)
+    {
+        // LAS 1.4 extra-bytes descriptor: 192 bytes each, data_type 1-based (3 = uint16,
+        // 0 = undocumented with `options` holding the byte count).
+        constexpr size_t kDescriptorSize = 192;
+        constexpr int kTypeSize[] = { 0, 1, 1, 2, 2, 4, 4, 8, 8, 4, 8 };
+        for (laszip_U32 i = 0; i < header->number_of_variable_length_records; ++i)
+        {
+            const laszip_vlr_struct& vlr = header->vlrs[i];
+            if (vlr.record_id != 4 || std::strncmp(vlr.user_id, "LASF_Spec", 16) != 0 || vlr.data == nullptr)
+                continue;
+            int start = 0;
+            for (size_t a = 0; a + kDescriptorSize <= vlr.record_length_after_header; a += kDescriptorSize)
+            {
+                const laszip_U8* d = vlr.data + a;
+                const int data_type = d[2];
+                char attribute[33] = {};
+                std::memcpy(attribute, d + 4, 32);
+                if (std::strcmp(attribute, name) == 0)
+                    return data_type == 3 ? start : -1;
+                start += data_type == 0 ? d[3] : (data_type <= 10 ? kTypeSize[data_type] : 0);
+            }
+        }
+        return -1;
+    }
+} // namespace
+
 std::vector<Point3Di> load_point_cloud(
     const std::string& lazFile,
     bool ommit_points_with_timestamp_equals_zero,
     double filter_threshold_xy_inner,
     double filter_threshold_xy_outer,
-    const std::unordered_map<int, Eigen::Affine3d>& calibrations)
+    const std::unordered_map<int, Eigen::Affine3d>& calibrations,
+    std::vector<uint16_t>* rings)
 {
     std::vector<Point3Di> points;
     laszip_POINTER laszip_reader;
@@ -539,6 +572,10 @@ std::vector<Point3Di> load_point_cloud(
     // LAS point formats carrying rgb: 2, 3, 5, 7, 8, 10
     const int fmt = header->point_data_format;
     const bool has_rgb = fmt == 2 || fmt == 3 || fmt == 5 || fmt == 7 || fmt == 8 || fmt == 10;
+
+    if (rings)
+        rings->clear();
+    const int ring_offset = rings ? find_u16_extra_bytes_attribute(header, "ring") : -1;
 
     for (laszip_U32 j = 0; j < header->number_of_point_records; j++)
     {
@@ -590,6 +627,13 @@ std::vector<Point3Di> load_point_cloud(
                 sqrt(pf.x() * pf.x() + pf.y() * pf.y()) < filter_threshold_xy_outer)
             {
                 points.emplace_back(p);
+                if (rings)
+                {
+                    uint16_t ring = 0;
+                    if (ring_offset >= 0 && ring_offset + 2 <= point->num_extra_bytes)
+                        std::memcpy(&ring, point->extra_bytes + ring_offset, 2);
+                    rings->push_back(ring);
+                }
             }
             else
             {

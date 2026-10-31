@@ -272,5 +272,14 @@ message(STATUS "Using external library: WGS84toCartesian")
 # mcap - support for ROS 2 bag export
 add_subdirectory(${THIRDPARTY_DIRECTORY}/mcap)
 
+# rosbags/Ros1Bag reads bz2 chunks through libbz2. Like mcap's LZ4/ZSTD, this is
+# skipped on Windows: no package manager provides it there, so Ros1Bag.cpp compiles out
+# all chunk compression on MCAP_COMPRESSION_NO_LZ4 and reads uncompressed bags only.
+add_library(ros1bag_compression INTERFACE)
+if(NOT WIN32)
+    find_package(BZip2 REQUIRED)
+    target_link_libraries(ros1bag_compression INTERFACE BZip2::BZip2)
+endif()
+
 message(STATUS "==== Dependencies Configuration Complete ====")
 

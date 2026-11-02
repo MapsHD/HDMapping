@@ -1,19 +1,25 @@
 #include <RaylibWidgets/ShortcutsTable.h>
 #include <imgui.h>
 
+#include <algorithm>
 #include <cfloat>
 
 namespace raylib_widgets
 {
 
-    void ShowShortcutsTable(const std::vector<ShortcutEntry>& entries)
+    void ShowShortcutsTable(const std::vector<ShortcutEntry>& entries, float height)
     {
         if (!ImGui::BeginTable(
-                "ShortcutsTable", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY, ImVec2(-FLT_MIN, 200)))
+                "ShortcutsTable", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY, ImVec2(-FLT_MIN, height)))
             return;
 
+        float shortcutWidth = 120.f;
+        for (const auto& entry : entries)
+            if (!entry.description.empty())
+                shortcutWidth =
+                    std::max(shortcutWidth, ImGui::CalcTextSize(entry.shortcut.c_str()).x + ImGui::GetStyle().CellPadding.x * 2);
         ImGui::TableSetupScrollFreeze(0, 1);
-        ImGui::TableSetupColumn("Shortcut", ImGuiTableColumnFlags_WidthFixed, 120);
+        ImGui::TableSetupColumn("Shortcut", ImGuiTableColumnFlags_WidthFixed, shortcutWidth);
         ImGui::TableSetupColumn("Description");
         ImGui::TableHeadersRow();
 

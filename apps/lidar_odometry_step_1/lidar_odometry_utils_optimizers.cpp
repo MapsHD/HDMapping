@@ -2452,6 +2452,8 @@ static bool compute_step_2_impl(
     spdlog::stopwatch stopwatch_worker;
     if (initialize_lidar_odometry(worker_data, params, ts_failure, loProgress, pause, debugMsg, lookup_stats))
     {
+        if (params.publish_processing_head && !worker_data.empty() && !worker_data.front().intermediate_trajectory.empty())
+            params.publish_processing_head(worker_data.front().intermediate_trajectory.front().translation());
         if (params.publish_trajectory)
             params.publish_trajectory(worker_data, true);
         for (int i = 0; i < worker_data.size(); i++)
@@ -2676,6 +2678,9 @@ static bool compute_step_2_impl(
             process_worker_step_update_rgd_after(acc_distance, params, points_global, worker_data[i], lookup_stats, intermediate_points);
 
             HDMAP_ZONE_END(update_rgd_after);
+
+            if (params.publish_processing_head && !worker_data[i].intermediate_trajectory.empty())
+                params.publish_processing_head(worker_data[i].intermediate_trajectory.back().translation());
 
             if (i > 1)
             {

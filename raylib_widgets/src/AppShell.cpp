@@ -2,6 +2,8 @@
 
 #include <imgui_internal.h> // ImGui::DockBuilder*
 
+#include <algorithm>
+
 #ifdef _WIN32
 // NOGDI/NOUSER: windows.h's wingdi.h/winuser.h #define (or, for CloseWindow/
 // ShowCursor, directly declare) identifiers that collide with raylib.h's own
@@ -103,49 +105,51 @@ namespace raylib_widgets
             return;
 
         static bool show_about = false;
+        const ImVec2 workSize = ImGui::GetMainViewport()->WorkSize;
+        const ImVec2 maximum(workSize.x * 0.95f, workSize.y * 0.95f);
+        ImGui::SetNextWindowSize(ImVec2(std::min(1000.f, maximum.x), std::min(760.f, maximum.y)), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSizeConstraints(ImVec2(std::min(540.f, maximum.x), std::min(480.f, maximum.y)), maximum);
 
-        if (ImGui::Begin(
-                "Info",
-                &open,
-                ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoCollapse))
+        if (ImGui::Begin("Info", &open, ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoCollapse))
         {
-            bool firstLine = true;
-            for (const auto& line : infoLines)
+            if (ImGui::BeginTabBar("InfoTabs"))
             {
-                if (line.empty())
-                    ImGui::NewLine();
-                else if (line.rfind("https://", 0) == 0)
-                    ImGuiHyperlink(line.c_str());
-                else
-                    ImGui::TextUnformatted(line.c_str());
-
-                if (firstLine)
+                if (ImGui::BeginTabItem("Controls", nullptr, ImGuiTabItemFlags_NoPushId))
                 {
-                    ImGui::SameLine(
-                        ImGui::GetWindowWidth() - ImGui::CalcTextSize("ImGui").x - ImGui::GetStyle().ItemSpacing.x * 2 -
-                        ImGui::GetStyle().FramePadding.x * 2);
-                    if (ImGui::Button("ImGui"))
-                        show_about = true;
-
-                    firstLine = false;
+                    ShowShortcutsTable(appShortcuts, std::max(1.f, ImGui::GetContentRegionAvail().y));
+                    ImGui::EndTabItem();
                 }
+                if (ImGui::BeginTabItem("About / camera guide", nullptr, ImGuiTabItemFlags_NoPushId))
+                {
+                    if (ImGui::BeginChild("InfoDetails"))
+                    {
+                        ImGui::PushTextWrapPos(0.f);
+                        for (const auto& line : infoLines)
+                        {
+                            if (line.empty())
+                                ImGui::NewLine();
+                            else if (line.rfind("https://", 0) == 0)
+                                ImGuiHyperlink(line.c_str());
+                            else
+                                ImGui::TextUnformatted(line.c_str());
+                        }
+
+                        ImGui::NewLine();
+                        ImGui::TextUnformatted("Author: Janusz Bedkowski & contributors");
+                        ImGui::NewLine();
+                        ImGui::TextUnformatted("Part of HDMapping software suite");
+                        ImGui::Text("Version: %s (%s)", versionString, buildDate);
+                        ImGui::TextUnformatted("Project page:");
+                        ImGuiHyperlink("https://github.com/MapsHD/HDMapping");
+                        ImGui::PopTextWrapPos();
+                        if (ImGui::Button("ImGui"))
+                            show_about = true;
+                    }
+                    ImGui::EndChild();
+                    ImGui::EndTabItem();
+                }
+                ImGui::EndTabBar();
             }
-
-            ImGui::NewLine();
-            ImGui::Text("Author: Janusz Bedkowski & contributors");
-            ImGui::NewLine();
-            ImGui::Text("Part of HDMapping software suite");
-            ImGui::Text("Version: %s (%s)", versionString, buildDate);
-            ImGui::Text("Project page: ");
-            ImGui::SameLine();
-            ImGuiHyperlink("https://github.com/MapsHD/HDMapping");
-
-            ImGui::NewLine();
-            ImGui::Separator();
-            ImGui::NewLine();
-
-            ShowShortcutsTable(appShortcuts);
-
             if (show_about)
                 ImGui::ShowAboutWindow(&show_about);
         }

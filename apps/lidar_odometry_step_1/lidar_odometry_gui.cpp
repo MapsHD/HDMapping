@@ -18,6 +18,7 @@
 #include "lidar_odometry.h"
 #include "lidar_odometry_utils.h"
 #include "render_cache.h"
+#include "trajectory_follow.h"
 
 #include <Core/export_laz.h>
 #include <Core/hash_utils.h>
@@ -54,90 +55,40 @@ std::vector<std::string> infoLines = {
     "",
     "It results trajectory and point clouds as single session for 'multi_view_tls_registration_step_2' program.",
     "",
+    "The camera follows the processing head smoothly by default.",
+    "Orbit, zoom and pan keep the current pivot attached.",
+    "Double left click explores around the nearest trajectory point on screen.",
+    "Double right click returns smoothly to the processing head.",
+    "During SLAM, exploration ends after the inactivity delay set in Progress.",
+    "After SLAM, there is no automatic return; use double right click.",
+    "F1 shows or hides this help. Controls / Help opens it during a run.",
+    "",
     "Next step will be to load session.json file with 'multi_view_tls_registration_step_2' program."
 };
 
-// App specific shortcuts (Type and Shortcut are just for easy reference)
-static const std::vector<ShortcutEntry> appShortcuts = { { "Normal keys", "A", "" },
-                                                         { "", "Ctrl+A", "" },
-                                                         { "", "B", "" },
-                                                         { "", "Ctrl+B", "" },
-                                                         { "", "C", "" },
-                                                         { "", "Ctrl+C", "" },
-                                                         { "", "D", "" },
-                                                         { "", "Ctrl+D", "" },
-                                                         { "", "E", "" },
-                                                         { "", "Ctrl+E", "" },
-                                                         { "", "F", "" },
-                                                         { "", "Ctrl+F", "" },
-                                                         { "", "G", "" },
-                                                         { "", "Ctrl+G", "" },
-                                                         { "", "H", "" },
-                                                         { "", "Ctrl+H", "" },
-                                                         { "", "I", "" },
-                                                         { "", "Ctrl+I", "" },
-                                                         { "", "J", "" },
-                                                         { "", "Ctrl+K", "" },
-                                                         { "", "K", "" },
-                                                         { "", "Ctrl+K", "" },
-                                                         { "", "L", "" },
-                                                         { "", "Ctrl+L", "" },
-                                                         { "", "M", "" },
-                                                         { "", "Ctrl+M", "" },
-                                                         { "", "N", "" },
-                                                         { "", "Ctrl+N", "" },
-                                                         { "", "O", "" },
-                                                         { "", "Ctrl+O", "Open data" },
-                                                         { "", "P", "" },
-                                                         { "", "Ctrl+P", "" },
-                                                         { "", "Q", "" },
-                                                         { "", "Ctrl+Q", "" },
-                                                         { "", "R", "" },
-                                                         { "", "Ctrl+R", "" },
-                                                         { "", "Shift+R", "" },
-                                                         { "", "S", "" },
-                                                         { "", "Ctrl+S", "" },
-                                                         { "", "Ctrl+Shift+S", "" },
-                                                         { "", "T", "" },
-                                                         { "", "Ctrl+T", "" },
-                                                         { "", "U", "" },
-                                                         { "", "Ctrl+U", "" },
-                                                         { "", "V", "" },
-                                                         { "", "Ctrl+V", "" },
-                                                         { "", "W", "" },
-                                                         { "", "Ctrl+W", "" },
-                                                         { "", "X", "" },
-                                                         { "", "Ctrl+X", "" },
-                                                         { "", "Y", "" },
-                                                         { "", "Ctrl+Y", "" },
-                                                         { "", "Z", "" },
-                                                         { "", "Ctrl+Z", "" },
-                                                         { "", "Shift+Z", "" },
-                                                         { "", "1-9", "" },
-                                                         { "Special keys", "Up arrow", "" },
-                                                         { "", "Shift + up arrow", "" },
-                                                         { "", "Ctrl + up arrow", "" },
-                                                         { "", "Down arrow", "" },
-                                                         { "", "Shift + down arrow", "" },
-                                                         { "", "Ctrl + down arrow", "" },
-                                                         { "", "Left arrow", "" },
-                                                         { "", "Shift + left arrow", "" },
-                                                         { "", "Ctrl + left arrow", "" },
-                                                         { "", "Right arrow", "" },
-                                                         { "", "Shift + right arrow", "" },
-                                                         { "", "Ctrl + right arrow", "" },
-                                                         { "", "Pg down", "" },
-                                                         { "", "Pg up", "" },
-                                                         { "", "- key", "" },
-                                                         { "", "+ key", "" },
-                                                         { "Mouse related", "Left click + drag", "" },
-                                                         { "", "Right click + drag", "n" },
-                                                         { "", "Scroll", "" },
-                                                         { "", "Shift + scroll", "" },
-                                                         { "", "Shift + drag", "" },
-                                                         { "", "Ctrl + left click", "" },
-                                                         { "", "Ctrl + right click", "" },
-                                                         { "", "Ctrl + middle click", "" } };
+// List only implemented controls; the same help is available during loading and processing.
+static const std::vector<ShortcutEntry> appShortcuts = { { "Help", "F1", "Show / hide controls and help" },
+                                                         { "Mouse", "Left drag", "Orbit around current pivot" },
+                                                         { "", "Right drag", "Pan; keep pivot attached" },
+                                                         { "", "Scroll", "Zoom; keep pivot attached" },
+                                                         { "", "Shift + scroll", "Faster zoom in perspective view" },
+                                                         { "", "Double left click", "Explore nearest trajectory point" },
+                                                         { "", "Double right click", "Return to processing head" },
+                                                         { "Camera", "Ctrl + arrows", "Rotate camera" },
+                                                         { "", "Shift + arrows", "Pan camera" },
+                                                         { "", "F / B", "Front / back view" },
+                                                         { "", "L / R", "Left / right view" },
+                                                         { "", "T / U", "Top / bottom view" },
+                                                         { "", "I", "Isometric view" },
+                                                         { "", "Z", "Reset camera" },
+                                                         { "", "Shift + Z", "Toggle Z lock in perspective view" },
+                                                         { "Display", "O", "Toggle orthographic / perspective view" },
+                                                         { "", "C", "Show / hide compass and ruler" },
+                                                         { "", "X", "Show / hide axes" },
+                                                         { "", "1-9", "Set point size" },
+                                                         { "Data", "Ctrl + O", "Load and process data when idle" },
+                                                         { "Free exploration", "Shift + R", "Open rotation-center coordinates" },
+                                                         { "", "Ctrl + right/middle click", "Choose rotation center on Z=0" } };
 
 namespace fs = std::filesystem;
 
@@ -179,6 +130,17 @@ bool trajectory_points_dirty = true; // GUI-thread edits; worker changes are ide
 // Only display fields are copied; raw IMU, timestamps and point-cache paths stay with the worker.
 std::mutex trajectory_preview_mutex;
 std::shared_ptr<const std::vector<WorkerData>> trajectory_preview;
+std::optional<Vector3> processing_head; // protected by trajectory_preview_mutex
+step1_render::TrajectoryFollow trajectory_follow;
+
+void publish_processing_head(const Eigen::Vector3d& position)
+{
+    const auto p = position.cast<float>().eval();
+    if (!p.allFinite())
+        return;
+    std::scoped_lock lock(trajectory_preview_mutex);
+    processing_head = Vector3{ p.x(), p.y(), p.z() };
+}
 
 void publish_trajectory_preview(const std::vector<WorkerData>& source, bool force)
 {
@@ -223,6 +185,7 @@ std::vector<std::vector<Point3Di>> pointsPerFile;
 Imu imu_data;
 Trajectory trajectory;
 std::atomic<bool> loRunning{ false };
+std::atomic<bool> loComputing{ false }; // excludes loading and export
 std::atomic<float> loProgress{ 0.0 };
 std::atomic<bool> loPause{ false };
 std::atomic<bool> loParked{ false }; //!< step 2 is waiting on loPause and touches no file (see compute_step_2)
@@ -1783,6 +1746,9 @@ void progress_window()
 {
     ImGui::Begin("Progress", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 
+    if (ImGui::SmallButton("Controls / Help (F1)"))
+        info_gui = true;
+
     ImGui::Text(("Working directory:\n'" + working_directory + "'").c_str());
     recording_span_gui();
 
@@ -1831,6 +1797,13 @@ void progress_window()
     ImGui::ProgressBar(progress, ImVec2(-1.0f, 0.0f), progressText);
     ImGui::Text("%s", timeInfo);
     resources_gui();
+
+    ImGui::SliderFloat("Resume after inactivity", &trajectory_follow.idleSeconds, 1.f, 30.f, "%.0f s");
+    if (!loComputing)
+        ImGui::TextDisabled("Camera: automatic following off (double right click to return)");
+    else
+        ImGui::TextUnformatted(
+            trajectory_follow.exploring() ? "Camera: exploring (double right click to return)" : "Camera: smooth following");
 
 #ifdef _WIN32
     // Update Windows taskbar progress
@@ -1918,6 +1891,12 @@ static void launchPipeline(const std::string& folder, bool compute, bool save)
     loPause = false;
     loParked = false;
     loProgress = 0;
+    loComputing = false;
+    trajectory_follow.reset(GetTime());
+    {
+        std::scoped_lock lock(trajectory_preview_mutex);
+        processing_head.reset();
+    }
     loQuitting = false;
     if (!folder.empty())
     {
@@ -1953,7 +1932,9 @@ static void launchPipeline(const std::string& folder, bool compute, bool save)
                 {
                     if (compute)
                     {
+                        loComputing = true;
                         step2(loPause);
+                        loComputing = false;
                         if (!step_2_done)
                             throw std::runtime_error("Odometry failed");
                     }
@@ -1997,6 +1978,7 @@ static void launchPipeline(const std::string& folder, bool compute, bool save)
                     completionMessage += "\nCould not save failure report.";
                 }
             }
+            loComputing = false;
             loLoading = false;
             loRunning = false;
         });
@@ -2104,11 +2086,20 @@ void display()
     {
         ClearBackground(LIGHTGRAY);
         rlImGuiBegin();
+        if (ImGui::IsKeyPressed(ImGuiKey_F1, false))
+            info_gui = !info_gui;
         ImGui::Begin("Loading data", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+        if (ImGui::SmallButton("Controls / Help (F1)"))
+            info_gui = true;
         ImGui::Text("Loading and preparing: %s", pendingLoadFolder.c_str());
         recording_span_gui();
         resources_gui();
         ImGui::End();
+        if (info_gui)
+        {
+            infoLines[infoLines.size() - 2] = "Preparing data: " + pendingLoadFolder;
+            info_window(infoLines, appShortcuts);
+        }
         rlImGuiEnd();
         return; // initial_points, m_g and buckets are being initialized; never read them concurrently
     }
@@ -2128,10 +2119,10 @@ void display()
         }
     }
     const bool trajectory_running = loRunning.load();
-    const auto preview = [] // retain an immutable snapshot for this whole frame
+    const auto [preview, head] = [] // retain an immutable snapshot for this whole frame
     {
         std::scoped_lock lock(trajectory_preview_mutex);
-        return trajectory_preview;
+        return std::make_pair(trajectory_preview, processing_head);
     }();
     static const std::vector<WorkerData> empty_preview;
     const auto& display_workers = !trajectory_running ? worker_data : preview ? *preview : empty_preview;
@@ -2145,7 +2136,15 @@ void display()
     rlMatrixMode(RL_PROJECTION);
     rlLoadIdentity();
 
-    updateCameraTransition();
+    trajectory_follow.update(
+        camera,
+        head,
+        loComputing && !loPause && !loParked,
+        ImGui::IsAnyItemActive() || ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel) ||
+            IsMouseButtonDown(MOUSE_BUTTON_LEFT) || IsMouseButtonDown(MOUSE_BUTTON_RIGHT) || IsMouseButtonDown(MOUSE_BUTTON_MIDDLE),
+        IsWindowFocused(),
+        GetTime(),
+        GetFrameTime());
 
     reshape((int)io.DisplaySize.x, (int)io.DisplaySize.y);
 
@@ -2221,22 +2220,14 @@ void display()
     {
         rlBegin(RL_LINES);
         rlColor3f(1, 0, 0);
-        if (display_workers.size() > 0)
+        if (head)
         {
-            const auto& wd = display_workers[display_workers.size() - 1];
-            if (wd.intermediate_trajectory.size() > 0)
-            {
-                const auto& it = wd.intermediate_trajectory[wd.intermediate_trajectory.size() - 1];
-
-                rlVertex3f(it(0, 3) - 1, it(1, 3), it(2, 3));
-                rlVertex3f(it(0, 3) + 1, it(1, 3), it(2, 3));
-
-                rlVertex3f(it(0, 3), it(1, 3) - 1, it(2, 3));
-                rlVertex3f(it(0, 3), it(1, 3) + 1, it(2, 3));
-
-                rlVertex3f(it(0, 3), it(1, 3), it(2, 3) - 1);
-                rlVertex3f(it(0, 3), it(1, 3), it(2, 3) + 1);
-            }
+            rlVertex3f(head->x - 1, head->y, head->z);
+            rlVertex3f(head->x + 1, head->y, head->z);
+            rlVertex3f(head->x, head->y - 1, head->z);
+            rlVertex3f(head->x, head->y + 1, head->z);
+            rlVertex3f(head->x, head->y, head->z - 1);
+            rlVertex3f(head->x, head->y, head->z + 1);
         }
         rlEnd();
     }
@@ -2322,7 +2313,28 @@ void display()
 
     rlImGuiBegin();
 
+    if (ImGui::IsKeyPressed(ImGuiKey_F1, false))
+        info_gui = !info_gui;
+
     ShowMainDockSpace();
+
+    if (!io.WantCaptureMouse)
+    {
+        if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Right))
+            trajectory_follow.returnToHead();
+        else if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+        {
+            const auto picked = step1_render::nearestProjectedTrajectoryPoint(
+                display_workers,
+                camera.frameView3D,
+                camera.frameProj3D,
+                Vector2{ io.MousePos.x, io.MousePos.y },
+                io.DisplaySize.x,
+                io.DisplaySize.y);
+            if (picked)
+                trajectory_follow.explore(*picked, GetTime());
+        }
+    }
 
     view_kbd_shortcuts();
 
@@ -2741,6 +2753,8 @@ void mouse(int glut_button, int state, int x, int y)
 {
     ImGuiIO& io = ImGui::GetIO();
 
+    if (state == GLUT_UP)
+        mouse_buttons &= ~(1 << glut_button);
     if (!io.WantCaptureMouse)
     {
         if ((glut_button == GLUT_MIDDLE_BUTTON || glut_button == GLUT_RIGHT_BUTTON) && state == GLUT_DOWN && io.KeyCtrl)
@@ -2748,8 +2762,6 @@ void mouse(int glut_button, int state, int x, int y)
 
         if (state == GLUT_DOWN)
             mouse_buttons |= 1 << glut_button;
-        else if (state == GLUT_UP)
-            mouse_buttons = 0;
 
         mouse_old_x = x;
         mouse_old_y = y;
@@ -2891,6 +2903,7 @@ int main(int argc, char* argv[])
             std::cout << argv[0] << " input_folder parameters(*.toml) output_folder" << std::endl;
 
             params.publish_trajectory = publish_trajectory_preview;
+            params.publish_processing_head = publish_processing_head;
             initGL(&argc, argv, winTitle, display, mouse);
             trajectory_renderer.init();
 

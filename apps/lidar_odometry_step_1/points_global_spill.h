@@ -13,6 +13,7 @@
 //! reset: its second half becomes the new buffer and is folded into the buckets point by point, in order. Kept in a
 //! file instead of RAM, and streamed back in the same order with the ray-cast decision of its whole size, the buckets
 //! and so the trajectory are the ones the in-memory buffer gives; the RAM is one chunk. Empty directory = in memory.
+//! The exception is params.decimation > 0: the in-memory buffer is decimated at a reset and this one is not, so they differ.
 //!
 //! One spill file per compute_step_2 call, owned by a PointsGlobalSpill on that call's stack and reached through
 //! LidarOdometryParams::points_global_spill: created on entry, its final close checked on success, removed on every exit.

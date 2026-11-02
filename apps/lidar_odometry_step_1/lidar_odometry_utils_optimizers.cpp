@@ -2256,7 +2256,6 @@ bool process_worker_step_update_rgd_after(
         {
             acc_distance = 0;
             std::scoped_lock lock(params.mutex_buckets_indoor, params.mutex_buckets_outdoor);
-            // the upstream decimate() below discards its result: the buffer is never decimated, so neither is this
             const Eigen::Vector3d viewport = worker_data.intermediate_trajectory[0].translation();
             ++params.buckets_indoor_revision;
             ++params.buckets_outdoor_revision;
@@ -2290,7 +2289,7 @@ bool process_worker_step_update_rgd_after(
         // decimate
         if (params.decimation > 0)
         {
-            decimate(points_global, params.decimation, params.decimation, params.decimation);
+            points_global = decimate(points_global, params.decimation, params.decimation, params.decimation);
         }
 
         if (params.ablation_study_use_hierarchical_rgd)

@@ -77,6 +77,7 @@ struct LidarOdometryParams
 
     // Optional GUI observer, called by the producer only at safe trajectory boundaries.
     std::function<void(const std::vector<WorkerData>&, bool)> publish_trajectory;
+    std::function<void(const Eigen::Vector3d&)> publish_processing_head; // completed worker, never the predicted tail
 
     // filter points
     double filter_threshold_xy_inner = 0.3; // filtering points during load

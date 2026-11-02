@@ -18,7 +18,7 @@ namespace raylib_widgets
     };
 
     // Renders `entries` as a bordered, scrollable two-column table (Shortcut |
-    // Description) inside the current ImGui window.
-    void ShowShortcutsTable(const std::vector<ShortcutEntry>& entries);
+    // Description) inside the current ImGui window, with the requested height.
+    void ShowShortcutsTable(const std::vector<ShortcutEntry>& entries, float height = 200.f);
 
 } // namespace raylib_widgets

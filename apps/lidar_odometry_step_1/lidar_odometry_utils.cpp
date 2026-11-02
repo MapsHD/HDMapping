@@ -395,7 +395,7 @@ bool save_poses(const std::string& file_name, const std::vector<Eigen::Affine3d>
     }
     outfile.close();
 
-    return true;
+    return static_cast<bool>(outfile);
 }
 
 std::vector<std::tuple<std::pair<double, double>, Eigen::Vector3f, Eigen::Vector3f>> load_imu(const std::string& imu_file, int imuToUse)

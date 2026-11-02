@@ -49,7 +49,7 @@ target_include_directories(
 
 target_link_libraries(
   mandeye_raw_data_viewer_legacy
-  PRIVATE vqf Fusion
+  PRIVATE step1_run_report vqf Fusion
   unordered_dense::unordered_dense
   spdlog::spdlog
   UTL::include

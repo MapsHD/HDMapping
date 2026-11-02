@@ -1,4 +1,5 @@
 #include "points_global_spill.h"
+#include "run_report.h"
 
 #include <chrono>
 #include <limits>
@@ -23,6 +24,8 @@ PointsGlobalSpill::PointsGlobalSpill(LidarOdometryParams& params)
 
 PointsGlobalSpill::~PointsGlobalSpill()
 {
+    if (params_.run_report)
+        params_.run_report->spillSize(n_ * sizeof(Point3Di));
     if (params_.points_global_spill == this)
         params_.points_global_spill = nullptr;
     if (in_)
@@ -31,9 +34,19 @@ PointsGlobalSpill::~PointsGlobalSpill()
         std::fclose(f_);
     std::error_code ec;
     if (!pending_remove_.empty()) // a reset that did not finish: the previous generation's file too
+    {
         std::filesystem::remove(pending_remove_, ec);
+        if (ec && params_.run_report)
+            params_.run_report->fail("Spill cleanup failed: " + pending_remove_.string() + ": " + ec.message());
+    }
     if (!dir_.empty())
         std::filesystem::remove(path(), ec);
+    if (params_.run_report)
+    {
+        if (ec)
+            params_.run_report->fail("Spill cleanup failed: " + ec.message());
+        params_.run_report->spillSize(n_ * sizeof(Point3Di), !ec);
+    }
 }
 
 void PointsGlobalSpill::append(const Point3Di& p)
@@ -45,6 +58,8 @@ void PointsGlobalSpill::append(const Point3Di& p)
 
 void PointsGlobalSpill::finish()
 {
+    if (params_.run_report)
+        params_.run_report->spillSize(n_ * sizeof(Point3Di));
     if (f_ && std::fclose(f_) != 0)
     {
         f_ = nullptr;

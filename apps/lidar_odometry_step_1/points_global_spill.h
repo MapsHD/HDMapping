@@ -1,6 +1,7 @@
 #pragma once
 
 #include "lidar_odometry_utils.h"
+#include "run_report.h"
 
 #include <spdlog/spdlog.h>
 
@@ -78,13 +79,21 @@ void PointsGlobalSpill::reset(Update update)
             fail("reset read/write failed on '" + old_path.string() + "'");
         update(chunk, ray_cast);
         done += m;
+        if (params_.run_report)
+            params_.run_report->spillSize((n_ + done) * sizeof(Point3Di));
     }
     std::fclose(in_);
     in_ = nullptr;
     std::error_code ec;
     std::filesystem::remove(old_path, ec);
     if (ec)
+    {
         spdlog::warn("points_global spill: could not remove '{}': {}", old_path.string(), ec.message());
+        if (params_.run_report)
+            params_.run_report->fail("Spill cleanup failed: " + old_path.string() + ": " + ec.message());
+    }
     pending_remove_.clear();
     n_ = keep;
+    if (params_.run_report)
+        params_.run_report->spillSize(n_ * sizeof(Point3Di));
 }

@@ -43,6 +43,7 @@ target_include_directories(
 target_link_libraries(
   mandeye_raw_data_viewer
   PRIVATE
+  step1_run_report
   # core_raylib_utils brings in core_raylib (core, raylib), raylib_widgets and rlImGui.
   core_raylib_utils
   imgui_raylib

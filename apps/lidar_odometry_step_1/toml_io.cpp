@@ -99,7 +99,8 @@ bool TomlIO::SaveParametersToTomlFile(const std::string& filepath, const LidarOd
     tbl.erase("version_info");
 
     out << tbl;
-    return true;
+    out.close();
+    return static_cast<bool>(out);
 }
 
 template<typename T>

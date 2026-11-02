@@ -55,6 +55,7 @@ target_include_directories(
 target_link_libraries(
           lidar_odometry_step_1_legacy
           PRIVATE
+          step1_run_report
           vqf
           Fusion
           unordered_dense::unordered_dense

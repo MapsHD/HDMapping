@@ -48,6 +48,7 @@ inline std::string get_software_version()
 }
 
 struct RawCloudLoader; // raw_cloud_loader.h: raw point clouds loaded per file during step 1
+class RunReport;
 class PointsGlobalSpill; // points_global_spill.h: step 2's map buffer kept in a file
 
 struct LidarOdometryParams
@@ -72,6 +73,7 @@ struct LidarOdometryParams
     // runtime state of the two options above, not parameters (not saved to the parameter file)
     std::shared_ptr<RawCloudLoader> raw_cloud_loader;
     PointsGlobalSpill* points_global_spill = nullptr;
+    std::shared_ptr<RunReport> run_report; // runtime accounting, never a processing parameter
 
     // Optional GUI observer, called by the producer only at safe trajectory boundaries.
     std::function<void(const std::vector<WorkerData>&, bool)> publish_trajectory;

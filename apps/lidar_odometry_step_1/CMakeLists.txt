@@ -60,6 +60,7 @@ target_include_directories(
 target_link_libraries(
           lidar_odometry_step_1
           PRIVATE
+          step1_run_report
           # core_raylib_utils brings in core_raylib (core, raylib), raylib_widgets and rlImGui.
           core_raylib_utils
           imgui_raylib
@@ -118,7 +119,8 @@ target_include_directories(
 
 target_link_libraries(
           drag_folder_with_mandeye_data_and_drop_here-precision_forestry
-          PRIVATE 
+          PRIVATE
+          step1_run_report
           vqf 
           Fusion
           unordered_dense::unordered_dense

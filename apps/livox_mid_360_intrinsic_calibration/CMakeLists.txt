@@ -31,7 +31,7 @@ target_include_directories(
 
 target_link_libraries(
   livox_mid_360_intrinsic_calibration
-  PRIVATE vqf
+  PRIVATE step1_run_report vqf
   unordered_dense::unordered_dense
   spdlog::spdlog
   UTL::include

@@ -107,6 +107,7 @@ include(cmake/dependencies.cmake)
 # e.g. core/include/Core/raylib_render.hpp) that links against them. Required
 # unconditionally: apps/multi_view_tls_registration (step2) is raylib-based.
 include(cmake/raylib.cmake)
+include(cmake/step1_run_report.cmake)
 
 # ============================================================================
 # Core Library

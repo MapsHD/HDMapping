@@ -226,14 +226,78 @@ std::atomic<bool> loRunning{ false };
 std::atomic<float> loProgress{ 0.0 };
 std::atomic<bool> loPause{ false };
 std::atomic<bool> loParked{ false }; //!< step 2 is waiting on loPause and touches no file (see compute_step_2)
-bool loQuitting = false; //!< quit confirmed mid-run: the run is paused, display() exits once it is parked or done
-std::string pendingLoadFolder; //!< openData() picked it; display() loads it once the "Loading data" modal is on screen
-int pendingLoadFrames = 0; //!< frames left before that load; 0 = none pending
-std::chrono::time_point<std::chrono::system_clock> loStartTime;
+std::atomic<bool> loQuitting{ false }; //!< quit confirmed mid-run: the run is paused, display() exits once it is parked or done
+std::string pendingLoadFolder; // GUI-owned label; unchanged while the loading worker is running
 std::atomic<double> loElapsedSeconds{ 0.0 };
 std::atomic<double> loEstimatedTimeRemaining{ 0.0 };
 
 fs::path outwd;
+std::atomic<bool> loLoading{ false };
+std::thread pipelineThread;
+std::mutex completionMutex;
+std::string completionMessage;
+bool pipelinePending = false;
+bool pendingCompute = true, pendingSave = true;
+std::string pendingFolder;
+void startPipeline(const std::string& folder, bool compute, bool save);
+
+static void resources_gui()
+{
+    if (!params.run_report || !ImGui::CollapsingHeader("Resources", ImGuiTreeNodeFlags_DefaultOpen))
+        return;
+    // OS queries run in the sampler; the GUI copies only the small aggregate snapshot.
+    const auto live = params.run_report->live();
+    ImGui::Text("Stage: %s | Total: %.1f s | Paused: %.1f s", live.label.c_str(), live.total, live.paused);
+    auto memoryRow = [&](const char* key, const char* label)
+    {
+        auto it = live.memory.find(key);
+        if (it == live.memory.end() || !it->second.current)
+        {
+            ImGui::Text("%s: N/A", label);
+            return;
+        }
+        ImGui::Text(
+            "%s: %.1f MiB | Peak sampled: %.1f MiB",
+            label,
+            *it->second.current / (1024 * 1024),
+            it->second.maximum.value_or(0) / (1024 * 1024));
+    };
+    memoryRow("process_resident_bytes", "Application resident RAM");
+    memoryRow("process_private_commit_bytes", "Application private commit");
+    memoryRow("gpu_dedicated_bytes", "GPU dedicated (adapter sum)");
+    memoryRow("gpu_shared_bytes", "GPU shared (adapter sum)");
+    if (ImGui::TreeNode("GPU adapter detail"))
+    {
+        for (const auto& [name, metric] : live.memory)
+            if (name.find("/luid_") != std::string::npos)
+                memoryRow(name.c_str(), name.c_str());
+        ImGui::TreePop();
+    }
+    memoryRow("system_available_ram_bytes", "System available RAM");
+    memoryRow("system_commit_bytes", "System commit used");
+    memoryRow("system_commit_limit_bytes", "System commit limit");
+    for (const auto& volume : live.volumes)
+    {
+        std::string roles;
+        for (const auto& role : volume.roles)
+            roles += (roles.empty() ? "" : ", ") + role;
+        if (volume.free.current)
+            ImGui::Text(
+                "%s free: %.2f GiB | Min sampled: %.2f GiB",
+                volume.path.c_str(),
+                *volume.free.current / (1024 * 1024 * 1024),
+                volume.free.minimum.value_or(0) / (1024 * 1024 * 1024));
+        else
+            ImGui::Text("%s free: N/A", volume.path.c_str());
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", roles.c_str());
+    }
+    ImGui::Text(
+        "Disk cache: %.1f MiB | Peak: %.1f MiB",
+        static_cast<double>(live.cacheBytes) / (1024 * 1024),
+        static_cast<double>(live.cachePeak) / (1024 * 1024));
+    ImGui::TextDisabled("Commit is not physical pagefile usage. Peaks are sampled within this run.");
+}
 
 #if _WIN32
 #define DEFAULT_PATH "C:\\"
@@ -673,13 +737,12 @@ void step1(const std::string& input_folder_name, const std::atomic<bool>& loPaus
 
     if (fs::exists(input_folder_name))
     {
-        std::string newTitle = winTitle + " - ..\\" + std::filesystem::path(input_folder_name).filename().string();
-        SetWindowTitle(newTitle.c_str());
-
+        RunReport::Scope discovery(params.run_report.get(), RunReport::Stage::Loading);
         for (const auto& entry : fs::directory_iterator(input_folder_name))
             if (entry.is_regular_file())
                 input_file_names.push_back(entry.path().string());
 
+        discovery.finish();
         if (load_data(input_file_names, params, pointsPerFile, imu_data, full_debug_messages))
         {
             working_directory = fs::path(input_file_names[0]).parent_path().string();
@@ -698,10 +761,7 @@ void step1(const std::string& input_folder_name, const std::atomic<bool>& loPaus
             std::string message_info = "Problem with loading data from folder '" + input_folder_name +
                 "' (Pease check if folder exists). Program will close once You click OK!!!";
             std::cout << message_info << std::endl;
-            [[maybe_unused]] pfd::message message("Information", message_info.c_str(), pfd::choice::ok, pfd::icon::info);
-            message.result();
-
-            exit(1);
+            throw std::runtime_error("Input data loading failed: " + input_folder_name);
         }
     }
 }
@@ -732,19 +792,6 @@ void step2(const std::atomic<bool>& loPause)
             std::cout << "file: '" << imufn << "' [OK]" << std::endl;
         }
         calculations_failed = true;
-    }
-}
-
-void save_results(bool info, double elapsed_seconds)
-{
-    outwd = get_next_result_path(working_directory);
-    save_result(worker_data, params, outwd, elapsed_seconds);
-    if (info)
-    {
-        std::string message_info = "Results saved to folder: '" + outwd.string() + "'";
-        std::cout << message_info << std::endl;
-        [[maybe_unused]] pfd::message message("Information", message_info.c_str(), pfd::choice::ok, pfd::icon::info);
-        message.result();
     }
 }
 
@@ -1195,15 +1242,9 @@ void settings_gui()
         {
             if (ImGui::Button("Load data"))
             {
-                loStartTime = std::chrono::system_clock::now();
-
-                step1(mandeye::fd::SelectFolder("Select Mandeye data folder"), loPause);
-                std::cout << "Load data done please click 'Compute all' to continue calculations" << std::endl;
-
-                std::chrono::duration<double> elapsed = std::chrono::system_clock::now() - loStartTime;
-                double elapsedSeconds = elapsed.count();
-
-                std::cout << "Elapsed time: " << formatTime(elapsedSeconds).c_str() << std::endl;
+                const auto folder = mandeye::fd::SelectFolder("Select Mandeye data folder");
+                if (!folder.empty())
+                    startPipeline(folder, false, false);
             }
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(
@@ -1212,7 +1253,7 @@ void settings_gui()
         if (step_1_done && !step_2_done)
         {
             if (ImGui::Button("Compute all"))
-                step2(loPause);
+                startPipeline("", true, false);
 
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Press this button for automatic LiDAR odometry calculation -> it will produce trajectory");
@@ -1239,7 +1280,7 @@ void settings_gui()
                 ImGui::SetTooltip("Multiple Gaussians suppose to work better in floor plan indoor scenarios (multiple neighbouring rooms)");
 
             if (ImGui::Button("Save result"))
-                save_results(true, 0.0);
+                startPipeline("", false, true);
             if (ImGui::IsItemHovered())
             {
                 ImGui::BeginTooltip();
@@ -1727,16 +1768,26 @@ void settings_gui()
     ImGui::End();
 }
 
+static void recording_span_gui()
+{
+    const auto seconds = params.run_report ? params.run_report->recordingSeconds() : std::nullopt;
+    if (seconds)
+        ImGui::Text("Raw recording span (IMU): %.3f s (%.2f min)", *seconds, *seconds / 60.0);
+    else
+        ImGui::TextDisabled("Raw recording span (IMU): awaiting timestamps");
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Last minus first loaded raw IMU timestamp, including gaps. Separate from processing time.");
+}
+
 void progress_window()
 {
     ImGui::Begin("Progress", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 
     ImGui::Text(("Working directory:\n'" + working_directory + "'").c_str());
+    recording_span_gui();
 
     // Calculate elapsed time and ETA
-    auto currentTime = std::chrono::system_clock::now();
-    std::chrono::duration<double> elapsed = currentTime - loStartTime;
-    double elapsedSeconds = elapsed.count();
+    double elapsedSeconds = params.run_report ? params.run_report->stageSeconds(RunReport::Stage::Odometry, true) : 0;
     loElapsedSeconds.store(elapsedSeconds);
 
     float progress = loProgress.load();
@@ -1760,7 +1811,7 @@ void progress_window()
         snprintf(
             timeInfo,
             sizeof(timeInfo),
-            "Elapsed: %s | Remaining: %s | Estimated finish: ~%s",
+            "Odometry (without pauses): %s | Remaining: %s | Estimated finish: ~%s",
             formatTime(elapsedSeconds).c_str(),
             formatTime(estimatedTimeRemaining).c_str(),
             completionTime.c_str());
@@ -1768,11 +1819,18 @@ void progress_window()
     else
     {
         snprintf(progressText, sizeof(progressText), "Processing: %.1f%%", progress * 100.0f);
-        snprintf(timeInfo, sizeof(timeInfo), "Elapsed: %s | Calculating completion time...", formatTime(elapsedSeconds).c_str());
+        snprintf(
+            timeInfo,
+            sizeof(timeInfo),
+            "Odometry (without pauses): %s | Calculating completion time...",
+            formatTime(elapsedSeconds).c_str());
     }
 
+    if (params.run_report && params.run_report->live().stage == "export")
+        snprintf(progressText, sizeof(progressText), "Writing results...");
     ImGui::ProgressBar(progress, ImVec2(-1.0f, 0.0f), progressText);
     ImGui::Text("%s", timeInfo);
+    resources_gui();
 
 #ifdef _WIN32
     // Update Windows taskbar progress
@@ -1790,6 +1848,8 @@ void progress_window()
 
     if (loQuitting)
         ImGui::TextColored(ImVec4(1.f, 0.6f, 0.2f, 1.f), "Quitting: waiting for the current worker to finish...");
+    else if (params.run_report && params.run_report->live().stage != "odometry")
+        ImGui::Text("Finishing output...");
     else if (!loPause)
     {
         if (ImGui::Button("Pause"))
@@ -1829,67 +1889,117 @@ void progress_window()
 }
 
 //! folder: Mandeye data folder to process; empty asks for one with a folder dialog.
-//! Loading (step 1) blocks the UI thread, so display() first presents a "Loading data" modal and only
-//! then calls loadData(): one frame for the auto-resized modal to measure itself, one to show it.
+//! Loading and processing share one owned worker; drawing is suspended only during initial preparation.
 void openData(const std::string& folder = "")
 {
     const std::string input_folder_name = folder.empty() ? mandeye::fd::SelectFolder("Select Mandeye data folder") : folder;
-    if (input_folder_name.empty())
-        return;
-    pendingLoadFolder = input_folder_name;
-    pendingLoadFrames = 3;
+    if (!input_folder_name.empty())
+        startPipeline(input_folder_name, true, true);
 }
 
-void loadData(const std::string& input_folder_name)
+void startPipeline(const std::string& folder, bool compute, bool save)
 {
+    if (loRunning)
+        return;
+    pendingFolder = folder;
+    pendingCompute = compute;
+    pendingSave = save;
+    pipelinePending = true;
+}
+
+static void launchPipeline(const std::string& folder, bool compute, bool save)
+{
+    if (loRunning)
+        return;
+    if (pipelineThread.joinable())
+        pipelineThread.join();
     is_settings_gui = false;
     info_gui = false;
-
-    loRunning.store(true);
-    loProgress.store(0.0f);
-    loElapsedSeconds.store(0.0);
-    loEstimatedTimeRemaining.store(0.0);
-    loStartTime = std::chrono::system_clock::now();
-
-    step1(input_folder_name, loPause);
-
-    if (step_1_done)
+    loPause = false;
+    loParked = false;
+    loProgress = 0;
+    loQuitting = false;
+    if (!folder.empty())
     {
-        std::thread loThread(
-            []()
-            {
-                std::chrono::time_point<std::chrono::system_clock> start, end;
-                start = std::chrono::system_clock::now();
-
-                step2(loPause);
-                if (!step_2_done)
-                {
-                    loRunning = false;
-                    std::cerr << "Lidar odometry step 2 failed: no results saved" << std::endl;
-                    return;
-                }
-
-                end = std::chrono::system_clock::now();
-                std::chrono::duration<double> elapsed_seconds = end - start;
-
-                save_results(false, elapsed_seconds.count());
-
-                loRunning = false;
-
-                std::ostringstream oss;
-                oss << "Data saved to folder:\n'" << outwd.string() << "'\n"
-                    << "Calculated trajectory length: " << std::fixed << std::setprecision(1)
-                    << params.total_length_of_calculated_trajectory << "[m]\n"
-                    << "Elapsed time: " << formatTime(elapsed_seconds.count()).c_str();
-
-                [[maybe_unused]] pfd::message message("Information", oss.str(), pfd::choice::ok, pfd::icon::info);
-                message.result();
-            });
-
-        loThread.detach();
+        // Dispose the previous run before changing the shared report/data pointers.
+        if (params.run_report && !params.working_directory_cache.empty())
+            remove_cache(params);
+        params.run_report = std::make_shared<RunReport>(folder, params.points_global_spill_directory, "gui");
+        step_1_done = step_2_done = false;
+        calculations_failed = false;
+        pendingLoadFolder = folder;
+        SetWindowTitle((winTitle + " - " + fs::path(folder).filename().string()).c_str());
     }
-    else // no data loaded
-        loRunning = false;
+    if (folder.empty())
+        publish_trajectory_preview(worker_data, true);
+    loLoading = !folder.empty();
+    loRunning = true;
+    pipelineThread = std::thread(
+        [folder, compute, save]
+        {
+            try
+            {
+                if (!folder.empty())
+                    step1(folder, loPause);
+                if (!folder.empty() && !step_1_done)
+                    throw std::runtime_error("Initial preparation failed");
+                loLoading = false; // release publishes the completed initial geometry to display()
+                if (loQuitting)
+                {
+                    if (params.run_report)
+                        params.run_report->finishOperation("cancelled");
+                }
+                else
+                {
+                    if (compute)
+                    {
+                        step2(loPause);
+                        if (!step_2_done)
+                            throw std::runtime_error("Odometry failed");
+                    }
+                    if (loQuitting)
+                    {
+                        if (params.run_report)
+                            params.run_report->finishOperation("cancelled");
+                    }
+                    else if (save)
+                    {
+                        outwd = get_next_result_path(working_directory);
+                        const bool success = save_result(worker_data, params, outwd, 0);
+                        std::lock_guard lock(completionMutex);
+                        completionMessage = std::string(success ? "Results saved to: " : "Export incomplete: ") + outwd.string() + "\n" +
+                            "Calculated trajectory length: " + std::to_string(params.total_length_of_calculated_trajectory) + " m\n" +
+                            params.run_report->summary() + "Report: HDMapping_results_*.json";
+                    }
+                    else if (params.run_report)
+                        params.run_report->finishOperation(compute ? "processed" : "prepared");
+                }
+            } catch (const std::exception& error)
+            {
+                if (params.run_report)
+                {
+                    params.run_report->fail(error.what());
+                    params.run_report->finishOperation("failed");
+                }
+                std::lock_guard lock(completionMutex);
+                completionMessage = std::string("Operation failed: ") + error.what();
+                try
+                {
+                    const fs::path input = folder.empty() ? fs::path(working_directory) : fs::path(folder);
+                    if (fs::is_directory(input))
+                    {
+                        const auto output = get_next_result_path(input.string());
+                        if (save_failed_run_report(params, output, error.what()))
+                            completionMessage += "\nFailure report: " + output.string();
+                    }
+                } catch (const std::exception&)
+                {
+                    completionMessage += "\nCould not save failure report.";
+                }
+            }
+            loLoading = false;
+            loRunning = false;
+        });
 }
 
 bool step1(
@@ -1902,7 +2012,9 @@ bool step1(
     std::vector<WorkerData>& worker_data,
     const std::atomic<bool>& loPause)
 {
+    params.run_report = std::make_shared<RunReport>(folder, params.points_global_spill_directory, "cli");
     std::vector<std::string> input_file_names;
+    RunReport::Scope discovery(params.run_report.get(), RunReport::Stage::Loading);
 
     for (const auto& entry : fs::directory_iterator(folder))
     {
@@ -1913,6 +2025,7 @@ bool step1(
         }
     }
 
+    discovery.finish();
     if (load_data(input_file_names, params, pointsPerFile, imu_data, full_debug_messages))
     {
         working_directory = fs::path(input_file_names[0]).parent_path().string();
@@ -1934,17 +2047,6 @@ bool step2(std::vector<WorkerData>& worker_data, LidarOdometryParams& params, co
     return compute_step_2(worker_data, params, ts_failure, loProgress, loPause, full_debug_messages, parked);
 }
 
-void save_results(
-    bool info,
-    double elapsed_seconds,
-    std::string& working_directory,
-    std::vector<WorkerData>& worker_data,
-    LidarOdometryParams& params,
-    fs::path outwd)
-{
-    save_result(worker_data, params, outwd, elapsed_seconds);
-}
-
 //! Window close: while odometry runs, ask first. A confirmed quit pauses the run and keeps the
 //! window open until display() sees the run parked or finished (quit_abandoned_run()).
 bool confirm_close()
@@ -1955,13 +2057,15 @@ bool confirm_close()
         return false;
     pfd::message message(
         "Lidar odometry is running",
-        "Quit anyway? The run is abandoned: nothing is saved and the cache is deleted.",
+        "Close after reaching a safe boundary? Unfinished processing is abandoned; an export already in progress finishes before cache "
+        "cleanup.",
         pfd::choice::yes_no,
         pfd::icon::warning);
     if (message.result() != pfd::button::yes)
         return false;
     loQuitting = true;
-    loPause.store(true);
+    if (!loLoading)
+        loPause.store(true);
     return false;
 }
 
@@ -1969,15 +2073,60 @@ bool confirm_close()
 //! without destructors, after removing the cache the parked (or finished) run no longer reads.
 static void quit_abandoned_run()
 {
+    if (params.run_report && (loParked || params.run_report->live().status == "cancelled"))
+    {
+        params.run_report->finishOperation("cancelled");
+        try
+        {
+            const fs::path input = working_directory.empty() ? fs::path(pendingLoadFolder) : fs::path(working_directory);
+            if (fs::is_directory(input))
+                save_run_status_report(params, get_next_result_path(input.string()), "cancelled", "");
+        } catch (const std::exception& error)
+        {
+            std::cerr << "Cancellation report: " << error.what() << '\n';
+        }
+    }
     remove_cache(params);
     std::_Exit(0);
 }
 
 void display()
 {
+    if (pipelinePending)
+    {
+        pipelinePending = false;
+        launchPipeline(pendingFolder, pendingCompute, pendingSave);
+    }
     if (loQuitting && (loParked || !loRunning))
         quit_abandoned_run();
 
+    if (loLoading)
+    {
+        ClearBackground(LIGHTGRAY);
+        rlImGuiBegin();
+        ImGui::Begin("Loading data", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+        ImGui::Text("Loading and preparing: %s", pendingLoadFolder.c_str());
+        recording_span_gui();
+        resources_gui();
+        ImGui::End();
+        rlImGuiEnd();
+        return; // initial_points, m_g and buckets are being initialized; never read them concurrently
+    }
+    if (!loRunning)
+    {
+        std::string message;
+        {
+            std::lock_guard lock(completionMutex);
+            message.swap(completionMessage);
+        }
+        if (!message.empty())
+        {
+            if (pipelineThread.joinable())
+                pipelineThread.join();
+            pfd::message popup("Run report", message, pfd::choice::ok, pfd::icon::info);
+            popup.result();
+        }
+    }
     const bool trajectory_running = loRunning.load();
     const auto preview = [] // retain an immutable snapshot for this whole frame
     {
@@ -2179,7 +2328,7 @@ void display()
 
     // Drag and drop: a Mandeye data folder, or any file in one, is processed like "Load & process scanning".
     const auto dropped = takeDroppedFiles();
-    if (!dropped.empty() && !loRunning && pendingLoadFrames == 0)
+    if (!dropped.empty() && !loRunning && !pipelinePending)
     {
         fs::path folder(dropped[0]);
         if (!fs::is_directory(folder))
@@ -2187,28 +2336,7 @@ void display()
         openData(folder.string());
     }
 
-    // The previous frame presented the "Loading data" modal, so it stays on screen while loading blocks.
-    if (pendingLoadFrames == 1)
-    {
-        pendingLoadFrames = 0;
-        loadData(pendingLoadFolder);
-    }
-    else if (pendingLoadFrames > 1)
-        --pendingLoadFrames;
-
-    if (pendingLoadFrames > 0 && !ImGui::IsPopupOpen("Loading data"))
-        ImGui::OpenPopup("Loading data");
-    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal("Loading data", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
-    {
-        ImGui::Text("Loading data and running step 1 from folder:\n'%s'", pendingLoadFolder.c_str());
-        ImGui::TextDisabled("The window does not respond until this finishes, see console for progress.");
-        if (pendingLoadFrames == 0)
-            ImGui::CloseCurrentPopup();
-        ImGui::EndPopup();
-    }
-
-    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_O, false) && !loRunning && pendingLoadFrames == 0)
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_O, false) && !loRunning && !pipelinePending)
     {
         openData();
 
@@ -2606,7 +2734,7 @@ void display()
 
 void on_exit()
 {
-    remove_cache(params);
+    remove_cache(params); // Persist final cleanup status without repeating the export notification.
 }
 
 void mouse(int glut_button, int state, int x, int y)
@@ -2699,15 +2827,15 @@ int main(int argc, char* argv[])
                 if (!step1(path.string(), params, pointsPerFile, imu_data, working_directory, trajectory, worker_data, loPause) ||
                     !step2(worker_data, params, loPause))
                 {
-                    std::cerr << "Lidar odometry failed: no results saved" << std::endl;
+                    std::cerr << "Lidar odometry failed: no point-cloud results saved" << std::endl;
+                    save_failed_run_report(params, get_next_result_path(path.string()), "Loading/preparation/odometry failed");
+                    remove_cache(params);
                     return 1;
                 }
 
                 end = std::chrono::system_clock::now();
                 std::chrono::duration<double> elapsed_seconds = end - start;
-                std::time_t end_time = std::chrono::system_clock::to_time_t(end);
-                std::cout << "calculations finished computation at " << std::ctime(&end_time)
-                          << "Elapsed time: " << formatTime(elapsed_seconds.count()).c_str() << "s\n";
+                std::cout << "Odometry finished; exporting results...\n";
 
                 // Only the input folder was given: store the session where the GUI would,
                 // in the next free lio_result_N under the working directory.
@@ -2717,9 +2845,12 @@ int main(int argc, char* argv[])
                     return 1;
                 }
                 const fs::path result_dir = get_next_result_path(working_directory);
-                save_results(false, elapsed_seconds.count(), working_directory, worker_data, params, result_dir);
-                std::cout << "Results saved to folder: '" << result_dir.string() << "'" << std::endl;
+                const bool success = save_result(worker_data, params, result_dir, elapsed_seconds.count());
                 remove_cache(params);
+                std::cout << params.run_report->summary();
+                if (!success || params.run_report->live().status != "completed")
+                    return 1;
+                std::cout << "Results and run report saved to: '" << result_dir.string() << "'\n";
             }
         }
         else if (argc == 4) // runnning from command line with custom params
@@ -2739,18 +2870,21 @@ int main(int argc, char* argv[])
             if (!step1(argv[1], params, pointsPerFile, imu_data, working_directory, trajectory, worker_data, loPause) ||
                 !step2(worker_data, params, loPause))
             {
-                std::cerr << "Lidar odometry failed: no results saved" << std::endl;
+                std::cerr << "Lidar odometry failed: no point-cloud results saved" << std::endl;
+                save_failed_run_report(params, argv[3], "Loading/preparation/odometry failed");
+                remove_cache(params);
                 return 1;
             }
 
             end = std::chrono::system_clock::now();
             std::chrono::duration<double> elapsed_seconds = end - start;
-            std::time_t end_time = std::chrono::system_clock::to_time_t(end);
-            std::cout << "calculations finished computation at " << std::ctime(&end_time)
-                      << "Elapsed time: " << formatTime(elapsed_seconds.count()).c_str() << "s\n";
+            std::cout << "Odometry finished; exporting results...\n";
 
-            save_results(false, elapsed_seconds.count(), working_directory, worker_data, params, argv[3]);
+            const bool success = save_result(worker_data, params, argv[3], elapsed_seconds.count());
             remove_cache(params);
+            std::cout << params.run_report->summary();
+            if (!success || params.run_report->live().status != "completed")
+                return 1;
         }
         else // full GUI mode
         {
@@ -2765,6 +2899,8 @@ int main(int argc, char* argv[])
 #endif
 
             mainLoop(confirm_close);
+            if (pipelineThread.joinable())
+                pipelineThread.join();
 
             trajectory_cache.clear(trajectory_renderer);
             unloadPointVertices(initial_point_cache.parts);
@@ -2779,12 +2915,24 @@ int main(int argc, char* argv[])
     {
         std::cerr << "System is out of memory : " << e.what() << std::endl;
         mandeye::fd::OutOfMemMessage();
+        loPause = false;
+        if (pipelineThread.joinable())
+            pipelineThread.join();
+        return 1;
     } catch (const std::exception& e)
     {
         std::cout << e.what();
+        loPause = false;
+        if (pipelineThread.joinable())
+            pipelineThread.join();
+        return 1;
     } catch (...)
     {
         std::cerr << "Unknown fatal error occurred." << std::endl;
+        loPause = false;
+        if (pipelineThread.joinable())
+            pipelineThread.join();
+        return 1;
     }
 
     return 0;

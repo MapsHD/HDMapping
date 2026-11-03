@@ -2073,8 +2073,8 @@ void bow_loop_closure_gui()
     ImGui::Separator();
     ImGui::Text(
         "Review candidates below before adding an edge -- appearance matching alone is known to produce\n"
-        "confident false positives on repetitive scenes (see BOW_PLACE_RECOGNITION_HANDOFF.md). Select a row\n"
-        "to preview its matched keypoints.");
+        "confident false positives on repetitive scenes (see BOW_PLACE_RECOGNITION_HANDOFF.md). Press\n"
+        "\"Show edge\" to preview a candidate's matched keypoints.");
 
     ImGui::BeginChild("BowResults", ImVec2(0, 260), true);
     for (size_t row = 0; row < results_copy.size(); row++)
@@ -2082,14 +2082,20 @@ void bow_loop_closure_gui()
         const auto& c = results_copy[row];
         ImGui::PushID(static_cast<int>(row));
 
-        bool selected = (bow_state.selected_candidate == static_cast<int>(row));
-        if (ImGui::Selectable("##select_row", selected, ImGuiSelectableFlags_SpanAllColumns))
+        const bool shown = (bow_state.selected_candidate == static_cast<int>(row));
+        if (shown)
+            ImGui::PushStyleColor(ImGuiCol_Button, orangeBorder);
+        if (ImGui::Button("Show edge"))
         {
             bow_state.selected_candidate = static_cast<int>(row);
             std::lock_guard<std::mutex> lk(bow_state.results_mutex);
             cv::Mat montage = bow_loop_closure::buildCandidateMontage(c, bow_state.frames, bow_state.chunk_to_frame, bow_state.params);
             bow_loop_closure_upload_montage(montage);
         }
+        if (shown)
+            ImGui::PopStyleColor();
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Preview this candidate's matched keypoints below");
         ImGui::SameLine();
         ImGui::Text(
             "i=%d j=%d  xy=%.2fm  arc=%.2fm  score=%.3f  inliers=%d", c.index_i, c.index_j, c.xy_dist_m, c.arc_gap_m, c.bow_score,

@@ -65,11 +65,17 @@ public:
     void graph_slam(PointClouds& point_clouds_container, GNSS& gnss, GroundControlPoints& gcps, ControlPoints& cps);
     void FuseTrajectoryWithGNSS(PointClouds& point_clouds_container, GNSS& gnss);
     void FuseTrajectoryWithTUM(PointClouds& point_clouds_container, TUM& tum);
-    void run_icp(
+    //! Refines one edge's relative pose with point-to-point ICP between its two scans (each extended by its
+    //! neighbouring scans).
+    //! @return false when ICP fails; the edge is then left unchanged
+    bool run_icp(
         PointClouds& point_clouds_container,
         int index_active_edge,
         float search_radius,
         int number_of_iterations,
         int num_edge_extended_before,
         int num_edge_extended_after);
+    //! Search radii for coarse-to-fine ICP: `start_radius`, then those of the per-edge ICP buttons' steps (2.0, 1.0,
+    //! 0.5, 0.25, 0.1 m) below it.
+    static std::vector<float> icp_search_radii(float start_radius);
 };

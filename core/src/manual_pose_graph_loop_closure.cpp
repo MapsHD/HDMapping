@@ -25,6 +25,131 @@
 
 #include <common/include/cauchy.h>
 
+void ManualPoseGraphLoopClosure::icp_all_edges_step(
+    PointClouds& point_clouds_container, int num_edge_extended_before, int num_edge_extended_after)
+{
+    auto& run = icp_all_edges_run;
+    // The first step waits for a frame that shows the progress bar, since each step blocks the window.
+    if (!run.progress_drawn)
+    {
+        return;
+    }
+    if (run.edge < static_cast<int>(edges.size()))
+    {
+        const float radius = run.radii[run.step];
+        std::cout << "ICP all edges: edge " << run.edge + 1 << " of " << edges.size() << ", search radius " << radius << " m" << std::endl;
+        if (run_icp(point_clouds_container, run.edge, radius, 30, num_edge_extended_before, num_edge_extended_after))
+        {
+            run.step++;
+        }
+        else
+        {
+            std::cout << "ICP all edges: edge " << run.edge << " failed at search radius " << radius << " m" << std::endl;
+            run.failed.push_back(run.edge);
+            run.step = run.radii.size(); // an edge stops at its first failed step
+        }
+        if (run.step >= run.radii.size())
+        {
+            run.edge++;
+            run.step = 0;
+        }
+    }
+    if (run.edge >= static_cast<int>(edges.size()))
+    {
+        run.running = false;
+        icp_failed_edges = run.failed;
+        icp_all_edges_count = edges.size();
+        std::cout << "ICP all edges: " << edges.size() - run.failed.size() << " of " << edges.size() << " edges refined" << std::endl;
+    }
+}
+
+void ManualPoseGraphLoopClosure::icp_all_edges_gui()
+{
+    auto& run = icp_all_edges_run;
+    const auto format_duration = [](double seconds)
+    {
+        const int s = static_cast<int>(seconds + 0.5);
+        char buf[32];
+        std::snprintf(buf, sizeof(buf), "%d:%02d", s / 60, s % 60);
+        return std::string(buf);
+    };
+
+    if (run.running)
+    {
+        const size_t steps_per_edge = run.radii.size();
+        const double done = static_cast<double>(run.edge * steps_per_edge + run.step);
+        const double total = static_cast<double>(edges.size() * steps_per_edge);
+        const double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - run.start).count();
+        char overlay[96];
+        std::snprintf(
+            overlay,
+            sizeof(overlay),
+            "edge %d of %zu, radius %.2f m",
+            std::min(run.edge + 1, static_cast<int>(edges.size())),
+            edges.size(),
+            run.radii[std::min(run.step, steps_per_edge - 1)]);
+        ImGui::ProgressBar(total > 0.0 ? static_cast<float>(done / total) : 1.0f, ImVec2(350, 0), overlay);
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel"))
+        {
+            run.running = false;
+            std::cout << "ICP all edges: cancelled after " << run.edge << " of " << edges.size() << " edges" << std::endl;
+        }
+        ImGui::SameLine();
+        if (done > 0.0)
+            ImGui::Text(
+                "%s elapsed, about %s left", format_duration(elapsed).c_str(), format_duration(elapsed * (total - done) / done).c_str());
+        else
+            ImGui::Text("%s elapsed", format_duration(elapsed).c_str());
+        run.progress_drawn = true;
+        return;
+    }
+
+    ImGui::BeginDisabled(edges.empty());
+    if (ImGui::Button("ICP all edges"))
+    {
+        run = IcpAllEdgesRun{};
+        run.running = true;
+        run.radii = icp_search_radii(static_cast<float>(icp_all_edges_start_radius));
+        run.start = std::chrono::steady_clock::now();
+        icp_all_edges_count = 0;
+    }
+    ImGui::EndDisabled();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        ImGui::SetTooltip(
+            "Refine every edge with ICP, coarse to fine from the start radius.\n"
+            "Run before 'Compute Pose Graph SLAM': an edge added without ICP holds the current misalignment.");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(ImGuiNumberWidth);
+    ImGui::InputDouble("Start radius [m]", &icp_all_edges_start_radius, 0.0, 0.0, "%.2f");
+    if (icp_all_edges_start_radius < 0.01)
+        icp_all_edges_start_radius = 0.01;
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip(
+            "First ICP search radius; the run continues through 2.0, 1.0, 0.5, 0.25, 0.1 m below it.\n"
+            "Start above how far the edges are off: a larger radius converges from farther but takes longer.");
+
+    // Edge indexes shift when edges are added or removed elsewhere (e.g. the BoW window), so the result is only
+    // shown while the edge count still matches.
+    if (icp_all_edges_count > 0 && icp_all_edges_count == edges.size())
+    {
+        ImGui::SameLine();
+        if (icp_failed_edges.empty())
+        {
+            ImGui::Text("all %zu edges refined", edges.size());
+        }
+        else
+        {
+            std::string failed;
+            for (const int e : icp_failed_edges)
+                failed += (failed.empty() ? "" : ", ") + std::to_string(e);
+            ImGui::TextColored(orangeBorder, "ICP failed on edges: %s", failed.c_str());
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Check these edges: farther off than the start radius, or too little overlap");
+        }
+    }
+}
+
 void ManualPoseGraphLoopClosure::Gui(
     PointClouds& point_clouds_container,
     int& index_loop_closure_source,
@@ -39,6 +164,11 @@ void ManualPoseGraphLoopClosure::Gui(
 {
     if (point_clouds_container.point_clouds.size() > 0)
     {
+        if (icp_all_edges_run.running)
+        {
+            icp_all_edges_step(point_clouds_container, num_edge_extended_before, num_edge_extended_after);
+        }
+
         if (!manipulate_active_edge)
         {
             // suboptimal as distance is computed each frame!
@@ -90,6 +220,8 @@ void ManualPoseGraphLoopClosure::Gui(
             {
                 add_edge(point_clouds_container, index_loop_closure_source, index_loop_closure_target);
                 index_active_edge = edges.size() - 1;
+                icp_all_edges_count = 0;
+                icp_all_edges_run.running = false;
             }
             ImGui::SameLine();
             ImGui::Text("(number of active edges: %zu)", edges.size());
@@ -98,6 +230,9 @@ void ManualPoseGraphLoopClosure::Gui(
             {
                 static bool keep_initial_trajectory_curvature = true;
 
+                icp_all_edges_gui();
+
+                ImGui::BeginDisabled(icp_all_edges_run.running);
                 if (ImGui::Button("Compute Pose Graph SLAM"))
                 {
                     if (keep_initial_trajectory_curvature)
@@ -110,6 +245,7 @@ void ManualPoseGraphLoopClosure::Gui(
                     }
                     graph_slam(point_clouds_container, gnss, gcps, cps);
                 }
+                ImGui::EndDisabled();
 
                 ImGui::SameLine();
                 ImGui::Checkbox("Keep initial trajectory curvature", &keep_initial_trajectory_curvature);
@@ -432,6 +568,8 @@ void ManualPoseGraphLoopClosure::Gui(
                                 new_edges.push_back(edges[ni]);
                         }
                         edges = new_edges;
+                        icp_all_edges_count = 0;
+                        icp_all_edges_run.running = false;
 
                         index_active_edge = std::min(index_active_edge, static_cast<int>(edges.size() - 1));
                         manipulate_active_edge = (edges.size() > 0);

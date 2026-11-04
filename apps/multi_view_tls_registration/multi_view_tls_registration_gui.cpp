@@ -2019,6 +2019,14 @@ void bow_loop_closure_upload_montage(cv::Mat mat)
     bow_state.montage_tex = LoadTextureFromImage(ri);
     bow_state.montage_tex_valid = bow_state.montage_tex.id > 0;
 }
+
+void bow_loop_closure_clear_preview()
+{
+    bow_state.selected_candidate = -1;
+    if (bow_state.montage_tex_valid)
+        UnloadTexture(bow_state.montage_tex);
+    bow_state.montage_tex_valid = false;
+}
 } // namespace
 
 void bow_loop_closure_gui()
@@ -2074,7 +2082,7 @@ void bow_loop_closure_gui()
     ImGui::Text(
         "Review candidates below before adding an edge -- appearance matching alone is known to produce\n"
         "confident false positives on repetitive scenes (see BOW_PLACE_RECOGNITION_HANDOFF.md). Press\n"
-        "\"Show edge\" to preview a candidate's matched keypoints.");
+        "\"Show edge\" to preview a candidate's matched keypoints, \"Remove edge\" there to drop a false positive.");
 
     ImGui::BeginChild("BowResults", ImVec2(0, 260), true);
     for (size_t row = 0; row < results_copy.size(); row++)
@@ -2123,7 +2131,15 @@ void bow_loop_closure_gui()
         {
             for (const auto& c : results_copy)
                 session.pose_graph_loop_closure.add_edge(session.point_clouds_container, c.index_i, c.index_j);
+            {
+                std::lock_guard<std::mutex> lk(bow_state.results_mutex);
+                bow_state.results.clear();
+                bow_state.status = "Added " + std::to_string(results_copy.size()) + " edges to the pose graph";
+            }
+            bow_loop_closure_clear_preview();
         }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Add every candidate as a pose graph edge and clear the list");
         ImGui::SameLine();
         if (ImGui::Button("Save all shown as montages..."))
         {
@@ -2166,12 +2182,36 @@ void bow_loop_closure_gui()
                         cv::imwrite(out_file, m);
                 }
             }
+            ImGui::SameLine();
+            if (ImGui::Button("Remove edge"))
+            {
+                const auto& shown = results_copy[bow_state.selected_candidate];
+                {
+                    std::lock_guard<std::mutex> lk(bow_state.results_mutex);
+                    auto& results = bow_state.results;
+                    const auto it = std::find_if(
+                        results.begin(),
+                        results.end(),
+                        [&shown](const bow_loop_closure::Candidate& c)
+                        {
+                            return c.index_i == shown.index_i && c.index_j == shown.index_j;
+                        });
+                    if (it != results.end())
+                        results.erase(it);
+                }
+                bow_loop_closure_clear_preview();
+            }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Remove this candidate from the list; an edge already added to the pose graph stays there");
         }
-        ImVec2 avail = ImGui::GetContentRegionAvail();
-        float aspect = static_cast<float>(bow_state.montage_tex.height) / static_cast<float>(bow_state.montage_tex.width);
-        int dispW = static_cast<int>(avail.x);
-        int dispH = static_cast<int>(avail.x * aspect);
-        rlImGuiImageSize(&bow_state.montage_tex, dispW, dispH);
+        if (bow_state.montage_tex_valid)
+        {
+            ImVec2 avail = ImGui::GetContentRegionAvail();
+            float aspect = static_cast<float>(bow_state.montage_tex.height) / static_cast<float>(bow_state.montage_tex.width);
+            int dispW = static_cast<int>(avail.x);
+            int dispH = static_cast<int>(avail.x * aspect);
+            rlImGuiImageSize(&bow_state.montage_tex, dispW, dispH);
+        }
     }
 
     ImGui::End();

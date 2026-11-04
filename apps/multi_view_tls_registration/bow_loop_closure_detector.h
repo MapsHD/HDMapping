@@ -49,8 +49,12 @@ struct DetectorParams
     double min_arc_gap_m = 40.0;
     double max_xy_dist_m = 15.0;
 
-    // Stage 2 (appearance pre-filter): fbow::fBow::score threshold.
-    double min_bow_score = 0.02;
+    // Stage 2 (appearance pre-filter): fbow::fBow::score threshold. A cheap
+    // pre-filter only: on a warehouse walk (mandeye CAMERA_0 and Insta360
+    // front/back) the score barely separates revisits from far-apart pairs
+    // (median 0.006-0.011 vs 0.004-0.006), and 0.02 kept fewer than 1 in 10
+    // revisits. The inlier count below is what tells them apart.
+    double min_bow_score = 0.005;
 
     // Stage 3 (geometric verification): ORB ratio-test match + RANSAC
     // fundamental matrix.
@@ -58,7 +62,14 @@ struct DetectorParams
     float match_ratio_test = 0.75f;
     double ransac_reproj_threshold_px = 3.0;
     double ransac_confidence = 0.99;
-    int min_inliers = 15;
+    // Pairs more than 30 m apart (certainly not the same view) reach up to
+    // ~28 inliers by chance on the same walk.
+    int min_inliers = 30;
+
+    // Images whose longer side exceeds this are downscaled to it before ORB
+    // (0 = full resolution). Halving the Insta360 X5's 3840 px lens images
+    // finds more revisits with fewer chance inliers, and twice as fast.
+    int max_image_size_px = 1920;
 
     // Chunk<->camera-frame association tolerance (nearest-timestamp match).
     int64_t max_frame_time_gap_ns = 500000000; // 0.5 s

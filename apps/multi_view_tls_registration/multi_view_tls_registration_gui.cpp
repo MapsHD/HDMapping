@@ -2088,6 +2088,9 @@ void bow_loop_closure_gui()
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("Minimum RANSAC-verified ORB match inliers to accept a candidate");
     ImGui::InputInt("ORB features", &bow_state.params.orb_features);
+    ImGui::InputInt("Max image size [px]", &bow_state.params.max_image_size_px);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Downscale images whose longer side is larger than this before ORB (0 = full resolution)");
     ImGui::PopItemWidth();
 
     bool detecting = bow_state.detecting.load();

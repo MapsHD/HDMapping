@@ -86,18 +86,33 @@ int nearestFrameIndex(const std::vector<CameraFrame>& frames, int begin, int end
     return -1;
 }
 
+// Reads an image, downscaled so its longer side is at most
+// params.max_image_size_px; empty if it can't be read.
+cv::Mat readImage(const std::string& image_path, int flags, const DetectorParams& params)
+{
+    cv::Mat image = cv::imread(image_path, flags);
+    const int longer_side = std::max(image.cols, image.rows);
+    if (!image.empty() && params.max_image_size_px > 0 && longer_side > params.max_image_size_px)
+    {
+        const double scale = static_cast<double>(params.max_image_size_px) / longer_side;
+        cv::resize(image, image, cv::Size(), scale, scale, cv::INTER_AREA);
+    }
+    return image;
+}
+
 // Detects ORB features + computes the fbow descriptor for one representative
 // frame. Returns false (leaving outputs untouched) if the image can't be
 // loaded or has no descriptors.
 bool detectAndTransform(
     const std::string& image_path,
+    const DetectorParams& params,
     cv::ORB& orb,
     fbow::Vocabulary& vocabulary,
     std::vector<cv::KeyPoint>& out_keypoints,
     cv::Mat& out_descriptors,
     fbow::fBow& out_bow)
 {
-    cv::Mat gray = cv::imread(image_path, cv::IMREAD_GRAYSCALE);
+    cv::Mat gray = readImage(image_path, cv::IMREAD_GRAYSCALE, params);
     if (gray.empty())
     {
         spdlog::warn("bow_loop_closure: could not read image '{}'", image_path);
@@ -295,8 +310,8 @@ std::vector<Candidate> detectCandidates(
         {
             if (f < 0 || f >= static_cast<int>(m) || has_bow[f])
                 continue;
-            has_bow[f] =
-                detectAndTransform(frames[f].file_path, *orb, vocabulary, keypoints_by_frame[f], descriptors_by_frame[f], bow_by_frame[f]);
+            has_bow[f] = detectAndTransform(
+                frames[f].file_path, params, *orb, vocabulary, keypoints_by_frame[f], descriptors_by_frame[f], bow_by_frame[f]);
         }
     }
     auto has_any_bow = [&](size_t chunk)
@@ -376,8 +391,8 @@ cv::Mat buildCandidateMontage(const Candidate& candidate, const std::vector<Came
     if (frame_i < 0 || frame_j < 0 || frame_i >= static_cast<int>(frames.size()) || frame_j >= static_cast<int>(frames.size()))
         return cv::Mat();
 
-    cv::Mat color_i = cv::imread(frames[frame_i].file_path, cv::IMREAD_COLOR);
-    cv::Mat color_j = cv::imread(frames[frame_j].file_path, cv::IMREAD_COLOR);
+    cv::Mat color_i = readImage(frames[frame_i].file_path, cv::IMREAD_COLOR, params);
+    cv::Mat color_j = readImage(frames[frame_j].file_path, cv::IMREAD_COLOR, params);
     if (color_i.empty() || color_j.empty())
         return cv::Mat();
 

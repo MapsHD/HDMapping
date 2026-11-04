@@ -1943,6 +1943,7 @@ struct BowLoopClosureState
     std::string status;
 
     int selected_candidate = -1;
+    bool scroll_to_selected = false; //!< scroll the list to selected_candidate on the next frame
     Texture2D montage_tex{};
     bool montage_tex_valid = false;
 };
@@ -2030,6 +2031,15 @@ void bow_loop_closure_upload_montage(cv::Mat mat)
     Image ri = { mat.data, mat.cols, mat.rows, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8 };
     bow_state.montage_tex = LoadTextureFromImage(ri);
     bow_state.montage_tex_valid = bow_state.montage_tex.id > 0;
+}
+
+// Shows results[row] in the montage preview.
+void bow_loop_closure_show_candidate(const std::vector<bow_loop_closure::Candidate>& results, int row)
+{
+    bow_state.selected_candidate = row;
+    std::lock_guard<std::mutex> lk(bow_state.results_mutex);
+    cv::Mat montage = bow_loop_closure::buildCandidateMontage(results[row], bow_state.frames, bow_state.params);
+    bow_loop_closure_upload_montage(montage);
 }
 
 void bow_loop_closure_clear_preview()
@@ -2123,7 +2133,8 @@ void bow_loop_closure_gui()
     ImGui::Text(
         "Review candidates below before adding an edge -- appearance matching alone is known to produce\n"
         "confident false positives on repetitive scenes (see BOW_PLACE_RECOGNITION_HANDOFF.md). Press\n"
-        "\"Show edge\" to preview a candidate's matched keypoints, \"Remove edge\" there to drop a false positive.");
+        "\"Show edge\" to preview a candidate's matched keypoints, \"Previous\"/\"Next edge\" there to step through\n"
+        "the candidates and \"Remove edge\" to drop a false positive.");
 
     ImGui::BeginChild("BowResults", ImVec2(0, 260), true);
     for (size_t row = 0; row < results_copy.size(); row++)
@@ -2132,15 +2143,15 @@ void bow_loop_closure_gui()
         ImGui::PushID(static_cast<int>(row));
 
         const bool shown = (bow_state.selected_candidate == static_cast<int>(row));
+        if (shown && bow_state.scroll_to_selected)
+        {
+            ImGui::SetScrollHereY(0.5f);
+            bow_state.scroll_to_selected = false;
+        }
         if (shown)
             ImGui::PushStyleColor(ImGuiCol_Button, orangeBorder);
         if (ImGui::Button("Show edge"))
-        {
-            bow_state.selected_candidate = static_cast<int>(row);
-            std::lock_guard<std::mutex> lk(bow_state.results_mutex);
-            cv::Mat montage = bow_loop_closure::buildCandidateMontage(c, bow_state.frames, bow_state.params);
-            bow_loop_closure_upload_montage(montage);
-        }
+            bow_loop_closure_show_candidate(results_copy, static_cast<int>(row));
         if (shown)
             ImGui::PopStyleColor();
         if (ImGui::IsItemHovered())
@@ -2212,12 +2223,31 @@ void bow_loop_closure_gui()
     {
         ImGui::Separator();
         ImGui::Text("Montage preview:");
-        if (bow_state.selected_candidate >= 0 && bow_state.selected_candidate < static_cast<int>(results_copy.size()))
+        const int selected = bow_state.selected_candidate;
+        if (selected >= 0 && selected < static_cast<int>(results_copy.size()))
         {
+            ImGui::SameLine();
+            ImGui::BeginDisabled(selected == 0);
+            if (ImGui::Button("< Previous edge"))
+            {
+                bow_loop_closure_show_candidate(results_copy, selected - 1);
+                bow_state.scroll_to_selected = true;
+            }
+            ImGui::EndDisabled();
+            ImGui::SameLine();
+            ImGui::BeginDisabled(selected + 1 >= static_cast<int>(results_copy.size()));
+            if (ImGui::Button("Next edge >"))
+            {
+                bow_loop_closure_show_candidate(results_copy, selected + 1);
+                bow_state.scroll_to_selected = true;
+            }
+            ImGui::EndDisabled();
+            ImGui::SameLine();
+            ImGui::Text("%d of %zu", selected + 1, results_copy.size());
             ImGui::SameLine();
             if (ImGui::Button("Save montage..."))
             {
-                const auto& c = results_copy[bow_state.selected_candidate];
+                const auto& c = results_copy[selected];
                 std::string default_name = "cand_" + std::to_string(c.index_i) + "_" + std::to_string(c.index_j) + ".png";
                 std::string out_file =
                     mandeye::fd::SaveFileDialog("Save montage", { "PNG image (*.png)", "*.png" }, ".png", default_name);
@@ -2232,7 +2262,9 @@ void bow_loop_closure_gui()
             ImGui::SameLine();
             if (ImGui::Button("Remove edge"))
             {
-                const auto& shown = results_copy[bow_state.selected_candidate];
+                const auto& shown = results_copy[selected];
+                std::vector<bow_loop_closure::Candidate> remaining;
+                int next_row = selected;
                 {
                     std::lock_guard<std::mutex> lk(bow_state.results_mutex);
                     auto& results = bow_state.results;
@@ -2244,12 +2276,23 @@ void bow_loop_closure_gui()
                             return c.index_i == shown.index_i && c.index_j == shown.index_j;
                         });
                     if (it != results.end())
-                        results.erase(it);
+                        next_row = static_cast<int>(results.erase(it) - results.begin());
+                    remaining = results;
                 }
-                bow_loop_closure_clear_preview();
+                // Show the candidate that took its place, or the new last one.
+                if (remaining.empty())
+                {
+                    bow_loop_closure_clear_preview();
+                }
+                else
+                {
+                    bow_loop_closure_show_candidate(remaining, std::min(next_row, static_cast<int>(remaining.size()) - 1));
+                    bow_state.scroll_to_selected = true;
+                }
             }
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Remove this candidate from the list; an edge already added to the pose graph stays there");
+                ImGui::SetTooltip(
+                    "Remove this candidate from the list and show the next one; an edge already added to the pose graph stays there");
         }
         if (bow_state.montage_tex_valid)
         {

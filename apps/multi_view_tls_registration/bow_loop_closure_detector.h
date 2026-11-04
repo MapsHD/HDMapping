@@ -1,8 +1,8 @@
 #pragma once
 
 // Automatic image-based loop-closure candidate detection for step 2, using
-// the vendored fbow (Fast Bag-of-Words) library on ORB features from mandeye
-// CAMERA_0 frames. Framework-agnostic (no ImGui/raylib), so both
+// the vendored fbow (Fast Bag-of-Words) library on ORB features from camera
+// frames (mandeye CAMERA_0, or an Insta360's cam_front and cam_back). Framework-agnostic (no ImGui/raylib), so both
 // bow_loop_closure_gui() (multi_view_tls_registration_gui.cpp) and the
 // headless bow_loop_closure_detect console tool can drive it.
 //
@@ -29,12 +29,15 @@ class PointClouds;
 namespace bow_loop_closure
 {
 
-// One CAMERA_0 frame: `cam0_<timestamp_ns>.jpg`, timestamp on the same clock
-// as the LiDAR/IMU (same parsing as TrajectoryViewer.cpp's loadImages()).
+// One camera frame: `<prefix>_<timestamp_ns>.jpg` or `<timestamp_ns>.jpg`
+// (mandeye's cam0_<ns>.jpg, Insta360 front_<ns>.jpg / back_<ns>.jpg), timestamp
+// on the same clock as the LiDAR/IMU (same name rule as TrajectoryViewer.cpp's
+// parseImageTsNs()).
 struct CameraFrame
 {
     int64_t timestamp_ns = 0;
     std::string file_path;
+    int camera = 0; //!< index of its folder in loadCameraFrames' camera_dirs
 };
 
 struct DetectorParams
@@ -65,22 +68,26 @@ struct Candidate
 {
     int index_i = -1;
     int index_j = -1;
+    int frame_i = -1; //!< frames[] entry of chunk index_i that matched (the best camera pair)
+    int frame_j = -1; //!< frames[] entry of chunk index_j that matched
     double xy_dist_m = 0.0;
     double arc_gap_m = 0.0;
     double bow_score = 0.0;
     int inliers = 0;
 };
 
-// Scans `camera0_dir` for `cam0_<timestamp_ns>.jpg` files, sorted by
-// timestamp ascending.
-std::vector<CameraFrame> loadCameraFrames(const std::string& camera0_dir);
+// Scans every folder in `camera_dirs` (one per camera, e.g. an Insta360's
+// cam_front and cam_back) for `<prefix>_<timestamp_ns>.jpg` files. Returns
+// them sorted by camera, then timestamp ascending.
+std::vector<CameraFrame> loadCameraFrames(const std::vector<std::string>& camera_dirs);
 
-// For each chunk in `point_clouds_container`, finds the nearest-timestamp
-// frame in `frames` (frames must be sorted by timestamp_ns, as returned by
-// loadCameraFrames). Returns one frame index per chunk (same size as
-// point_clouds_container.point_clouds), or -1 where no frame falls within
-// `max_time_gap_ns`, or the chunk has no per-point timestamp loaded.
-std::vector<int> associateFramesToChunks(
+// For each chunk in `point_clouds_container`, finds every camera's
+// nearest-timestamp frame in `frames` (sorted as loadCameraFrames returns
+// them). Returns one list of frame indices per chunk (same size as
+// point_clouds_container.point_clouds), at most one per camera; a camera with
+// no frame within `max_time_gap_ns` is left out, and a chunk with no
+// per-point timestamp loaded gets an empty list.
+std::vector<std::vector<int>> associateFramesToChunks(
     const PointClouds& point_clouds_container, const std::vector<CameraFrame>& frames, int64_t max_time_gap_ns);
 
 // Absolute path to the fbow ORB vocabulary bundled with this build
@@ -94,24 +101,23 @@ std::string defaultVocabularyPath();
 fbow::Vocabulary loadVocabulary(const std::string& vocabulary_path);
 
 // Runs the full pose-gate -> appearance-filter -> geometric-verification
-// pipeline. `chunk_to_frame` is associateFramesToChunks()'s output. Returns
-// surviving candidates sorted by inlier count descending.
+// pipeline. `chunk_frames` is associateFramesToChunks()'s output. With several
+// cameras, every camera pair of a chunk pair is tried (front vs back too, which
+// finds a place revisited facing the other way) and the pair with the most
+// inliers is kept. Returns surviving candidates sorted by inlier count
+// descending.
 std::vector<Candidate> detectCandidates(
     const PointClouds& point_clouds_container,
     const std::vector<CameraFrame>& frames,
-    const std::vector<int>& chunk_to_frame,
+    const std::vector<std::vector<int>>& chunk_frames,
     const DetectorParams& params,
     fbow::Vocabulary& vocabulary);
 
-// Re-runs ORB detect + ratio-test match + RANSAC for one candidate pair
-// (independent of detectCandidates' internal per-run cache) and draws the
+// Re-runs ORB detect + ratio-test match + RANSAC for one candidate's frame
+// pair (independent of detectCandidates' internal per-run cache) and draws the
 // inlier correspondences on a side-by-side image pair, for visual review
 // before adding an edge. Returns an empty cv::Mat if either frame can't be
 // loaded/matched.
-cv::Mat buildCandidateMontage(
-    const Candidate& candidate,
-    const std::vector<CameraFrame>& frames,
-    const std::vector<int>& chunk_to_frame,
-    const DetectorParams& params);
+cv::Mat buildCandidateMontage(const Candidate& candidate, const std::vector<CameraFrame>& frames, const DetectorParams& params);
 
 } // namespace bow_loop_closure

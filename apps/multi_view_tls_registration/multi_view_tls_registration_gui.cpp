@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 // This app used to be built on GLUT + legacy immediate-mode OpenGL
@@ -1928,7 +1929,8 @@ namespace
 {
 struct BowLoopClosureState
 {
-    char camera_dir[1024] = "";
+    //! One row per camera folder (CAMERA_0, or an Insta360's cam_front and cam_back); empty rows are skipped.
+    std::vector<std::array<char, 1024>> camera_dirs = std::vector<std::array<char, 1024>>(1);
     bow_loop_closure::DetectorParams params;
 
     std::atomic<bool> detecting{ false };
@@ -1937,7 +1939,7 @@ struct BowLoopClosureState
     std::mutex results_mutex;
     std::vector<bow_loop_closure::Candidate> results;
     std::vector<bow_loop_closure::CameraFrame> frames;
-    std::vector<int> chunk_to_frame;
+    std::vector<std::string> camera_names; //!< folder name per CameraFrame::camera
     std::string status;
 
     int selected_candidate = -1;
@@ -1961,30 +1963,40 @@ void bow_loop_closure_start_detection()
         bow_state.selected_candidate = -1;
     }
 
-    std::string camera_dir = bow_state.camera_dir;
+    std::vector<std::string> camera_dirs;
+    std::vector<std::string> camera_names;
+    for (const auto& dir : bow_state.camera_dirs)
+    {
+        if (dir[0] == '\0')
+            continue;
+        camera_dirs.emplace_back(dir.data());
+        std::filesystem::path path(camera_dirs.back());
+        if (!path.has_filename())
+            path = path.parent_path(); // ".../cam_front/"
+        camera_names.push_back(path.filename().string());
+    }
     bow_loop_closure::DetectorParams params = bow_state.params;
 
     bow_state.detect_thread = std::thread(
-        [camera_dir, params]()
+        [camera_dirs, camera_names, params]()
         {
-            auto frames = bow_loop_closure::loadCameraFrames(camera_dir);
-            std::vector<int> chunk_to_frame;
+            auto frames = bow_loop_closure::loadCameraFrames(camera_dirs);
             std::vector<bow_loop_closure::Candidate> candidates;
             std::string status;
 
             if (frames.empty())
             {
-                status = "No camera frames found in '" + camera_dir + "'";
+                status = "No camera frames found in the camera folders";
             }
             else
             {
-                chunk_to_frame =
+                auto chunk_frames =
                     bow_loop_closure::associateFramesToChunks(session.point_clouds_container, frames, params.max_frame_time_gap_ns);
                 try
                 {
                     auto vocabulary = bow_loop_closure::loadVocabulary(bow_loop_closure::defaultVocabularyPath());
                     candidates =
-                        bow_loop_closure::detectCandidates(session.point_clouds_container, frames, chunk_to_frame, params, vocabulary);
+                        bow_loop_closure::detectCandidates(session.point_clouds_container, frames, chunk_frames, params, vocabulary);
                     status = std::to_string(candidates.size()) + " candidates found";
                 }
                 catch (const std::exception& e)
@@ -1995,7 +2007,7 @@ void bow_loop_closure_start_detection()
 
             std::lock_guard<std::mutex> lk(bow_state.results_mutex);
             bow_state.frames = std::move(frames);
-            bow_state.chunk_to_frame = std::move(chunk_to_frame);
+            bow_state.camera_names = camera_names;
             bow_state.results = std::move(candidates);
             bow_state.status = status;
             bow_state.detecting = false;
@@ -2033,20 +2045,36 @@ void bow_loop_closure_gui()
 {
     ImGui::Begin("Automatic Image Loop Closure (BoW)", &is_bow_loop_closure_gui);
 
-    ImGui::Text("CAMERA_0 folder:");
-    ImGui::SameLine();
-    ImGui::PushItemWidth(400);
-    ImGui::InputText("##bow_camera_dir", bow_state.camera_dir, sizeof(bow_state.camera_dir));
-    ImGui::PopItemWidth();
-    ImGui::SameLine();
-    if (ImGui::Button("Select..."))
+    ImGui::Text("Camera folders (CAMERA_0, or an Insta360's cam_front and cam_back):");
+    int remove_camera_dir = -1;
+    for (size_t k = 0; k < bow_state.camera_dirs.size(); k++)
     {
-        std::string dir = mandeye::fd::SelectFolder("Select CAMERA_0 directory");
-        if (!dir.empty())
+        auto& dir = bow_state.camera_dirs[k];
+        ImGui::PushID(static_cast<int>(k));
+        ImGui::PushItemWidth(400);
+        ImGui::InputText("##bow_camera_dir", dir.data(), dir.size());
+        ImGui::PopItemWidth();
+        ImGui::SameLine();
+        if (ImGui::Button("Select..."))
         {
-            std::snprintf(bow_state.camera_dir, sizeof(bow_state.camera_dir), "%s", dir.c_str());
+            std::string selected = mandeye::fd::SelectFolder("Select camera directory");
+            if (!selected.empty())
+                std::snprintf(dir.data(), dir.size(), "%s", selected.c_str());
         }
+        if (bow_state.camera_dirs.size() > 1)
+        {
+            ImGui::SameLine();
+            if (ImGui::Button("Remove"))
+                remove_camera_dir = static_cast<int>(k);
+        }
+        ImGui::PopID();
     }
+    if (remove_camera_dir >= 0)
+        bow_state.camera_dirs.erase(bow_state.camera_dirs.begin() + remove_camera_dir);
+    if (ImGui::Button("Add camera folder"))
+        bow_state.camera_dirs.emplace_back();
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Frames of all cameras are matched against each other, front vs back too");
 
     ImGui::PushItemWidth(ImGuiNumberWidth);
     ImGui::InputDouble("Min arc gap [m]", &bow_state.params.min_arc_gap_m);
@@ -2070,11 +2098,21 @@ void bow_loop_closure_gui()
     ImGui::SameLine();
 
     std::vector<bow_loop_closure::Candidate> results_copy;
+    std::vector<std::string> results_cameras; // "front/back" per row, only with several cameras
     std::string status_copy;
     {
         std::lock_guard<std::mutex> lk(bow_state.results_mutex);
         results_copy = bow_state.results;
         status_copy = bow_state.status;
+        if (bow_state.camera_names.size() > 1)
+        {
+            for (const auto& c : results_copy)
+            {
+                results_cameras.push_back(
+                    "  cameras=" + bow_state.camera_names[bow_state.frames[c.frame_i].camera] + "/" +
+                    bow_state.camera_names[bow_state.frames[c.frame_j].camera]);
+            }
+        }
     }
     ImGui::Text("%s", status_copy.c_str());
 
@@ -2097,7 +2135,7 @@ void bow_loop_closure_gui()
         {
             bow_state.selected_candidate = static_cast<int>(row);
             std::lock_guard<std::mutex> lk(bow_state.results_mutex);
-            cv::Mat montage = bow_loop_closure::buildCandidateMontage(c, bow_state.frames, bow_state.chunk_to_frame, bow_state.params);
+            cv::Mat montage = bow_loop_closure::buildCandidateMontage(c, bow_state.frames, bow_state.params);
             bow_loop_closure_upload_montage(montage);
         }
         if (shown)
@@ -2106,8 +2144,14 @@ void bow_loop_closure_gui()
             ImGui::SetTooltip("Preview this candidate's matched keypoints below");
         ImGui::SameLine();
         ImGui::Text(
-            "i=%d j=%d  xy=%.2fm  arc=%.2fm  score=%.3f  inliers=%d", c.index_i, c.index_j, c.xy_dist_m, c.arc_gap_m, c.bow_score,
-            c.inliers);
+            "i=%d j=%d  xy=%.2fm  arc=%.2fm  score=%.3f  inliers=%d%s",
+            c.index_i,
+            c.index_j,
+            c.xy_dist_m,
+            c.arc_gap_m,
+            c.bow_score,
+            c.inliers,
+            results_cameras.empty() ? "" : results_cameras[row].c_str());
         ImGui::SameLine();
         if (ImGui::Button("Add edge"))
         {
@@ -2149,7 +2193,7 @@ void bow_loop_closure_gui()
                 std::lock_guard<std::mutex> lk(bow_state.results_mutex);
                 for (const auto& c : results_copy)
                 {
-                    cv::Mat m = bow_loop_closure::buildCandidateMontage(c, bow_state.frames, bow_state.chunk_to_frame, bow_state.params);
+                    cv::Mat m = bow_loop_closure::buildCandidateMontage(c, bow_state.frames, bow_state.params);
                     if (!m.empty())
                     {
                         std::string fn = out_dir + "/cand_" + std::to_string(c.index_i) + "_" + std::to_string(c.index_j) + ".png";
@@ -2177,7 +2221,7 @@ void bow_loop_closure_gui()
                 if (!out_file.empty())
                 {
                     std::lock_guard<std::mutex> lk(bow_state.results_mutex);
-                    cv::Mat m = bow_loop_closure::buildCandidateMontage(c, bow_state.frames, bow_state.chunk_to_frame, bow_state.params);
+                    cv::Mat m = bow_loop_closure::buildCandidateMontage(c, bow_state.frames, bow_state.params);
                     if (!m.empty())
                         cv::imwrite(out_file, m);
                 }

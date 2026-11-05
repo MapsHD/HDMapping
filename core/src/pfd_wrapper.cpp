@@ -1,6 +1,7 @@
 #include <Core/pfd_wrapper.hpp>
 
 #include <portable-file-dialogs.h>
+#include <spdlog/spdlog.h>
 
 #include <filesystem>
 #include <iostream>
@@ -90,7 +91,11 @@ namespace mandeye::fd
 
         return output_folder_name;
     }
-
+    void SetLastLocationHint(const std::string& locationHint)
+    {
+        spdlog::info("File dialogs will open in: '{}'", locationHint);
+        internal::lastLocationHint = locationHint;
+    }
     void OutOfMemMessage()
     {
         std::cerr << "Adjust paging / swap memory with tips available here : "

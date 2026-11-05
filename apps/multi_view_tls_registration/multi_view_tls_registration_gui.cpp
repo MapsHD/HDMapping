@@ -3007,6 +3007,14 @@ std::string lowerExtension(const std::filesystem::path& path)
     return ext;
 }
 
+// Next file dialog opens in the folder of a file loaded without one (drag & drop, command line).
+void setLocationHintFromFile(const fs::path& file)
+{
+    std::error_code ec;
+    const fs::path absolute = fs::absolute(file, ec);
+    mandeye::fd::SetLastLocationHint((ec ? file : absolute).parent_path().string());
+}
+
 // Accepts a Mandeye JSON Session file (*.mjs/*.json) -- shared by the drag & drop handler in main()'s loop and
 // the CLI argv handling below, so both accept the same input and report unsupported drops the same way.
 void loadSessionFromPath(const std::string& path)
@@ -3025,6 +3033,7 @@ void loadSessionFromPath(const std::string& path)
         return;
     }
 
+    setLocationHintFromFile(path);
     session_file_name = path;
     loadSession(path);
 }
@@ -3435,6 +3444,7 @@ void loadDroppedFiles(const std::vector<std::string>& paths)
             else
                 spdlog::warn("Ignoring non-e57 file dropped alongside e57 file(s): '{}'", p);
         }
+        setLocationHintFromFile(e57_paths.back());
         loadE57Files(e57_paths, fillInSession);
         return;
     }

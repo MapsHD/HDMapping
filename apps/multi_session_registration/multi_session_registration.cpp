@@ -1594,6 +1594,14 @@ bool addSessionFile(const std::string& path)
     return true;
 }
 
+// Next file dialog opens in the folder of a file loaded without one (drag & drop, command line).
+void setLocationHintFromFile(const fs::path& file)
+{
+    std::error_code ec;
+    const fs::path absolute = fs::absolute(file, ec);
+    mandeye::fd::SetLastLocationHint((ec ? file : absolute).parent_path().string());
+}
+
 // Drag & drop: a project (*.mjp) replaces the current one; session files (*.mjs, *.json) and single point clouds
 // (*.laz, *.las) are added and loaded right away (appended to already loaded sessions, which keep their in-memory state).
 void loadDroppedFiles()
@@ -1613,6 +1621,7 @@ void loadDroppedFiles()
     {
         if (ext_of(path) == ".mjp")
         {
+            setLocationHintFromFile(path);
             loadProject(path.string(), project_settings);
             return;
         }
@@ -1640,6 +1649,7 @@ void loadDroppedFiles()
             pfd::icon::warning);
         return;
     }
+    setLocationHintFromFile(added.back());
 
     if (loaded_sessions)
     {
@@ -4095,7 +4105,12 @@ int main(int argc, char* argv[])
         }
 
         if (!project_file.empty())
+        {
+            setLocationHintFromFile(project_file);
             loadProject(project_file, project_settings);
+        }
+        if (!session_files.empty())
+            setLocationHintFromFile(session_files.back());
 
         bool added = false;
         for (const auto& session_file : session_files)

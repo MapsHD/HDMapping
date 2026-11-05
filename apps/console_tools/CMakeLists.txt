@@ -231,6 +231,35 @@ if (MSVC)
     target_compile_options(session_to_mcap PRIVATE /bigobj)
 endif()
 
+# session_intensity_panoramas: a session's lidar intensity rendered as 360-degree
+# panoramas seen from the lidar, one every N seconds, named like camera frames
+# (intensity_<ns>.jpg) so the BoW loop closure can use them. Reads Core::Session,
+# so it links core_no_gui (WITH_GUI=0) like session_to_mcap.
+add_executable(session_intensity_panoramas session_intensity_panoramas.cpp)
+
+target_compile_definitions(session_intensity_panoramas PRIVATE WITH_GUI=0)
+
+target_include_directories(
+  session_intensity_panoramas PRIVATE
+  ${REPOSITORY_DIRECTORY}/core/include
+  ${EIGEN3_INCLUDE_DIR}
+  ${LASZIP_INCLUDE_DIR}/LASzip/include
+  ${THIRDPARTY_DIRECTORY}/json/include
+  ${THIRDPARTY_DIRECTORY}/observation_equations/codes
+  ${OpenCV_INCLUDE_DIRS})
+
+target_link_libraries(
+  session_intensity_panoramas PRIVATE
+  core_no_gui
+  ${OpenCV_LIBS}
+  ${PLATFORM_LASZIP_LIB}
+  ${PLATFORM_MISCELLANEOUS_LIBS}
+  spdlog::spdlog)
+
+if (MSVC)
+    target_compile_definitions(session_intensity_panoramas PRIVATE _USE_MATH_DEFINES)
+endif()
+
 # These are built whenever BUILD_WITH_CLI_TOOLS is ON (the default), so they
 # ship in the DEB package alongside the GUI apps.
 hdmapping_install_app(
@@ -244,4 +273,5 @@ hdmapping_install_app(
   laz_to_mcap
   mcap_to_laz
   ouster_pcap_to_laz
+  session_intensity_panoramas
   session_to_mcap)

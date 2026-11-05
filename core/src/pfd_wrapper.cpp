@@ -4,7 +4,6 @@
 #include <spdlog/spdlog.h>
 
 #include <filesystem>
-#include <iostream>
 #include <memory>
 
 namespace mandeye::fd
@@ -98,10 +97,9 @@ namespace mandeye::fd
     }
     void OutOfMemMessage()
     {
-        std::cerr << "Adjust paging / swap memory with tips available here : "
-                     "https://github.com/MapsHD/HDMapping/tree/main/doc/"
-                     "virtual_memory.md "
-                  << std::endl;
+        spdlog::error(
+            "Adjust paging / swap memory with tips available here: "
+            "https://github.com/MapsHD/HDMapping/tree/main/doc/virtual_memory.md");
         [[maybe_unused]] pfd::message message(
             "System is out of memory",
             "System is out memory, make sure that virtual memory is set "

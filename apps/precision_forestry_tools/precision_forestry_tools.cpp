@@ -174,7 +174,7 @@ std::vector<int> get_lowest_points_indexes(const std::vector<Eigen::Vector3d>& p
     std::sort(
         indexes_tuple.begin(),
         indexes_tuple.end(),
-        [](const std::tuple<uint64_t, uint32_t, uint32_t>& a, const std::tuple<uint64_t, uint32_t, uint32_t>& b)
+        [](const std::tuple<uint64_t, uint32_t, double>& a, const std::tuple<uint64_t, uint32_t, double>& b)
         {
             return (std::get<0>(a) == std::get<0>(b)) ? (std::get<2>(a) < std::get<2>(b)) : (std::get<0>(a) < std::get<0>(b));
         });

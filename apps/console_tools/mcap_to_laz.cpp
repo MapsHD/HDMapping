@@ -95,7 +95,7 @@ namespace
         spdlog::error("  output_session_dir  written as mandeye lidarNNNN.laz + imuNNNN.csv chunk pairs,");
         spdlog::error("                      ready to open in lidar_odometry_step_1");
         spdlog::error("Options:");
-        spdlog::error("  --chunk-seconds <float>  chunk length in seconds (default: 20, mandeye's own");
+        spdlog::error("  --chunk-seconds <float>  chunk length in seconds (default: 10, mandeye's own");
         spdlog::error("                           cadence; 0 = one single chunk)");
         spdlog::error("  --lidar-topic <name>     PointCloud2 topic (default: the file's only one)");
         spdlog::error("  --imu-topic <name>       Imu topic (default: the file's only one)");
@@ -330,7 +330,7 @@ int main(const int argc, const char** argv)
 
     std::vector<std::string> positionals;
     rosbags::McapReaderOptions options;
-    double chunk_seconds = 20.0;
+    double chunk_seconds = 10.0;
     bool list_only = false;
     ImuTransform imu_transform;
 

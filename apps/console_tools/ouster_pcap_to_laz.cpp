@@ -209,7 +209,7 @@ namespace
         spdlog::error("                      ready to open in lidar_odometry_step_1");
         spdlog::error("Options:");
         spdlog::error("  --metadata <file.json>   sensor metadata (default: <input>.json next to the pcap)");
-        spdlog::error("  --chunk-seconds <float>  chunk length in seconds (default: 20, mandeye's own");
+        spdlog::error("  --chunk-seconds <float>  chunk length in seconds (default: 10, mandeye's own");
         spdlog::error("                           cadence; 0 = one single chunk)");
         spdlog::error("  --start <float>          skip the first N seconds of lidar data (default: 0)");
         spdlog::error("  --duration <float>       convert only N seconds of lidar data, counted from --start (default: all)");
@@ -329,7 +329,7 @@ int main(const int argc, const char** argv)
     std::string session_dir;
     fs::path metadata_path;
     rosbags::OusterPcapReaderOptions options;
-    double chunk_seconds = 20.0;
+    double chunk_seconds = 10.0;
     double start = 0.0;
     double duration = 0.0;
     bool stationary_imu = false;

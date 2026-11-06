@@ -150,6 +150,16 @@ void ManualPoseGraphLoopClosure::icp_all_edges_gui()
     }
 }
 
+void ManualPoseGraphLoopClosure::compute_pose_graph_slam(
+    PointClouds& point_clouds_container, GNSS& gnss, GroundControlPoints& gcps, ControlPoints& cps)
+{
+    if (keep_initial_trajectory_curvature)
+        set_initial_poses_as_motion_model(point_clouds_container);
+    else
+        set_current_poses_as_motion_model(point_clouds_container);
+    graph_slam(point_clouds_container, gnss, gcps, cps);
+}
+
 void ManualPoseGraphLoopClosure::Gui(
     PointClouds& point_clouds_container,
     int& index_loop_closure_source,
@@ -228,23 +238,11 @@ void ManualPoseGraphLoopClosure::Gui(
 
             if (!manipulate_active_edge)
             {
-                static bool keep_initial_trajectory_curvature = true;
-
                 icp_all_edges_gui();
 
                 ImGui::BeginDisabled(icp_all_edges_run.running);
                 if (ImGui::Button("Compute Pose Graph SLAM"))
-                {
-                    if (keep_initial_trajectory_curvature)
-                    {
-                        set_initial_poses_as_motion_model(point_clouds_container);
-                    }
-                    else
-                    {
-                        set_current_poses_as_motion_model(point_clouds_container);
-                    }
-                    graph_slam(point_clouds_container, gnss, gcps, cps);
-                }
+                    compute_pose_graph_slam(point_clouds_container, gnss, gcps, cps);
                 ImGui::EndDisabled();
 
                 ImGui::SameLine();

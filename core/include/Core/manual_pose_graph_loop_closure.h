@@ -39,11 +39,15 @@ public:
         bool progress_drawn = false; //!< the progress bar has been shown at least once
     };
     IcpAllEdgesRun icp_all_edges_run;
+    //! "Keep initial trajectory curvature": compute_pose_graph_slam() uses the initial poses as the motion model, else the current ones.
+    bool keep_initial_trajectory_curvature = true;
 
     ManualPoseGraphLoopClosure() = default;
     ~ManualPoseGraphLoopClosure() = default;
 
 #if WITH_GUI == 1
+    //! "Compute Pose Graph SLAM": sets the motion model, then graph_slam() over the edges, GNSS, GCPs and CPs.
+    void compute_pose_graph_slam(PointClouds& point_clouds_container, GNSS& gnss, GroundControlPoints& gcps, ControlPoints& cps);
     void Gui(
         PointClouds& point_clouds_container,
         int& index_loop_closure_source,

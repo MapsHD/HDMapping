@@ -6633,6 +6633,24 @@ void display()
             }
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Intersection menu");
+
+            auto& loop_closure = session.pose_graph_loop_closure;
+            ImGui::BeginDisabled(loop_closure.icp_all_edges_run.running);
+            if (ImGui::Button("Compute Pose Graph SLAM"))
+            {
+                loop_closure.compute_pose_graph_slam(
+                    session.point_clouds_container, tls_registration.gnss, session.ground_control_points, session.control_points);
+            }
+            ImGui::EndDisabled();
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            {
+                ImGui::SetTooltip(
+                    "Manual Loop Closure's \"Compute Pose Graph SLAM\": optimize the poses with the %zu loop closure edges\n"
+                    "(and GNSS, GCPs, CPs). Keep initial trajectory curvature: %s.%s",
+                    loop_closure.edges.size(),
+                    loop_closure.keep_initial_trajectory_curvature ? "on" : "off",
+                    loop_closure.icp_all_edges_run.running ? "\nWaiting for \"ICP all edges\" to finish." : "");
+            }
         }
 
         if (ImGui::BeginMenu("View"))

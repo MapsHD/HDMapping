@@ -728,37 +728,57 @@ void loop_closure_gui()
         for (const auto& s : sessions)
             is_session_gizmo |= s.is_gizmo;
 
-        ImGui::BeginDisabled(is_session_gizmo);
-        int delete_edge_index = -1;
-        for (int i = 0; i < (int)edges.size(); i++)
-        {
-            const auto& e = edges[i];
-            // session:scan -> session:scan
-            ImGui::Text(
-                "%s edge %d: %d:%d -> %d:%d",
-                (manipulate_active_edge && i == index_active_edge) ? ">" : " ",
-                i,
-                e.index_session_from,
-                e.index_from,
-                e.index_session_to,
-                e.index_to);
-            ImGui::SameLine();
-            char buttonLabel[128];
-            snprintf(buttonLabel, sizeof(buttonLabel), "Set Active##%d", i);
+        // Scroll the list to the active edge when it changes, e.g. to a just added edge at the bottom.
+        static int listed_active_edge = -1;
+        const bool scroll_to_active_edge = (index_active_edge != listed_active_edge);
+        listed_active_edge = index_active_edge;
 
-            ImGui::BeginDisabled(!canEdgeBeActivated(i));
-            if (ImGui::Button(buttonLabel))
+        int delete_edge_index = -1;
+        if (!edges.empty())
+        {
+            // The list scrolls in a child past kMaxListedEdges rows, so this auto-resizing window stays on screen.
+            constexpr int kMaxListedEdges = 10;
+            const ImGuiStyle& style = ImGui::GetStyle();
+            const int listed_rows = std::min((int)edges.size(), kMaxListedEdges);
+            const float list_height = listed_rows * ImGui::GetFrameHeightWithSpacing() - style.ItemSpacing.y + 2.0f * style.WindowPadding.y;
+            ImGui::BeginChild("EdgeList", ImVec2(0.0f, list_height), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeX);
+
+            ImGui::BeginDisabled(is_session_gizmo);
+            for (int i = 0; i < (int)edges.size(); i++)
             {
-                setActiveEdge(i);
-                manipulate_active_edge = true;
+                if (scroll_to_active_edge && i == index_active_edge)
+                    ImGui::SetScrollHereY(0.5f);
+
+                const auto& e = edges[i];
+                // session:scan -> session:scan
+                ImGui::Text(
+                    "%s edge %d: %d:%d -> %d:%d",
+                    (manipulate_active_edge && i == index_active_edge) ? ">" : " ",
+                    i,
+                    e.index_session_from,
+                    e.index_from,
+                    e.index_session_to,
+                    e.index_to);
+                ImGui::SameLine();
+                char buttonLabel[128];
+                snprintf(buttonLabel, sizeof(buttonLabel), "Set Active##%d", i);
+
+                ImGui::BeginDisabled(!canEdgeBeActivated(i));
+                if (ImGui::Button(buttonLabel))
+                {
+                    setActiveEdge(i);
+                    manipulate_active_edge = true;
+                }
+                ImGui::EndDisabled();
+                ImGui::SameLine();
+                snprintf(buttonLabel, sizeof(buttonLabel), "Delete##%d", i);
+                if (ImGui::Button(buttonLabel))
+                    delete_edge_index = i;
             }
             ImGui::EndDisabled();
-            ImGui::SameLine();
-            snprintf(buttonLabel, sizeof(buttonLabel), "Delete##%d", i);
-            if (ImGui::Button(buttonLabel))
-                delete_edge_index = i;
+
+            ImGui::EndChild();
         }
-        ImGui::EndDisabled();
 
         // Deleted after the loop so the list is not modified while it is drawn. The active edge keeps pointing at
         // the same edge; deleting the active edge itself leaves manipulate mode, as "remove active edge" does.

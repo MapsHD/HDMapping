@@ -627,6 +627,16 @@ void view_kbd_shortcuts()
 
     ImGuiIO& io = ImGui::GetIO();
 
+    // 1-9: point size. Like N / P these also work while a window has focus, but not while a text field is being edited.
+    if (!io.WantTextInput && !io.KeyCtrl && !io.KeyAlt && !io.KeyShift)
+    {
+        for (int size = 1; size <= 9; size++)
+        {
+            if (ImGui::IsKeyPressed(static_cast<ImGuiKey>(ImGuiKey_0 + size)))
+                app_state.point_size = size;
+        }
+    }
+
     if (io.WantCaptureKeyboard)
         return;
 
@@ -709,25 +719,6 @@ void view_kbd_shortcuts()
         app_state.camera.isOrtho = !app_state.camera.isOrtho;
     if (ImGui::IsKeyPressed(ImGuiKey_X, false))
         app_state.show_axes = !app_state.show_axes;
-
-    if (ImGui::IsKeyPressed(ImGuiKey_1))
-        app_state.point_size = 1;
-    if (ImGui::IsKeyPressed(ImGuiKey_2))
-        app_state.point_size = 2;
-    if (ImGui::IsKeyPressed(ImGuiKey_3))
-        app_state.point_size = 3;
-    if (ImGui::IsKeyPressed(ImGuiKey_4))
-        app_state.point_size = 4;
-    if (ImGui::IsKeyPressed(ImGuiKey_5))
-        app_state.point_size = 5;
-    if (ImGui::IsKeyPressed(ImGuiKey_6))
-        app_state.point_size = 6;
-    if (ImGui::IsKeyPressed(ImGuiKey_7))
-        app_state.point_size = 7;
-    if (ImGui::IsKeyPressed(ImGuiKey_8))
-        app_state.point_size = 8;
-    if (ImGui::IsKeyPressed(ImGuiKey_9))
-        app_state.point_size = 9;
 }
 
 // Drawing itself lives in raylib_widgets::drawCompassRuler (shared with the
@@ -5680,7 +5671,14 @@ void display()
         }
     }
 
+    const int point_size_before_shortcuts = app_state.point_size;
     view_kbd_shortcuts();
+    // As View > Point cloud > Points size does: the active edge's moved scans are drawn with their own size.
+    if (app_state.point_size != point_size_before_shortcuts)
+    {
+        for (auto& point_cloud : session.point_clouds_container.point_clouds)
+            point_cloud.point_size = app_state.point_size;
+    }
 
     // No synthetic key/Ctrl release after handling a shortcut here: rlImGui
     // only forwards modifier edges, so a faked Ctrl release is never undone

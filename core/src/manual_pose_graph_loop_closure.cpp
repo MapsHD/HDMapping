@@ -536,6 +536,19 @@ void ManualPoseGraphLoopClosure::Gui(
             ImGui::Separator();
 
             int prev_index_active_edge = index_active_edge;
+
+            // N / P: next / previous active edge, unless a text field is being edited.
+            const ImGuiIO& io = ImGui::GetIO();
+            if (edge_hotkeys && !io.WantTextInput && !io.KeyCtrl && !io.KeyAlt && !io.KeyShift)
+            {
+                if (ImGui::IsKeyPressed(ImGuiKey_N) && index_active_edge + 1 < static_cast<int>(edges.size()))
+                    index_active_edge++;
+                if (ImGui::IsKeyPressed(ImGuiKey_P) && index_active_edge > 0)
+                    index_active_edge--;
+            }
+            const bool scroll_to_active_edge = (prev_index_active_edge != index_active_edge);
+            ImGui::TextDisabled("N / P: next / previous edge");
+
             ImGui::BeginChild("Edges", ImVec2(0, 0), true);
             {
                 for (size_t i = 0; i < edges.size(); i++)
@@ -547,6 +560,8 @@ void ManualPoseGraphLoopClosure::Gui(
                     ImGui::SetWindowFontScale(1.25f);
                     ImGui::RadioButton(("Active edge " + std::to_string(i)).c_str(), &index_active_edge, i);
                     ImGui::SetWindowFontScale(1.0f);
+                    if (scroll_to_active_edge && index_active_edge == static_cast<int>(i))
+                        ImGui::SetScrollHereY(0.5f);
 
                     // suboptimal as distance is computed each frame!
                     double distance = (point_clouds_container.point_clouds[edges[i].index_to].m_pose.translation() -

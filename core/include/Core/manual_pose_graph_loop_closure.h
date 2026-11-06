@@ -18,6 +18,8 @@ public:
     int index_active_edge = 0;
     bool manipulate_active_edge = false;
     bool gizmo = false;
+    //! N / P step the active edge in Gui(); the app turns this off while another list takes these keys.
+    bool edge_hotkeys = true;
     double search_radious = 0.1;
     //! "ICP all edges": first search radius of its coarse-to-fine steps, see PoseGraphLoopClosure::icp_search_radii.
     double icp_all_edges_start_radius = 1.0;

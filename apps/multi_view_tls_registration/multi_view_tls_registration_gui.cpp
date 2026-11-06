@@ -923,11 +923,11 @@ static const std::vector<ShortcutEntry> appShortcuts = { { "Normal keys", "A", "
                                                          { "", "Ctrl+L", "manual Loop closure" },
                                                          { "", "M", "" },
                                                          { "", "Ctrl+M", "Measure distance" },
-                                                         { "", "N", "" },
+                                                         { "", "N", "Next edge (manual loop closure, BoW preview)" },
                                                          { "", "Ctrl+N", "" },
                                                          { "", "O", "Ortographic view" },
                                                          { "", "Ctrl+O", "Open/load session/data" },
-                                                         { "", "P", "" },
+                                                         { "", "P", "Previous edge (manual loop closure, BoW preview)" },
                                                          { "", "Ctrl+P", "Pose graph slam" },
                                                          { "", "Q", "" },
                                                          { "", "Ctrl+Q", "" },
@@ -1944,6 +1944,7 @@ struct BowLoopClosureState
 
     int selected_candidate = -1;
     bool scroll_to_selected = false; //!< scroll the list to selected_candidate on the next frame
+    bool window_focused = false; //!< the BoW window had focus last frame, see bow_preview_takes_edge_hotkeys()
     Texture2D montage_tex{};
     bool montage_tex_valid = false;
 };
@@ -2049,11 +2050,24 @@ void bow_loop_closure_clear_preview()
         UnloadTexture(bow_state.montage_tex);
     bow_state.montage_tex_valid = false;
 }
+
+// N / P step the BoW candidates instead of the manual loop closure's active edge while a candidate is
+// shown and either the BoW window has focus or the active edge list is not shown.
+bool bow_preview_takes_edge_hotkeys()
+{
+    if (!is_bow_loop_closure_gui || bow_state.selected_candidate < 0)
+        return false;
+    const auto& loop_closure = session.pose_graph_loop_closure;
+    const bool active_edges_shown = is_loop_closure_gui && loop_closure.manipulate_active_edge && !loop_closure.edges.empty();
+    return bow_state.window_focused || !active_edges_shown;
+}
 } // namespace
 
 void bow_loop_closure_gui()
 {
+    const bool edge_hotkeys = bow_preview_takes_edge_hotkeys();
     ImGui::Begin("Automatic Image Loop Closure (BoW)", &is_bow_loop_closure_gui);
+    bow_state.window_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 
     ImGui::Text("Camera folders (CAMERA_0, or an Insta360's cam_front and cam_back):");
     int remove_camera_dir = -1;
@@ -2133,8 +2147,8 @@ void bow_loop_closure_gui()
     ImGui::Text(
         "Review candidates below before adding an edge -- appearance matching alone is known to produce\n"
         "confident false positives on repetitive scenes (see BOW_PLACE_RECOGNITION_HANDOFF.md). Press\n"
-        "\"Show edge\" to preview a candidate's matched keypoints, \"Previous\"/\"Next edge\" there to step through\n"
-        "the candidates and \"Remove edge\" to drop a false positive.");
+        "\"Show edge\" to preview a candidate's matched keypoints, \"Previous\"/\"Next edge\" there (or P / N)\n"
+        "to step through the candidates and \"Remove edge\" to drop a false positive.");
 
     ImGui::BeginChild("BowResults", ImVec2(0, 260), true);
     for (size_t row = 0; row < results_copy.size(); row++)
@@ -2226,9 +2240,14 @@ void bow_loop_closure_gui()
         const int selected = bow_state.selected_candidate;
         if (selected >= 0 && selected < static_cast<int>(results_copy.size()))
         {
+            const ImGuiIO& io = ImGui::GetIO();
+            const bool keys = edge_hotkeys && !io.WantTextInput && !io.KeyCtrl && !io.KeyAlt && !io.KeyShift;
+            const bool key_previous = keys && ImGui::IsKeyPressed(ImGuiKey_P);
+            const bool key_next = keys && ImGui::IsKeyPressed(ImGuiKey_N);
+
             ImGui::SameLine();
             ImGui::BeginDisabled(selected == 0);
-            if (ImGui::Button("< Previous edge"))
+            if ((ImGui::Button("< Previous edge") || key_previous) && selected > 0)
             {
                 bow_loop_closure_show_candidate(results_copy, selected - 1);
                 bow_state.scroll_to_selected = true;
@@ -2236,7 +2255,7 @@ void bow_loop_closure_gui()
             ImGui::EndDisabled();
             ImGui::SameLine();
             ImGui::BeginDisabled(selected + 1 >= static_cast<int>(results_copy.size()));
-            if (ImGui::Button("Next edge >"))
+            if ((ImGui::Button("Next edge >") || key_next) && selected + 1 < static_cast<int>(results_copy.size()))
             {
                 bow_loop_closure_show_candidate(results_copy, selected + 1);
                 bow_state.scroll_to_selected = true;
@@ -2349,6 +2368,7 @@ void loop_closure_gui()
         ImGui::PopItemWidth();
 
         int prev_index_active_edge = session.pose_graph_loop_closure.index_active_edge;
+        session.pose_graph_loop_closure.edge_hotkeys = !bow_preview_takes_edge_hotkeys();
         session.pose_graph_loop_closure.Gui(
             session.point_clouds_container,
             index_loop_closure_source,

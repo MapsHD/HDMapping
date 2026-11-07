@@ -66,7 +66,7 @@ bool convert_and_save(const char* from, const char* to)
         uint8_t* pointerTimstamp = pointDataPtr + sizeof(float) * 4;
         uint8_t* pointDataEndPtr = pointDataPtr + PointSizeBytes;
 
-        std::span<float> xyzi(reinterpret_cast<float*>(pointDataPtr), 3);
+        std::span<float> xyzi(reinterpret_cast<float*>(pointDataPtr), 4);
         xyzi[0] = static_cast<float>(header->x_offset + header->x_scale_factor * static_cast<double>(point->X));
         xyzi[1] = static_cast<float>(header->y_offset + header->y_scale_factor * static_cast<double>(point->Y));
         xyzi[2] = static_cast<float>(header->z_offset + header->z_scale_factor * static_cast<double>(point->Z));

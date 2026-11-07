@@ -4,6 +4,8 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
+#include <limits>
 #include <vector>
 
 #include <spdlog/spdlog.h>
@@ -78,11 +80,16 @@ bool convert_and_save(const char* from, const char* to)
 
     if (std::ofstream to_file = std::ofstream(to, std::ios::out))
     {
+        // The default 6 significant digits would print every timestamp as e.g. 1.731e+09.
+        const auto coordinate_precision = to_file.precision();
+        const auto timestamp_precision = std::numeric_limits<double>::max_digits10;
+
         ConsoleProgress write_progress("Writing points", points.size());
         uint64_t points_written = 0;
         for (const auto& point : points)
         {
-            to_file << point.x << ' ' << point.y << ' ' << point.z << ' ' << point.intensity << ' ' << point.timestamp << '\n';
+            to_file << std::setprecision(coordinate_precision) << point.x << ' ' << point.y << ' ' << point.z << ' ' << point.intensity
+                    << ' ' << std::setprecision(timestamp_precision) << point.timestamp << '\n';
             write_progress.update(++points_written);
         }
         write_progress.finish(points_written);

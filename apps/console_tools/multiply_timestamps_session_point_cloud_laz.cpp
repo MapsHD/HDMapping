@@ -11,6 +11,8 @@
 
 #include <spdlog/spdlog.h>
 
+#include "console_progress.h"
+
 bool load_pc(PointCloud& pc, const std::string& input_file_name)
 {
     laszip_POINTER laszip_reader;
@@ -56,6 +58,7 @@ bool load_pc(PointCloud& pc, const std::string& input_file_name)
     std::cout << (is_compressed ? "" : "un") << "compressed file '" << (std::filesystem::path(input_file_name).filename().string())
               << "' contains " << npoints << " points" << std::endl;
 
+    ConsoleProgress progress("Reading points", static_cast<uint64_t>(npoints));
     laszip_I64 p_count = 0;
 
     while (p_count < npoints)
@@ -86,7 +89,9 @@ bool load_pc(PointCloud& pc, const std::string& input_file_name)
         pc.colors.push_back(color);
 
         p_count++;
+        progress.update(static_cast<uint64_t>(p_count));
     }
+    progress.finish(static_cast<uint64_t>(p_count));
 
     laszip_close_reader(laszip_reader);
 

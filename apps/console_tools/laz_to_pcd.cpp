@@ -12,6 +12,8 @@
 
 #include <spdlog/spdlog.h>
 
+#include "console_progress.h"
+
 namespace fs = std::filesystem;
 
 bool check_path_ext(const char* path, const char* ext)
@@ -51,6 +53,7 @@ bool convert_and_save(const char* from, const char* to)
 
     std::vector<uint8_t> pointsBinary(point_count * PointSizeBytes);
 
+    ConsoleProgress progress("Reading points", static_cast<uint64_t>(point_count));
     laszip_I64 point_read_count = 0;
 
     while (point_read_count < point_count)
@@ -71,7 +74,9 @@ bool convert_and_save(const char* from, const char* to)
         const double ts = point->gps_time;
         memcpy(pointerTimstamp, &ts, sizeof(double));
         point_read_count++;
+        progress.update(static_cast<uint64_t>(point_read_count));
     }
+    progress.finish(static_cast<uint64_t>(point_read_count));
 
     if (std::ofstream to_file = std::ofstream(to, std::ios::out | std::ios::binary))
     {

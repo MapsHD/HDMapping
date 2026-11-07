@@ -18,6 +18,7 @@
 
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <random>
@@ -371,6 +372,67 @@ TEST_CASE("MandeyeSessionWriter: LAZ stores unscaled gps_time, zero lidar id and
         CHECK(decoded[i].intensity == static_cast<uint16_t>(points[i].intensity));
         CHECK(decoded[i].point_format == 1);
     }
+
+    fs::remove_all(dir);
+}
+
+TEST_CASE("MandeyeSessionWriter: with_ring stores the ring as a uint16 extra-bytes attribute")
+{
+    const auto dir = tempPath("hdmapping_session_ring");
+    fs::remove_all(dir);
+
+    auto points = makeReaderPoints(300, 2345.5);
+    for (size_t i = 0; i < points.size(); ++i)
+        points[i].ring = static_cast<uint16_t>((i * 7) % 64);
+    {
+        rosbags::MandeyeSessionWriter writer(dir, /*with_rgb=*/false, /*with_ring=*/true);
+        REQUIRE_MESSAGE(writer.isOpen(), writer.error());
+        REQUIRE(writer.beginChunk(0));
+        REQUIRE_MESSAGE(writer.addPoints(points), writer.error());
+        REQUIRE(writer.endChunk());
+    }
+
+    laszip_POINTER reader = nullptr;
+    REQUIRE(laszip_create(&reader) == 0);
+    laszip_BOOL is_compressed = 0;
+    REQUIRE(laszip_open_reader(reader, (dir / "lidar0000.laz").string().c_str(), &is_compressed) == 0);
+    laszip_header* header = nullptr;
+    REQUIRE(laszip_get_header_pointer(reader, &header) == 0);
+    laszip_point* point = nullptr;
+    REQUIRE(laszip_get_point_pointer(reader, &point) == 0);
+
+    // The standard fields keep their meaning: format 1, lidar id in user_data.
+    CHECK(header->point_data_format == 1);
+    CHECK(header->point_data_record_length == 30);
+
+    // The extra-bytes VLR names the attribute, so other tools see a "ring" field.
+    bool described = false;
+    for (laszip_U32 v = 0; v < header->number_of_variable_length_records; ++v)
+    {
+        const auto& vlr = header->vlrs[v];
+        if (vlr.record_id == 4 && std::string(vlr.user_id, 9) == "LASF_Spec" && vlr.record_length_after_header >= 192)
+        {
+            CHECK(vlr.data[2] == 3); // LAS data_type 3 = unsigned short
+            CHECK(std::string(reinterpret_cast<const char*>(vlr.data + 4)) == rosbags::kSessionRingAttribute);
+            described = true;
+        }
+    }
+    CHECK(described);
+
+    REQUIRE(header->number_of_point_records == points.size());
+    for (size_t i = 0; i < points.size(); ++i)
+    {
+        REQUIRE(laszip_read_point(reader) == 0);
+        REQUIRE(point->num_extra_bytes == 2);
+        uint16_t ring = 0;
+        std::memcpy(&ring, point->extra_bytes, 2);
+        CHECK(ring == points[i].ring);
+        CHECK(point->user_data == 0);
+        CHECK(point->point_source_ID == 0);
+        CHECK(point->gps_time == points[i].timestamp);
+    }
+    laszip_close_reader(reader);
+    laszip_destroy(reader);
 
     fs::remove_all(dir);
 }

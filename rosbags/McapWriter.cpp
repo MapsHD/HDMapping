@@ -2,6 +2,7 @@
 #include "McapWriter.h"
 #include "cdr_serializer.hpp"
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <iostream>
 #include <iterator>
@@ -111,42 +112,101 @@ float64 z
 
 // ---------------------------------------------------------------------------
 // PointCloud2 binary layouts, little-endian (see PointCloudLayout in McapWriter.h
-// for the full per-layout offset table).
+// for the full per-layout offset table). Public so the ROS1 bag writer packs
+// exactly the same records.
 // ---------------------------------------------------------------------------
 
-static constexpr uint32_t kPointStepGeneric = 28;
-static constexpr uint32_t kPointStepVelodyne = 26;
-static constexpr uint32_t kPointStepOuster = 26;
-static constexpr uint32_t kPointStepHesai = 26;
-
-static uint32_t pointStepFor(PointCloudLayout layout)
+std::vector<PointCloudField> pointCloudFields(PointCloudLayout layout)
 {
 	switch(layout)
 	{
-	case PointCloudLayout::Velodyne: return kPointStepVelodyne;
-	case PointCloudLayout::Ouster: return kPointStepOuster;
-	case PointCloudLayout::Hesai: return kPointStepHesai;
+	case PointCloudLayout::Velodyne:
+		return {
+			{"x",         0,  7}, // FLOAT32
+			{"y",         4,  7}, // FLOAT32
+			{"z",         8,  7}, // FLOAT32
+			{"intensity", 12, 7}, // FLOAT32
+			{"ring",      16, 4}, // UINT16
+			{"time",      18, 8}, // FLOAT64
+		};
+	case PointCloudLayout::Ouster:
+		return {
+			{"x",            0,  7}, // FLOAT32
+			{"y",            4,  7}, // FLOAT32
+			{"z",            8,  7}, // FLOAT32
+			{"intensity",    12, 7}, // FLOAT32
+			{"t",            16, 6}, // UINT32
+			{"reflectivity", 20, 4}, // UINT16
+			{"ring",         22, 4}, // UINT16
+			{"ambient",      24, 4}, // UINT16
+		};
+	case PointCloudLayout::Hesai:
+		return {
+			{"x",         0,  7}, // FLOAT32
+			{"y",         4,  7}, // FLOAT32
+			{"z",         8,  7}, // FLOAT32
+			{"intensity", 12, 7}, // FLOAT32
+			{"timestamp", 16, 8}, // FLOAT64
+			{"ring",      24, 4}, // UINT16
+		};
+	case PointCloudLayout::Canonical:
+		return {
+			{"x",         0,  7}, // FLOAT32
+			{"y",         4,  7}, // FLOAT32
+			{"z",         8,  7}, // FLOAT32
+			{"intensity", 12, 7}, // FLOAT32
+			{"ring",      16, 4}, // UINT16
+			{"time",      20, 7}, // FLOAT32
+			{"t",         24, 6}, // UINT32
+		};
 	case PointCloudLayout::Generic:
-	default: return kPointStepGeneric;
+	default:
+		return {
+			{"x",         0,  7}, // FLOAT32
+			{"y",         4,  7}, // FLOAT32
+			{"z",         8,  7}, // FLOAT32
+			{"intensity", 12, 7}, // FLOAT32
+			{"ring",      16, 4}, // UINT16
+			{"laser_id",  18, 2}, // UINT8
+			{"time",      20, 8}, // FLOAT64
+		};
 	}
 }
 
-// Write one point as raw bytes per `layout`. Done field-by-field to avoid
-// C++ struct padding surprises.
-static void writePointBytes(CdrWriter& w, const McapPoint& p, double t0, PointCloudLayout layout)
+uint32_t pointCloudPointStep(PointCloudLayout layout)
 {
-	w.write_raw(&p.x, 4);
-	w.write_raw(&p.y, 4);
-	w.write_raw(&p.z, 4);
-	w.write_raw(&p.intensity, 4);
+	switch(layout)
+	{
+	case PointCloudLayout::Velodyne:
+	case PointCloudLayout::Ouster:
+	case PointCloudLayout::Hesai: return 26;
+	case PointCloudLayout::Canonical:
+	case PointCloudLayout::Generic:
+	default: return 28;
+	}
+}
+
+// Packs one point at `d` per `layout`. Done field-by-field to avoid C++ struct
+// padding surprises; padding bytes are left as the caller zeroed them.
+static void packPoint(uint8_t* d, const McapPoint& p, double t0, PointCloudLayout layout)
+{
+	const auto put = [&d](const void* v, size_t n)
+	{
+		std::memcpy(d, v, n);
+		d += n;
+	};
+	put(&p.x, 4);
+	put(&p.y, 4);
+	put(&p.z, 4);
+	put(&p.intensity, 4);
 
 	switch(layout)
 	{
 	case PointCloudLayout::Velodyne:
 	{
-		w.write_raw(&p.ring, 2);
+		put(&p.ring, 2);
 		const double t = p.timestamp - t0;
-		w.write_raw(&t, 8);
+		put(&t, 8);
 		return;
 	}
 	case PointCloudLayout::Ouster:
@@ -157,31 +217,51 @@ static void writePointBytes(CdrWriter& w, const McapPoint& p, double t0, PointCl
 		// approximated from intensity, ambient is always 0.
 		const uint16_t reflectivity = static_cast<uint16_t>(std::clamp(p.intensity, 0.0f, 65535.0f));
 		const uint16_t ambient = 0;
-		w.write_raw(&t, 4);
-		w.write_raw(&reflectivity, 2);
-		w.write_raw(&p.ring, 2);
-		w.write_raw(&ambient, 2);
+		put(&t, 4);
+		put(&reflectivity, 2);
+		put(&p.ring, 2);
+		put(&ambient, 2);
 		return;
 	}
 	case PointCloudLayout::Hesai:
 	{
 		// timestamp: ABSOLUTE seconds (not relative to t0), per Hesai driver convention.
-		w.write_raw(&p.timestamp, 8);
-		w.write_raw(&p.ring, 2);
+		put(&p.timestamp, 8);
+		put(&p.ring, 2);
+		return;
+	}
+	case PointCloudLayout::Canonical:
+	{
+		put(&p.ring, 2);
+		d += 2; // padding
+		const double dt = p.timestamp - t0;
+		const float time = static_cast<float>(dt);
+		const uint32_t t = static_cast<uint32_t>(std::llround(dt * 1e9));
+		put(&time, 4);
+		put(&t, 4);
 		return;
 	}
 	case PointCloudLayout::Generic:
 	default:
 	{
-		w.write_raw(&p.ring, 2);
-		w.write_raw(&p.laser_id, 1);
-		const uint8_t pad = 0;
-		w.write_raw(&pad, 1);
+		put(&p.ring, 2);
+		put(&p.laser_id, 1);
+		d += 1; // padding
 		const double t = p.timestamp - t0;
-		w.write_raw(&t, 8);
+		put(&t, 8);
 		return;
 	}
 	}
+}
+
+std::vector<uint8_t> packPointCloud(const std::vector<McapPoint>& points, PointCloudLayout layout)
+{
+	const uint32_t step = pointCloudPointStep(layout);
+	std::vector<uint8_t> data(points.size() * step, 0);
+	const double t0 = points.empty() ? 0.0 : points.front().timestamp;
+	for(size_t i = 0; i < points.size(); ++i)
+		packPoint(data.data() + i * step, points[i], t0, layout);
+	return data;
 }
 
 // ---------------------------------------------------------------------------
@@ -208,75 +288,15 @@ static std::vector<uint8_t> serializePointCloud2(
 	w.write_u32(static_cast<uint32_t>(pts.size()));
 
 	// PointField[]
-	struct FieldDef
-	{
-		const char* name;
-		uint32_t offset;
-		uint8_t datatype; // 6=UINT32, 7=FLOAT32, 4=UINT16, 2=UINT8, 8=FLOAT64
-	};
-	static constexpr FieldDef kFieldsGeneric[] = {
-		{"x",         0,  7}, // FLOAT32
-		{"y",         4,  7}, // FLOAT32
-		{"z",         8,  7}, // FLOAT32
-		{"intensity", 12, 7}, // FLOAT32
-		{"ring",      16, 4}, // UINT16
-		{"laser_id",  18, 2}, // UINT8
-		{"time",      20, 8}, // FLOAT64
-	};
-	static constexpr FieldDef kFieldsVelodyne[] = {
-		{"x",         0,  7}, // FLOAT32
-		{"y",         4,  7}, // FLOAT32
-		{"z",         8,  7}, // FLOAT32
-		{"intensity", 12, 7}, // FLOAT32
-		{"ring",      16, 4}, // UINT16
-		{"time",      18, 8}, // FLOAT64
-	};
-	static constexpr FieldDef kFieldsOuster[] = {
-		{"x",            0,  7}, // FLOAT32
-		{"y",            4,  7}, // FLOAT32
-		{"z",            8,  7}, // FLOAT32
-		{"intensity",    12, 7}, // FLOAT32
-		{"t",            16, 6}, // UINT32
-		{"reflectivity", 20, 4}, // UINT16
-		{"ring",         22, 4}, // UINT16
-		{"ambient",      24, 4}, // UINT16
-	};
-	static constexpr FieldDef kFieldsHesai[] = {
-		{"x",         0,  7}, // FLOAT32
-		{"y",         4,  7}, // FLOAT32
-		{"z",         8,  7}, // FLOAT32
-		{"intensity", 12, 7}, // FLOAT32
-		{"timestamp", 16, 8}, // FLOAT64
-		{"ring",      24, 4}, // UINT16
-	};
+	const auto fields = pointCloudFields(layout);
+	const uint32_t pointStep = pointCloudPointStep(layout);
 
-	const FieldDef* fields = kFieldsGeneric;
-	uint32_t nFields = std::size(kFieldsGeneric);
-	switch(layout)
+	w.write_u32(static_cast<uint32_t>(fields.size())); // sequence length
+	for(const auto& f : fields)
 	{
-	case PointCloudLayout::Velodyne:
-		fields = kFieldsVelodyne;
-		nFields = std::size(kFieldsVelodyne);
-		break;
-	case PointCloudLayout::Ouster:
-		fields = kFieldsOuster;
-		nFields = std::size(kFieldsOuster);
-		break;
-	case PointCloudLayout::Hesai:
-		fields = kFieldsHesai;
-		nFields = std::size(kFieldsHesai);
-		break;
-	case PointCloudLayout::Generic:
-	default: break;
-	}
-	const uint32_t pointStep = pointStepFor(layout);
-
-	w.write_u32(nFields); // sequence length
-	for(uint32_t i = 0; i < nFields; ++i)
-	{
-		w.write_string(fields[i].name);
-		w.write_u32(fields[i].offset);
-		w.write_u8(fields[i].datatype);
+		w.write_string(f.name);
+		w.write_u32(f.offset);
+		w.write_u8(f.datatype);
 		w.write_u32(1); // count
 	}
 
@@ -285,12 +305,9 @@ static std::vector<uint8_t> serializePointCloud2(
 	w.write_u32(static_cast<uint32_t>(pts.size()) * pointStep); // row_step
 
 	// data[] — uint32 length + raw bytes (no internal CDR padding)
-	const uint32_t dataBytes = static_cast<uint32_t>(pts.size()) * pointStep;
-	w.write_u32(dataBytes);
-
-	const double t0 = pts.empty() ? 0.0 : pts.front().timestamp;
-	for(const auto& p : pts)
-		writePointBytes(w, p, t0, layout);
+	const auto data = packPointCloud(pts, layout);
+	w.write_u32(static_cast<uint32_t>(data.size()));
+	w.write_raw(data.data(), data.size());
 
 	w.write_bool(true); // is_dense
 	return w.data();

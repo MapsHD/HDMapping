@@ -86,8 +86,6 @@ bool convert_and_save(const char* from, const char* to)
             write_progress.update(++points_written);
         }
         write_progress.finish(points_written);
-
-        to_file.write((const char*)points.data(), points.size() * sizeof(Point));
     }
     else
     {

@@ -42,7 +42,7 @@ bool convert_and_save(const char* from, const char* to)
     }
 
     laszip_point* point = nullptr;
-    if (laszip_get_point_pointer(header, &point))
+    if (laszip_get_point_pointer(laszip_reader, &point))
     {
         return false;
     }
@@ -58,7 +58,7 @@ bool convert_and_save(const char* from, const char* to)
 
     while (point_read_count < point_count)
     {
-        if (laszip_read_point(header))
+        if (laszip_read_point(laszip_reader))
         {
             return false;
         }
@@ -78,6 +78,12 @@ bool convert_and_save(const char* from, const char* to)
     }
     progress.finish(static_cast<uint64_t>(point_read_count));
 
+    if (laszip_close_reader(laszip_reader) || laszip_destroy(laszip_reader))
+    {
+        spdlog::error("Failed closing LASzip reader");
+        return false;
+    }
+
     if (std::ofstream to_file = std::ofstream(to, std::ios::out | std::ios::binary))
     {
         to_file << "# .PCD v0.7\n";
@@ -93,6 +99,12 @@ bool convert_and_save(const char* from, const char* to)
         to_file << "DATA binary\n";
 
         to_file.write((const char*)pointsBinary.data(), pointsBinary.size());
+        to_file.close();
+        if (!to_file)
+        {
+            spdlog::error("Failed writing PCD output {}", to);
+            return false;
+        }
     }
     else
     {

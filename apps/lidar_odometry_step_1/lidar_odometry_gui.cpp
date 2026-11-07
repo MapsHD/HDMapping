@@ -17,6 +17,7 @@
 
 #include "lidar_odometry.h"
 #include "lidar_odometry_utils.h"
+#include "overlay_layers.h"
 #include "render_cache.h"
 #include "trajectory_follow.h"
 
@@ -62,6 +63,7 @@ std::vector<std::string> infoLines = {
     "During SLAM, exploration ends after the inactivity delay set in Progress.",
     "After SLAM, there is no automatic return; use double right click.",
     "F1 shows or hides this help. Controls / Help opens it during a run.",
+    "Ctrl+L opens display-only layers; drop clouds or trajectories to compare them.",
     "",
     "Next step will be to load session.json file with 'multi_view_tls_registration_step_2' program."
 };
@@ -86,6 +88,7 @@ static const std::vector<ShortcutEntry> appShortcuts = { { "Help", "F1", "Show /
                                                          { "", "C", "Show / hide compass and ruler" },
                                                          { "", "X", "Show / hide axes" },
                                                          { "", "1-9", "Set point size" },
+                                                         { "Layers", "Ctrl + L", "Show / hide display-only overlays" },
                                                          { "Data", "Ctrl + O", "Load and process data when idle" },
                                                          { "Free exploration", "Shift + R", "Open rotation-center coordinates" },
                                                          { "", "Ctrl + right/middle click", "Choose rotation center on Z=0" } };
@@ -122,6 +125,7 @@ int lastPar = 1;
 std::vector<WorkerData> worker_data;
 
 ScanRenderer trajectory_renderer;
+step1_render::OverlayLayers overlay_layers;
 step1_render::TrajectoryCache trajectory_cache;
 step1_render::PointCache initial_point_cache, reference_point_cache;
 step1_render::BucketCache indoor_bucket_cache, outdoor_bucket_cache;
@@ -1798,6 +1802,8 @@ void progress_window()
     ImGui::Text("%s", timeInfo);
     resources_gui();
 
+    if (ImGui::SmallButton("Layers (Ctrl+L)"))
+        overlay_layers.open();
     ImGui::SliderFloat("Resume after inactivity", &trajectory_follow.idleSeconds, 1.f, 30.f, "%.0f s");
     if (!loComputing)
         ImGui::TextDisabled("Camera: automatic following off (double right click to return)");
@@ -2072,6 +2078,38 @@ static void quit_abandoned_run()
     std::_Exit(0);
 }
 
+//! Camera and display layers are GUI-owned and remain safe while SLAM prepares its cache.
+static void draw_overlay_scene()
+{
+    ImGuiIO& io = ImGui::GetIO();
+    rlViewport(0, 0, GetRenderWidth(), GetRenderHeight());
+
+    ClearBackground(ColorFromNormalized(Vector4{ bg_color.x * bg_color.w, bg_color.y * bg_color.w, bg_color.z * bg_color.w, bg_color.w }));
+    rlEnableDepthTest();
+
+    rlMatrixMode(RL_PROJECTION);
+    rlLoadIdentity();
+
+    reshape((int)io.DisplaySize.x, (int)io.DisplaySize.y);
+
+    viewLocal = Eigen::Affine3f::Identity();
+
+    viewLocal.translate(rotation_center);
+
+    viewLocal.translate(Eigen::Vector3f(translate_x, translate_y, translate_z));
+    if (!lock_z)
+        viewLocal.rotate(Eigen::AngleAxisf(rotate_x * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
+    else
+        viewLocal.rotate(Eigen::AngleAxisf(-90.0 * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
+    viewLocal.rotate(Eigen::AngleAxisf(rotate_y * DEG_TO_RAD, Eigen::Vector3f::UnitZ()));
+
+    viewLocal.translate(-rotation_center);
+
+    rlMultMatrixf(viewLocal.matrix().data());
+    captureFrameMatrices();
+    overlay_layers.draw();
+}
+
 void display()
 {
     if (pipelinePending)
@@ -2082,15 +2120,35 @@ void display()
     if (loQuitting && (loParked || !loRunning))
         quit_abandoned_run();
 
+    // Files become display-only overlays; raw-data folder drops retain the processing workflow.
+    const auto dropped = takeDroppedFiles();
+    if (!dropped.empty())
+    {
+        std::error_code error;
+        if (dropped.size() == 1 && fs::is_directory(fs::path(dropped.front()), error))
+        {
+            if (!loRunning && !pipelinePending)
+                openData(dropped.front());
+        }
+        else
+            overlay_layers.queue(dropped);
+    }
+
     if (loLoading)
     {
-        ClearBackground(LIGHTGRAY);
+        trajectory_follow.update(camera, std::nullopt, false, true, IsWindowFocused(), GetTime(), GetFrameTime());
+        draw_overlay_scene();
+        showAxes();
         rlImGuiBegin();
+        view_kbd_shortcuts();
         if (ImGui::IsKeyPressed(ImGuiKey_F1, false))
             info_gui = !info_gui;
         ImGui::Begin("Loading data", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
         if (ImGui::SmallButton("Controls / Help (F1)"))
             info_gui = true;
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Layers (Ctrl+L)"))
+            overlay_layers.open();
         ImGui::Text("Loading and preparing: %s", pendingLoadFolder.c_str());
         recording_span_gui();
         resources_gui();
@@ -2100,6 +2158,10 @@ void display()
             infoLines[infoLines.size() - 2] = "Preparing data: " + pendingLoadFolder;
             info_window(infoLines, appShortcuts);
         }
+        end3DAndDrawLabels();
+        if (compass_ruler)
+            drawMiniCompassWithRuler();
+        overlay_layers.gui();
         rlImGuiEnd();
         return; // initial_points, m_g and buckets are being initialized; never read them concurrently
     }
@@ -2128,13 +2190,6 @@ void display()
     const auto& display_workers = !trajectory_running ? worker_data : preview ? *preview : empty_preview;
 
     ImGuiIO& io = ImGui::GetIO();
-    rlViewport(0, 0, GetRenderWidth(), GetRenderHeight());
-
-    ClearBackground(ColorFromNormalized(Vector4{ bg_color.x * bg_color.w, bg_color.y * bg_color.w, bg_color.z * bg_color.w, bg_color.w }));
-    rlEnableDepthTest();
-
-    rlMatrixMode(RL_PROJECTION);
-    rlLoadIdentity();
 
     trajectory_follow.update(
         camera,
@@ -2146,23 +2201,7 @@ void display()
         GetTime(),
         GetFrameTime());
 
-    reshape((int)io.DisplaySize.x, (int)io.DisplaySize.y);
-
-    viewLocal = Eigen::Affine3f::Identity();
-
-    viewLocal.translate(rotation_center);
-
-    viewLocal.translate(Eigen::Vector3f(translate_x, translate_y, translate_z));
-    if (!lock_z)
-        viewLocal.rotate(Eigen::AngleAxisf(rotate_x * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
-    else
-        viewLocal.rotate(Eigen::AngleAxisf(-90.0 * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
-    viewLocal.rotate(Eigen::AngleAxisf(rotate_y * DEG_TO_RAD, Eigen::Vector3f::UnitZ()));
-
-    viewLocal.translate(-rotation_center);
-
-    rlMultMatrixf(viewLocal.matrix().data());
-    captureFrameMatrices();
+    draw_overlay_scene();
 
     showAxes();
 
@@ -2337,16 +2376,6 @@ void display()
     }
 
     view_kbd_shortcuts();
-
-    // Drag and drop: a Mandeye data folder, or any file in one, is processed like "Load & process scanning".
-    const auto dropped = takeDroppedFiles();
-    if (!dropped.empty() && !loRunning && !pipelinePending)
-    {
-        fs::path folder(dropped[0]);
-        if (!fs::is_directory(folder))
-            folder = folder.parent_path();
-        openData(folder.string());
-    }
 
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_O, false) && !loRunning && !pipelinePending)
     {
@@ -2583,6 +2612,9 @@ void display()
                 }
                 ImGui::EndDisabled();
 
+                if (ImGui::MenuItem("Layers...", "Ctrl+L"))
+                    overlay_layers.open();
+                ImGui::Separator();
                 ImGui::MenuItem("Show initial points", nullptr, &show_initial_points);
                 ImGui::MenuItem("Intensity shading", nullptr, &intensity_shading);
                 if (ImGui::IsItemHovered())
@@ -2741,6 +2773,7 @@ void display()
     if (compass_ruler)
         drawMiniCompassWithRuler();
 
+    overlay_layers.gui();
     rlImGuiEnd();
 }
 
@@ -2915,6 +2948,7 @@ int main(int argc, char* argv[])
             if (pipelineThread.joinable())
                 pipelineThread.join();
 
+            overlay_layers.shutdown();
             trajectory_cache.clear(trajectory_renderer);
             unloadPointVertices(initial_point_cache.parts);
             unloadPointVertices(reference_point_cache.parts);

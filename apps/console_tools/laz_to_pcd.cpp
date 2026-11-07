@@ -68,8 +68,8 @@ bool convert_and_save(const char* from, const char* to)
 
         std::span<float> xyzi(reinterpret_cast<float*>(pointDataPtr), 3);
         xyzi[0] = static_cast<float>(header->x_offset + header->x_scale_factor * static_cast<double>(point->X));
-        xyzi[1] = static_cast<float>(header->y_offset + header->x_scale_factor * static_cast<double>(point->Y));
-        xyzi[2] = static_cast<float>(header->z_offset + header->x_scale_factor * static_cast<double>(point->Z));
+        xyzi[1] = static_cast<float>(header->y_offset + header->y_scale_factor * static_cast<double>(point->Y));
+        xyzi[2] = static_cast<float>(header->z_offset + header->z_scale_factor * static_cast<double>(point->Z));
         xyzi[3] = static_cast<float>(point->intensity);
         const double ts = point->gps_time;
         memcpy(pointerTimstamp, &ts, sizeof(double));

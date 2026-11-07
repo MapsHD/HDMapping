@@ -4,6 +4,8 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
+#include <limits>
 #include <vector>
 
 #include <spdlog/spdlog.h>
@@ -47,7 +49,7 @@ bool convert_and_save(const char* from, const char* to)
     }
 
     laszip_point* point = nullptr;
-    if (laszip_get_point_pointer(header, &point))
+    if (laszip_get_point_pointer(laszip_reader, &point))
     {
         return false;
     }
@@ -60,7 +62,7 @@ bool convert_and_save(const char* from, const char* to)
     laszip_I64 point_read_count = 0;
     while (point_read_count < point_count)
     {
-        if (laszip_read_point(header))
+        if (laszip_read_point(laszip_reader))
         {
             return false;
         }
@@ -76,18 +78,34 @@ bool convert_and_save(const char* from, const char* to)
     }
     progress.finish(static_cast<uint64_t>(point_read_count));
 
+    if (laszip_close_reader(laszip_reader) || laszip_destroy(laszip_reader))
+    {
+        spdlog::error("Failed closing LASzip reader");
+        return false;
+    }
+
     if (std::ofstream to_file = std::ofstream(to, std::ios::out))
     {
+        // The default 6 significant digits would print every timestamp as e.g. 1.731e+09.
+        const auto coordinate_precision = to_file.precision();
+        const auto timestamp_precision = std::numeric_limits<double>::max_digits10;
+
         ConsoleProgress write_progress("Writing points", points.size());
         uint64_t points_written = 0;
         for (const auto& point : points)
         {
-            to_file << point.x << ' ' << point.y << ' ' << point.z << ' ' << point.intensity << ' ' << point.timestamp << '\n';
+            to_file << std::setprecision(coordinate_precision) << point.x << ' ' << point.y << ' ' << point.z << ' ' << point.intensity
+                    << ' ' << std::setprecision(timestamp_precision) << point.timestamp << '\n';
             write_progress.update(++points_written);
         }
         write_progress.finish(points_written);
 
-        to_file.write((const char*)points.data(), points.size() * sizeof(Point));
+        to_file.close();
+        if (!to_file)
+        {
+            spdlog::error("Failed writing TXT output {}", to);
+            return false;
+        }
     }
     else
     {

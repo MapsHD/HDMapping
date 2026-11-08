@@ -123,7 +123,7 @@ int main(int argc, char* argv[])
 
     if (!exportLaz(argv[2], pc.points_local, pc.intensities, pc.timestamps))
     {
-        std::cout << "Problem with saving: '" << argv[3] << std::endl;
+        std::cout << "Problem with saving: '" << argv[2] << "'" << std::endl;
     }
 
     return 0;

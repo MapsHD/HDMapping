@@ -2731,20 +2731,20 @@ void finalizeScanSession(const std::string& sourceDir, bool fillInSession)
     {
         {
             int counter = 1;
-            Eigen::Vector3d mean(session.point_clouds_container.point_clouds[0].points_local[0]);
-            for (auto& pc : session.point_clouds_container.point_clouds)
-            {
-                if (pc.points_local.size() > 100)
-                {
-                    // spdlog::info("mean " << mean << std::endl;
-                    for (size_t i = 100; i < pc.points_local.size(); i += 100)
-                    {
-                        mean += pc.points_local[i];
-                        counter++;
-                    }
-                }
-            }
-            mean /= counter;
+            //Eigen::Vector3d mean(session.point_clouds_container.point_clouds[0].points_local[0]);
+            //for (auto& pc : session.point_clouds_container.point_clouds)
+            //{
+            //    if (pc.points_local.size() > 100)
+            //    {
+            //        // spdlog::info("mean " << mean << std::endl;
+            //        for (size_t i = 100; i < pc.points_local.size(); i += 100)
+            //        {
+            //            mean += pc.points_local[i];
+            //            counter++;
+            //        }
+            //    }
+            //}
+            //mean /= counter;
 
             for (auto& pc : session.point_clouds_container.point_clouds)
             {
@@ -2761,7 +2761,7 @@ void finalizeScanSession(const std::string& sourceDir, bool fillInSession)
                     //}
 
                     // mean /= counter;
-                    m.translation() = mean;
+                    //m.translation() = mean;
 
                     PointCloud::LocalTrajectoryNode node;
                     node.imu_diff_angle_om_fi_ka_deg = { 0, 0, 0 };
@@ -2771,10 +2771,10 @@ void finalizeScanSession(const std::string& sourceDir, bool fillInSession)
 
                     pc.local_trajectory.push_back(node);
 
-                    for (auto& p : pc.points_local)
-                    {
-                        p -= mean;
-                    }
+                    //for (auto& p : pc.points_local)
+                    //{
+                    //    p -= mean;
+                    //}
                 }
 
                 pc.m_initial_pose = m;
@@ -5356,6 +5356,7 @@ void display()
 
                 if (ImGui::MenuItem("Open las/laz"))
                     openLaz(fillInSession);
+
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Create session from las/laz file(s)");
 
@@ -5391,6 +5392,7 @@ void display()
 
                     if (ImGui::MenuItem("Open las/laz"))
                         openLaz(fillInSession);
+
                     if (ImGui::IsItemHovered())
                         ImGui::SetTooltip("Replace the current session with one created from las/laz file(s)");
 

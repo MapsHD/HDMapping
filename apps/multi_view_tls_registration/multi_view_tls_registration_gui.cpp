@@ -4896,8 +4896,7 @@ void lioSegmentsGizmo()
                 gizmo_drag_preview_poses[0] = Eigen::Affine3d(Eigen::Map<const Eigen::Matrix4f>(m_gizmo).cast<double>());
                 for (size_t j = i + 1; j < last; j++)
                 {
-                    gizmo_drag_preview_poses[j - i] =
-                        gizmo_drag_preview_poses[j - i - 1] * (pcs[j - 1].m_pose.inverse() * pcs[j].m_pose);
+                    gizmo_drag_preview_poses[j - i] = gizmo_drag_preview_poses[j - i - 1] * (pcs[j - 1].m_pose.inverse() * pcs[j].m_pose);
                 }
             }
             else

@@ -75,6 +75,9 @@ int main(int argc, char* argv[])
 
                 ltn.timestamps.second = 0.0;
                 ltn.imu_om_fi_ka = { 0, 0, 0 };
+
+                ltn.timestamps.first *= atof(argv[3]);
+
                 local_trajectory.push_back(ltn);
             }
 

@@ -94,6 +94,7 @@ bool load_pc(PointCloud& pc, const std::string& input_file_name)
     progress.finish(static_cast<uint64_t>(p_count));
 
     laszip_close_reader(laszip_reader);
+    laszip_destroy(laszip_reader);
 
     return true;
 }

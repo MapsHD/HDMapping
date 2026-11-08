@@ -2766,7 +2766,7 @@ void display()
 
                 if (ImGui::MenuItem("Open las/laz"))
                     openLaz(fillInSession);
-                    
+
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Create session from las/laz file(s)");
 

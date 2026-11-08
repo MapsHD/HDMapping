@@ -116,7 +116,7 @@ int main(int argc, char* argv[])
 
     for (auto& t : pc.timestamps)
     {
-        t *= atof(argv[2]);
+        t *= atof(argv[3]);
     }
 
     if (!exportLaz(argv[2], pc.points_local, pc.intensities, pc.timestamps))

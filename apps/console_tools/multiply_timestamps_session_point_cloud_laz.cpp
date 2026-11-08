@@ -114,9 +114,11 @@ int main(int argc, char* argv[])
         return 2;
     }
 
+    // exportLaz() treats timestamps as seconds and writes them as nanoseconds (x 1e9),
+    // so divide by 1e9 to keep the input's units.
     for (auto& t : pc.timestamps)
     {
-        t *= atof(argv[3]);
+        t *= atof(argv[3]) / 1e9;
     }
 
     if (!exportLaz(argv[2], pc.points_local, pc.intensities, pc.timestamps))

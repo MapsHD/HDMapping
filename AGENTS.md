@@ -1,7 +1,6 @@
 # AGENTS.md
 
-Guidance for coding agents (and humans) working on HDMapping. The rules come from maintainer review comments; the
-number in brackets is the PR where a rule was raised.
+Guidance for coding agents (and humans) working on HDMapping. The rules come from maintainer review comments.
 
 ## Project
 
@@ -17,7 +16,8 @@ platforms, see "Platforms and portability" below.
 - `3rdparty/`: git submodules built from source. `3rdpartyBinary/`: prebuilt OpenCV and PROJ. Both are wired up in
   `cmake/dependencies.cmake`.
 - `scripts/`: developer tooling, documented in `scripts/README.md`.
-- User documentation lives in the GitHub wiki, not in the repo.
+- User documentation lives in the [GitHub wiki](https://github.com/MapsHD/HDMapping/wiki), not in the repo. File formats are described in
+  [File Formats](https://github.com/MapsHD/HDMapping/wiki/File-Formats).
 
 ## Build and check
 
@@ -35,41 +35,56 @@ macOS, the Debian package and the Python bindings. It fails on any clang-format 
 ## Scope of a change
 
 - One concern per PR. A bug fix and a feature or UX change go in separate PRs, even when they were found together.
-  (#590)
 - A bug found along the way (UB, race, crash) gets an issue and a minimal fix of a few lines, such as a mutex. Don't
-  rewrite the code around it. (#590)
+  rewrite the code around it.
 - Keep diffs reviewable. Agent-written code is fine, but a large diff that mixes fixes, refactors, tests and UX will
-  be sent back to be split. (#590)
-- Performance work must not change results. Give before/after timings. (#5)
+  be sent back to be split.
+- Performance work must not change results. Give before/after timings.
 
 ## Existing workflows
 
-- Changes must not break existing workflows. The processing chain (raw data viewer, step 1, step 2, step 3; see
-  `images/workflow.png`) must keep working end to end.
-- Files written by earlier versions must still load: sessions (`.mjs`), projects (`.mjp`), calibrations (`.mjc`) and
-  step outputs. If you change a format, keep reading the old one.
+- Changes must not break existing workflows. The processing chain below must keep working end to end.
+
+```mermaid
+flowchart LR
+    DC[Data collection] --> RAW([mandeye_raw_data_viewer])
+    RAW --> QC1[QC 1]
+    QC1 --> S1([lidar_odometry_step_1])
+    S1 --> SSV([mandeye_single_session_viewer])
+    SSV --> QC2[QC 2]
+    QC2 --> S2([multi_view_tls_registration<br/>step 2])
+    S2 --> PUB[Data publication - LAZ]
+    S2 --> GT[Ground truth session]
+    GT --> S3([multi_session_registration<br/>step 3])
+    S2 <--> S3
+```
+
+- Files written by earlier versions must still load: [raw sessions](https://github.com/MapsHD/HDMapping/wiki/File-Formats#raw-session-mandeye-recording),
+  sessions ([`.mjs`](https://github.com/MapsHD/HDMapping/wiki/File-Formats#sessionmjs)), projects ([`.mjp`](https://github.com/MapsHD/HDMapping/wiki/File-Formats#step-3-project-mjp)),
+  calibrations ([`.mjc`](https://github.com/MapsHD/HDMapping/wiki/File-Formats#calibrationjson--mjc)) and
+  [step outputs](https://github.com/MapsHD/HDMapping/wiki/File-Formats#step-1-output-lio_result_n). If you change a format, keep reading the old one and
+  update [File Formats](https://github.com/MapsHD/HDMapping/wiki/File-Formats) in the wiki.
 - Existing command-line options and parameters keep their names and meaning. Add new ones rather than renaming or
   repurposing old ones.
 - Call out in the PR description any change users will notice: defaults, output files, results.
 
 ## Reuse before adding
 
-- Search `core/` and `shared/` before adding a struct, helper or class. Don't duplicate one that already exists. (#590)
+- Search `core/` and `shared/` before adding a struct, helper or class. Don't duplicate one that already exists.
 - When a library already has a facility, use it instead of writing your own: raylib's mesh and buffer drawing,
-  Eigen's `Map` and `cast`. (#590, #192)
+  Eigen's `Map` and `cast`.
 - A new class with its own responsibility gets its own `.h`/`.cpp` pair and a short doc comment. Don't append it to a
-  large existing `.cpp`. (#555)
+  large existing `.cpp`.
 
 ## Platforms and portability
 
 - **Tier 1: Latest Windows 11.** Every change must build and work here. Test user-facing changes on Windows before merging.
-  (#576)
 - **Tier 2: macOS and Ubuntu 24.04.** Every change must build and work here too. CI builds and tests both on every PR.
 - **Tier 3: everything else** (other Linux distributions and versions, other architectures, Windows 10). Best effort. Fixes are
   welcome as long as they don't affect tier 1 or tier 2.
-- Features that work on only one platform are not merged. (#97, #571, #576)
-- Paths: use `std::filesystem::path` and `operator/`, never string concatenation with `"/"`. (#555)
-- Optional or debug behaviour goes behind a CMake option or preprocessor flag. Don't leave code commented out. (#64)
+- Features that work on only one platform are not merged.
+- Paths: use `std::filesystem::path` and `operator/`, never string concatenation with `"/"`.
+- Optional or debug behaviour goes behind a CMake option or preprocessor flag. Don't leave code commented out.
 
 ## Build and third-party libraries
 
@@ -85,14 +100,14 @@ macOS, the Debian package and the Python bindings. It fails on any clang-format 
   `ubuntu-24.04-apt-requirements.sh`, the CI workflows and the build docs in the same PR.
 - Every tool in the toolset links against the same version of each third-party library. Don't give one tool its own
   copy or its own way of getting a library (e.g. one tool building its own PROJ while the others use the shared one).
-  Changing a library for one tool means changing it for all of them. (#571, #97)
-- Don't move submodule commits by accident. Check `git diff --submodule` before committing. (#247)
+  Changing a library for one tool means changing it for all of them.
+- Don't move submodule commits by accident. Check `git diff --submodule` before committing.
 
 ## One product, one release
 
 - All tools share the version in the top-level `CMakeLists.txt` (`project(hd-mapping VERSION ...)`) and are released
-  together. No tool gets its own version, CI workflow, release script or packaging script. (#571)
-- A toolchain bump (CMake, compiler) updates the CI workflows and the build docs in the same PR. (#216)
+  together. No tool gets its own version, CI workflow, release script or packaging script.
+- A toolchain bump (CMake, compiler) updates the CI workflows and the build docs in the same PR.
 - Packaging is done in one place per platform: `deploy_mandeye.bat` (Windows), `macos_bundle_toolkit/` (macOS) and
   CPack (Debian).
 
@@ -112,15 +127,29 @@ Nothing fails if you miss one of these steps:
 - Unit tests (doctest, enabled with `BUILD_TESTING`) are for logic with a clear contract: math, parsing,
   interpolation, file formats.
 - Don't add tests for things you can check by looking at the output (rendering, GUI, UX). They are a maintenance
-  burden. A test must not encode an agent's reasoning steps. (#590)
+  burden. A test must not encode an agent's reasoning steps.
+
+### Test datasets
+
+Run changes to the processing chain against a real recording before opening a PR. Datasets are not stored in the repo;
+download them outside the source tree.
+
+- [Underground Parking Dataset](https://huggingface.co/datasets/MichalPelka/UndegroundParkingDataset): handheld
+  Mandeye recording of an underground garage (25 chunks, ~240 MB, Livox LiDAR + IMU, no GNSS) with a Z+F IMAGER 5010
+  TLS scan as ground truth (`ground-truth/`, own local frame, register before comparing). Feeds
+  `mandeye_raw_data_viewer` and `lidar_odometry_step_1` directly. Get it with `git lfs install` and
+  `git clone https://huggingface.co/datasets/MichalPelka/UndegroundParkingDataset`.
 
 ## Docs and comments
 
 - No design docs or agent notes in the source tree. Lasting guidance for agents belongs in this file, trimmed by a
-  human. (#571)
-- Every developer tool gets a line in `scripts/README.md`. (#486)
+  human.
+- Per-user agent notes (plans, analyses, implementation notes for your own PR or commit) go in `agents/`. Git ignores
+  everything there except its `.gitignore`. Code, commit messages, PR descriptions and tracked docs must not refer to
+  files in `agents/`; they exist only on one machine.
+- Every developer tool gets a line in `scripts/README.md`.
 - Doc comments use `//!` Doxygen on declarations. Keep them short.
 
 ## CI etiquette
 
-- A commit that touches only docs, images or the README gets `[skip ci]` in its message. (#437, #304)
+- A commit that touches only docs, images or the README gets `[skip ci]` in its message.

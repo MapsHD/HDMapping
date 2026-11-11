@@ -52,7 +52,10 @@ namespace
         std::vector<Eigen::Vector3d> points;
         const double step = 0.1;
         const double x0 = 2.0, x1 = 14.0, y0 = 3.0, y1 = 11.0, z0 = 0.0, z1 = 3.0;
-        const auto jitter = [&]() { return rng.uniform(-0.03, 0.03); };
+        const auto jitter = [&]()
+        {
+            return rng.uniform(-0.03, 0.03);
+        };
 
         for (double x = x0; x <= x1; x += step)
         {
@@ -122,10 +125,10 @@ namespace
         const double d2r = M_PI / 180.0;
         Eigen::Affine3d pose = Eigen::Affine3d::Identity();
         pose.translation() = t;
-        pose.linear() = (Eigen::AngleAxisd(yaw_deg * d2r, Eigen::Vector3d::UnitZ()) *
-                         Eigen::AngleAxisd(pitch_deg * d2r, Eigen::Vector3d::UnitY()) *
-                         Eigen::AngleAxisd(roll_deg * d2r, Eigen::Vector3d::UnitX()))
-                            .toRotationMatrix();
+        pose.linear() =
+            (Eigen::AngleAxisd(yaw_deg * d2r, Eigen::Vector3d::UnitZ()) * Eigen::AngleAxisd(pitch_deg * d2r, Eigen::Vector3d::UnitY()) *
+             Eigen::AngleAxisd(roll_deg * d2r, Eigen::Vector3d::UnitX()))
+                .toRotationMatrix();
         return pose;
     }
 
@@ -224,9 +227,20 @@ TEST_CASE("PairWiseICP::compute matches the reference result")
 
     // Build with -DPRINT_REFERENCE to print new reference values after a deliberate change to the algorithm.
 #ifdef PRINT_REFERENCE
-    std::printf("REFERENCE\n%.17g, %.17g, %.17g, %.17g\n%.17g, %.17g, %.17g, %.17g\n%.17g, %.17g, %.17g, %.17g\n",
-        pose(0, 0), pose(0, 1), pose(0, 2), pose(0, 3), pose(1, 0), pose(1, 1), pose(1, 2), pose(1, 3), pose(2, 0), pose(2, 1),
-        pose(2, 2), pose(2, 3));
+    std::printf(
+        "REFERENCE\n%.17g, %.17g, %.17g, %.17g\n%.17g, %.17g, %.17g, %.17g\n%.17g, %.17g, %.17g, %.17g\n",
+        pose(0, 0),
+        pose(0, 1),
+        pose(0, 2),
+        pose(0, 3),
+        pose(1, 0),
+        pose(1, 1),
+        pose(1, 2),
+        pose(1, 3),
+        pose(2, 0),
+        pose(2, 1),
+        pose(2, 2),
+        pose(2, 3));
 #endif
 
     const double tolerance = 1e-9;

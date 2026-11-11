@@ -36,7 +36,7 @@ set(CORE_MATH_SOURCES
 
 add_library(core_math STATIC ${CORE_MATH_SOURCES})
 target_compile_definitions(core_math PRIVATE WITH_GUI=0)
-target_link_libraries(core_math PRIVATE PROJ::proj spdlog::spdlog vqf Fusion wgs84_do_puwg92 plycpp WGS84toCartesian)
+target_link_libraries(core_math PRIVATE PROJ::proj spdlog::spdlog vqf Fusion wgs84_do_puwg92 plycpp WGS84toCartesian ${PLATFORM_MISCELLANEOUS_LIBS})
 target_include_directories(core_math PRIVATE
     include
     ${EIGEN3_INCLUDE_DIR}

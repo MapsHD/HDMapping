@@ -5,6 +5,8 @@
 #include <Core/structures.h>
 #include <Core/transformations.h>
 
+#include <tbb/parallel_for_each.h>
+
 #include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian_simplified.h>
 
 inline void point_to_point_source_to_target_tait_bryan_wc_AtPA_simplified_4(
@@ -324,13 +326,8 @@ bool PairWiseICP::compute(
 
         if (multithread)
         {
-            std::for_each(
-#if USE_EXECUTION_PAR_UNSEQ
-                std::execution::par_unseq,
-#endif
-                block_sums.begin(),
-                block_sums.end(),
-                block_fun);
+            // TBB rather than std::execution, which AppleClang's libc++ doesn't run in parallel.
+            tbb::parallel_for_each(block_sums.begin(), block_sums.end(), block_fun);
         }
         else
         {

@@ -62,8 +62,7 @@ int main(int argc, char* argv[])
     try
     {
         vocabulary = std::make_unique<fbow::Vocabulary>(bow_loop_closure::loadVocabulary(vocab_path));
-    }
-    catch (const std::exception& e)
+    } catch (const std::exception& e)
     {
         spdlog::error("{}", e.what());
         return 4;
@@ -97,7 +96,13 @@ int main(int argc, char* argv[])
         session.point_clouds_container.point_clouds.size(),
         params.min_arc_gap_m,
         params.max_xy_dist_m,
-        static_cast<int>(std::count_if(chunk_frames.begin(), chunk_frames.end(), [](const auto& f) { return !f.empty(); })),
+        static_cast<int>(std::count_if(
+            chunk_frames.begin(),
+            chunk_frames.end(),
+            [](const auto& f)
+            {
+                return !f.empty();
+            })),
         chunk_frames.size());
 
     return 0;

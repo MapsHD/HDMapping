@@ -1966,140 +1966,139 @@ void observation_picking_gui()
 // background image work.
 namespace
 {
-struct BowLoopClosureState
-{
-    //! One row per camera folder (CAMERA_0, or an Insta360's cam_front and cam_back); empty rows are skipped.
-    std::vector<std::array<char, 1024>> camera_dirs = std::vector<std::array<char, 1024>>(1);
-    bow_loop_closure::DetectorParams params;
-
-    std::atomic<bool> detecting{ false };
-    std::thread detect_thread;
-
-    std::mutex results_mutex;
-    std::vector<bow_loop_closure::Candidate> results;
-    std::vector<bow_loop_closure::CameraFrame> frames;
-    std::vector<std::string> camera_names; //!< folder name per CameraFrame::camera
-    std::string status;
-
-    int selected_candidate = -1;
-    bool scroll_to_selected = false; //!< scroll the list to selected_candidate on the next frame
-    bool window_focused = false; //!< the BoW window had focus last frame, see bow_preview_takes_edge_hotkeys()
-    Texture2D montage_tex{};
-    bool montage_tex_valid = false;
-};
-BowLoopClosureState bow_state;
-
-void bow_loop_closure_start_detection()
-{
-    if (bow_state.detecting.load())
-        return;
-    if (bow_state.detect_thread.joinable())
-        bow_state.detect_thread.join();
-
-    bow_state.detecting = true;
+    struct BowLoopClosureState
     {
-        std::lock_guard<std::mutex> lk(bow_state.results_mutex);
-        bow_state.status = "Detecting...";
-        bow_state.results.clear();
-        bow_state.selected_candidate = -1;
-    }
+        //! One row per camera folder (CAMERA_0, or an Insta360's cam_front and cam_back); empty rows are skipped.
+        std::vector<std::array<char, 1024>> camera_dirs = std::vector<std::array<char, 1024>>(1);
+        bow_loop_closure::DetectorParams params;
 
-    std::vector<std::string> camera_dirs;
-    std::vector<std::string> camera_names;
-    for (const auto& dir : bow_state.camera_dirs)
+        std::atomic<bool> detecting{ false };
+        std::thread detect_thread;
+
+        std::mutex results_mutex;
+        std::vector<bow_loop_closure::Candidate> results;
+        std::vector<bow_loop_closure::CameraFrame> frames;
+        std::vector<std::string> camera_names; //!< folder name per CameraFrame::camera
+        std::string status;
+
+        int selected_candidate = -1;
+        bool scroll_to_selected = false; //!< scroll the list to selected_candidate on the next frame
+        bool window_focused = false; //!< the BoW window had focus last frame, see bow_preview_takes_edge_hotkeys()
+        Texture2D montage_tex{};
+        bool montage_tex_valid = false;
+    };
+    BowLoopClosureState bow_state;
+
+    void bow_loop_closure_start_detection()
     {
-        if (dir[0] == '\0')
-            continue;
-        camera_dirs.emplace_back(dir.data());
-        std::filesystem::path path(camera_dirs.back());
-        if (!path.has_filename())
-            path = path.parent_path(); // ".../cam_front/"
-        camera_names.push_back(path.filename().string());
-    }
-    bow_loop_closure::DetectorParams params = bow_state.params;
+        if (bow_state.detecting.load())
+            return;
+        if (bow_state.detect_thread.joinable())
+            bow_state.detect_thread.join();
 
-    bow_state.detect_thread = std::thread(
-        [camera_dirs, camera_names, params]()
+        bow_state.detecting = true;
         {
-            auto frames = bow_loop_closure::loadCameraFrames(camera_dirs);
-            std::vector<bow_loop_closure::Candidate> candidates;
-            std::string status;
-
-            if (frames.empty())
-            {
-                status = "No camera frames found in the camera folders";
-            }
-            else
-            {
-                auto chunk_frames =
-                    bow_loop_closure::associateFramesToChunks(session.point_clouds_container, frames, params.max_frame_time_gap_ns);
-                try
-                {
-                    auto vocabulary = bow_loop_closure::loadVocabulary(bow_loop_closure::defaultVocabularyPath());
-                    candidates =
-                        bow_loop_closure::detectCandidates(session.point_clouds_container, frames, chunk_frames, params, vocabulary);
-                    status = std::to_string(candidates.size()) + " candidates found";
-                }
-                catch (const std::exception& e)
-                {
-                    status = e.what();
-                }
-            }
-
             std::lock_guard<std::mutex> lk(bow_state.results_mutex);
-            bow_state.frames = std::move(frames);
-            bow_state.camera_names = camera_names;
-            bow_state.results = std::move(candidates);
-            bow_state.status = status;
-            bow_state.detecting = false;
-        });
-}
+            bow_state.status = "Detecting...";
+            bow_state.results.clear();
+            bow_state.selected_candidate = -1;
+        }
 
-// Uploads `mat` (BGR, as cv::imread/drawMatches produce) as the montage
-// preview texture -- same LoadTextureFromImage/UnloadTexture pattern as
-// TrajectoryViewer.cpp's imgViewTex.
-void bow_loop_closure_upload_montage(cv::Mat mat)
-{
-    if (mat.empty())
-        return;
-    cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
-    if (!mat.isContinuous())
-        mat = mat.clone();
+        std::vector<std::string> camera_dirs;
+        std::vector<std::string> camera_names;
+        for (const auto& dir : bow_state.camera_dirs)
+        {
+            if (dir[0] == '\0')
+                continue;
+            camera_dirs.emplace_back(dir.data());
+            std::filesystem::path path(camera_dirs.back());
+            if (!path.has_filename())
+                path = path.parent_path(); // ".../cam_front/"
+            camera_names.push_back(path.filename().string());
+        }
+        bow_loop_closure::DetectorParams params = bow_state.params;
 
-    if (bow_state.montage_tex_valid)
-        UnloadTexture(bow_state.montage_tex);
-    Image ri = { mat.data, mat.cols, mat.rows, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8 };
-    bow_state.montage_tex = LoadTextureFromImage(ri);
-    bow_state.montage_tex_valid = bow_state.montage_tex.id > 0;
-}
+        bow_state.detect_thread = std::thread(
+            [camera_dirs, camera_names, params]()
+            {
+                auto frames = bow_loop_closure::loadCameraFrames(camera_dirs);
+                std::vector<bow_loop_closure::Candidate> candidates;
+                std::string status;
 
-// Shows results[row] in the montage preview.
-void bow_loop_closure_show_candidate(const std::vector<bow_loop_closure::Candidate>& results, int row)
-{
-    bow_state.selected_candidate = row;
-    std::lock_guard<std::mutex> lk(bow_state.results_mutex);
-    cv::Mat montage = bow_loop_closure::buildCandidateMontage(results[row], bow_state.frames, bow_state.params);
-    bow_loop_closure_upload_montage(montage);
-}
+                if (frames.empty())
+                {
+                    status = "No camera frames found in the camera folders";
+                }
+                else
+                {
+                    auto chunk_frames =
+                        bow_loop_closure::associateFramesToChunks(session.point_clouds_container, frames, params.max_frame_time_gap_ns);
+                    try
+                    {
+                        auto vocabulary = bow_loop_closure::loadVocabulary(bow_loop_closure::defaultVocabularyPath());
+                        candidates =
+                            bow_loop_closure::detectCandidates(session.point_clouds_container, frames, chunk_frames, params, vocabulary);
+                        status = std::to_string(candidates.size()) + " candidates found";
+                    } catch (const std::exception& e)
+                    {
+                        status = e.what();
+                    }
+                }
 
-void bow_loop_closure_clear_preview()
-{
-    bow_state.selected_candidate = -1;
-    if (bow_state.montage_tex_valid)
-        UnloadTexture(bow_state.montage_tex);
-    bow_state.montage_tex_valid = false;
-}
+                std::lock_guard<std::mutex> lk(bow_state.results_mutex);
+                bow_state.frames = std::move(frames);
+                bow_state.camera_names = camera_names;
+                bow_state.results = std::move(candidates);
+                bow_state.status = status;
+                bow_state.detecting = false;
+            });
+    }
 
-// N / P step the BoW candidates instead of the manual loop closure's active edge while a candidate is
-// shown and either the BoW window has focus or the active edge list is not shown.
-bool bow_preview_takes_edge_hotkeys()
-{
-    if (!is_bow_loop_closure_gui || bow_state.selected_candidate < 0)
-        return false;
-    const auto& loop_closure = session.pose_graph_loop_closure;
-    const bool active_edges_shown = is_loop_closure_gui && loop_closure.manipulate_active_edge && !loop_closure.edges.empty();
-    return bow_state.window_focused || !active_edges_shown;
-}
+    // Uploads `mat` (BGR, as cv::imread/drawMatches produce) as the montage
+    // preview texture -- same LoadTextureFromImage/UnloadTexture pattern as
+    // TrajectoryViewer.cpp's imgViewTex.
+    void bow_loop_closure_upload_montage(cv::Mat mat)
+    {
+        if (mat.empty())
+            return;
+        cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
+        if (!mat.isContinuous())
+            mat = mat.clone();
+
+        if (bow_state.montage_tex_valid)
+            UnloadTexture(bow_state.montage_tex);
+        Image ri = { mat.data, mat.cols, mat.rows, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8 };
+        bow_state.montage_tex = LoadTextureFromImage(ri);
+        bow_state.montage_tex_valid = bow_state.montage_tex.id > 0;
+    }
+
+    // Shows results[row] in the montage preview.
+    void bow_loop_closure_show_candidate(const std::vector<bow_loop_closure::Candidate>& results, int row)
+    {
+        bow_state.selected_candidate = row;
+        std::lock_guard<std::mutex> lk(bow_state.results_mutex);
+        cv::Mat montage = bow_loop_closure::buildCandidateMontage(results[row], bow_state.frames, bow_state.params);
+        bow_loop_closure_upload_montage(montage);
+    }
+
+    void bow_loop_closure_clear_preview()
+    {
+        bow_state.selected_candidate = -1;
+        if (bow_state.montage_tex_valid)
+            UnloadTexture(bow_state.montage_tex);
+        bow_state.montage_tex_valid = false;
+    }
+
+    // N / P step the BoW candidates instead of the manual loop closure's active edge while a candidate is
+    // shown and either the BoW window has focus or the active edge list is not shown.
+    bool bow_preview_takes_edge_hotkeys()
+    {
+        if (!is_bow_loop_closure_gui || bow_state.selected_candidate < 0)
+            return false;
+        const auto& loop_closure = session.pose_graph_loop_closure;
+        const bool active_edges_shown = is_loop_closure_gui && loop_closure.manipulate_active_edge && !loop_closure.edges.empty();
+        return bow_state.window_focused || !active_edges_shown;
+    }
 } // namespace
 
 void bow_loop_closure_gui()
@@ -2307,8 +2306,7 @@ void bow_loop_closure_gui()
             {
                 const auto& c = results_copy[selected];
                 std::string default_name = "cand_" + std::to_string(c.index_i) + "_" + std::to_string(c.index_j) + ".png";
-                std::string out_file =
-                    mandeye::fd::SaveFileDialog("Save montage", { "PNG image (*.png)", "*.png" }, ".png", default_name);
+                std::string out_file = mandeye::fd::SaveFileDialog("Save montage", { "PNG image (*.png)", "*.png" }, ".png", default_name);
                 if (!out_file.empty())
                 {
                     std::lock_guard<std::mutex> lk(bow_state.results_mutex);

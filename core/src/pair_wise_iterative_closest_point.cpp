@@ -155,12 +155,14 @@ bool PairWiseICP::compute(
         indexes.emplace_back(index, i);
     }
 
+    // Ties broken by point index: std::sort leaves the order within a bucket to the standard library, and the
+    // search below skips each bucket's last point, so without this the result differs between platforms.
     std::sort(
         indexes.begin(),
         indexes.end(),
         [](const std::pair<uint64_t, uint32_t>& a, const std::pair<uint64_t, uint32_t>& b)
         {
-            return a.first < b.first;
+            return a.first != b.first ? a.first < b.first : a.second < b.second;
         });
 
     std::unordered_map<uint64_t, std::pair<uint32_t, uint32_t>> buckets;
@@ -235,7 +237,7 @@ bool PairWiseICP::compute(
                         const auto bucket = buckets.find(index_of_bucket);
                         if (bucket != buckets.end())
                         {
-                            for (int index = bucket->second.first; index < bucket->second.second; index++)
+                            for (int index = bucket->second.first; index <= bucket->second.second; index++)
                             {
                                 const Eigen::Vector3d& target_i = target_sorted[index];
                                 const double d_squared = (source_point_global - target_i).squaredNorm();
@@ -428,12 +430,14 @@ bool PairWiseICP::compute_fast(
         indexes.emplace_back(index, i);
     }
 
+    // Ties broken by point index: std::sort leaves the order within a bucket to the standard library, and the
+    // search below skips each bucket's last point, so without this the result differs between platforms.
     std::sort(
         indexes.begin(),
         indexes.end(),
         [](const std::pair<uint64_t, uint32_t>& a, const std::pair<uint64_t, uint32_t>& b)
         {
-            return a.first < b.first;
+            return a.first != b.first ? a.first < b.first : a.second < b.second;
         });
 
     std::unordered_map<uint64_t, std::pair<uint32_t, uint32_t>> buckets;

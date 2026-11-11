@@ -212,10 +212,10 @@ TEST_CASE("PairWiseICP::compute returns false with fewer than 100 correspondence
 }
 
 // Pins the exact result of a fixed run, so a refactor of compute() (threading, neighbour search, summation) is
-// held to the numbers of the reference implementation (as of "Step 2: BoW loop closure, ICP all edges"). The
-// tolerance covers rounding differences between compilers and platforms (FMA, libm, summation order: about 1e-16
-// here); a change to the algorithm moves the result far more (e.g. also searching the last point of each bucket:
-// about 2e-4).
+// held to the numbers of the reference implementation (searching every point of each bucket, buckets ordered by
+// point index). The tolerance covers rounding differences between compilers and platforms (FMA, libm, summation
+// order: about 1e-16 here); a change to the algorithm moves the result far more (e.g. skipping the last point of
+// each bucket: about 2e-4).
 TEST_CASE("PairWiseICP::compute matches the reference result")
 {
     const std::vector<Eigen::Vector3d> target = make_room();
@@ -246,9 +246,9 @@ TEST_CASE("PairWiseICP::compute matches the reference result")
     const double tolerance = 1e-9;
     // clang-format off
     const double expected[3][4] = {
-        { 0.99847835113005579, -0.052624056892179416, -0.016483050713194683, 0.4000125297669288 },
-        { 0.052319974395097578, 0.99846146760778998, -0.018366218494686254, -0.29978225332893682 },
-        { 0.01742419593270856, 0.017475878767801229, 0.99969544915308661, 0.10003668251083121 },
+        { 0.99847729809823327, -0.052634179800603725, -0.016514487553943396, 0.40002885380785902 },
+        { 0.052329963103019038, 0.99846138157059194, -0.018342422789298693, -0.30000900062787589 },
+        { 0.017454516438111307, 0.017450290222871295, 0.99969536721295715, 0.099966409536268633 },
     };
     // clang-format on
     for (int r = 0; r < 3; r++)

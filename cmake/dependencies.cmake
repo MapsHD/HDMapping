@@ -180,7 +180,31 @@ if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|i686|x86)$")
         message(STATUS "Applied ${FBOW_PATCH}")
     endif()
 endif()
+# fbow's CMakeLists leaks global cache entries that would break every target
+# added after it (same trap as Xerces above):
+#   option(BUILD_SHARED_LIBS ... ON) -- flips raylib, glad, ... to shared libs
+#     that hide their bundled glfw/glad symbols (undefined glfw*/glad_gl* at link);
+#   WIN32: EXECUTABLE/LIBRARY/RUNTIME_OUTPUT_PATH -- redirect every later
+#     target's output (e.g. vqf.lib no longer under lib/Release).
+# Pin BUILD_SHARED_LIBS=OFF so fbow builds static and the option() is a no-op,
+# then restore/remove those cache entries once fbow is configured.
+if(DEFINED CACHE{BUILD_SHARED_LIBS})
+    set(_hd_bsl_prev "$CACHE{BUILD_SHARED_LIBS}")
+    set(_hd_bsl_restore ON)
+else()
+    set(_hd_bsl_restore OFF)
+endif()
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "HDMapping links fbow statically" FORCE)
+set(FBOW_DEVINSTALL OFF CACHE BOOL "" FORCE)
 add_subdirectory(${THIRDPARTY_DIRECTORY}/fbow)
+if(_hd_bsl_restore)
+    set(BUILD_SHARED_LIBS "${_hd_bsl_prev}" CACHE BOOL "Build shared libraries" FORCE)
+else()
+    unset(BUILD_SHARED_LIBS CACHE)
+endif()
+unset(EXECUTABLE_OUTPUT_PATH CACHE)
+unset(LIBRARY_OUTPUT_PATH CACHE)
+unset(RUNTIME_OUTPUT_PATH CACHE)
 set(FBOW_INCLUDE_DIR ${THIRDPARTY_DIRECTORY}/fbow/src)
 message(STATUS "Using bundled fbow from: ${THIRDPARTY_DIRECTORY}/fbow")
 

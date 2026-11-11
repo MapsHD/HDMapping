@@ -56,26 +56,36 @@ namespace
         {
             return rng.uniform(-0.03, 0.03);
         };
+        // Jitter drawn in x, y, z order as separate statements: the evaluation order of function arguments is
+        // unspecified (clang: left to right; GCC, MSVC: right to left), so jitter() calls inside one argument list
+        // would build a different room on each compiler.
+        const auto add_jittered = [&](double x, double y, double z, bool jitter_x, bool jitter_y, bool jitter_z)
+        {
+            const double dx = jitter_x ? jitter() : 0.0;
+            const double dy = jitter_y ? jitter() : 0.0;
+            const double dz = jitter_z ? jitter() : 0.0;
+            points.emplace_back(x + dx, y + dy, z + dz);
+        };
 
         for (double x = x0; x <= x1; x += step)
         {
             for (double y = y0; y <= y1; y += step)
             {
-                points.emplace_back(x + jitter(), y + jitter(), z0);
-                points.emplace_back(x + jitter(), y + jitter(), z1);
+                add_jittered(x, y, z0, true, true, false);
+                add_jittered(x, y, z1, true, true, false);
             }
         }
         for (double z = z0; z <= z1; z += step)
         {
             for (double x = x0; x <= x1; x += step)
             {
-                points.emplace_back(x + jitter(), y0, z + jitter());
-                points.emplace_back(x + jitter(), y1, z + jitter());
+                add_jittered(x, y0, z, true, false, true);
+                add_jittered(x, y1, z, true, false, true);
             }
             for (double y = y0; y <= y1; y += step)
             {
-                points.emplace_back(x0, y + jitter(), z + jitter());
-                points.emplace_back(x1, y + jitter(), z + jitter());
+                add_jittered(x0, y, z, false, true, true);
+                add_jittered(x1, y, z, false, true, true);
             }
         }
 
@@ -92,20 +102,20 @@ namespace
             {
                 for (double x = corner.x(); x <= c1.x(); x += step)
                 {
-                    points.emplace_back(x + jitter(), corner.y(), z + jitter());
-                    points.emplace_back(x + jitter(), c1.y(), z + jitter());
+                    add_jittered(x, corner.y(), z, true, false, true);
+                    add_jittered(x, c1.y(), z, true, false, true);
                 }
                 for (double y = corner.y(); y <= c1.y(); y += step)
                 {
-                    points.emplace_back(corner.x(), y + jitter(), z + jitter());
-                    points.emplace_back(c1.x(), y + jitter(), z + jitter());
+                    add_jittered(corner.x(), y, z, false, true, true);
+                    add_jittered(c1.x(), y, z, false, true, true);
                 }
             }
             for (double x = corner.x(); x <= c1.x(); x += step)
             {
                 for (double y = corner.y(); y <= c1.y(); y += step)
                 {
-                    points.emplace_back(x + jitter(), y + jitter(), c1.z());
+                    add_jittered(x, y, c1.z(), true, true, false);
                 }
             }
         }
@@ -150,7 +160,11 @@ namespace
         std::vector<Eigen::Vector3d> source;
         for (size_t i = 0; i < target.size(); i += 3)
         {
-            const Eigen::Vector3d noise(rng.uniform(-0.002, 0.002), rng.uniform(-0.002, 0.002), rng.uniform(-0.002, 0.002));
+            // Separate statements, so the draws are in x, y, z order on every compiler (see make_room).
+            const double noise_x = rng.uniform(-0.002, 0.002);
+            const double noise_y = rng.uniform(-0.002, 0.002);
+            const double noise_z = rng.uniform(-0.002, 0.002);
+            const Eigen::Vector3d noise(noise_x, noise_y, noise_z);
             source.push_back(target_to_source * target[i] + noise);
         }
         return source;

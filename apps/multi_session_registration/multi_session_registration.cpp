@@ -185,6 +185,8 @@ std::string project_file_name;
 
 std::vector<Edge> edges;
 int index_active_edge = -1;
+//!< Last index_active_edge the edge list was scrolled to (loop_closure_gui()).
+int edge_list_scrolled_to = -1;
 bool manipulate_active_edge = false;
 bool edge_gizmo = false;
 
@@ -730,6 +732,14 @@ void loop_closure_gui()
 
         ImGui::BeginDisabled(is_session_gizmo);
         int delete_edge_index = -1;
+        // Scrollable list, as step 2's "LIO segments" list, so many edges don't grow the
+        // window (AlwaysAutoResize) and push the active-edge controls below off screen.
+        // Fixed height (up to kEdgeListMaxRows rows) since an auto-resizing window can't
+        // give a child "the remaining space".
+        constexpr int kEdgeListMaxRows = 10;
+        const int edgeListRows = std::clamp((int)edges.size(), 1, kEdgeListMaxRows);
+        const float edgeListHeight = edgeListRows * ImGui::GetFrameHeightWithSpacing() + ImGui::GetStyle().WindowPadding.y * 2.0f;
+        ImGui::BeginChild("Edges", ImVec2(0, edgeListHeight), true);
         for (int i = 0; i < (int)edges.size(); i++)
         {
             const auto& e = edges[i];
@@ -757,7 +767,15 @@ void loop_closure_gui()
             snprintf(buttonLabel, sizeof(buttonLabel), "Delete##%d", i);
             if (ImGui::Button(buttonLabel))
                 delete_edge_index = i;
+
+            // Keep the active edge in view when it changes (slider/input below, Add edge).
+            if (i == index_active_edge && index_active_edge != edge_list_scrolled_to)
+            {
+                ImGui::SetScrollHereY(0.5f);
+                edge_list_scrolled_to = index_active_edge;
+            }
         }
+        ImGui::EndChild();
         ImGui::EndDisabled();
 
         // Deleted after the loop so the list is not modified while it is drawn. The active edge keeps pointing at

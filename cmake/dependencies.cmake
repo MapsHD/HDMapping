@@ -159,6 +159,26 @@ set(BUILD_UTILS OFF CACHE BOOL "" FORCE)
 if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|i686|x86)$")
     set(USE_SSE3 OFF CACHE BOOL "" FORCE)
     set(USE_AVX OFF CACHE BOOL "" FORCE)
+    # fbow's sources include <immintrin.h> and use cpuid unless built for
+    # Android; the patch takes those portable paths on any non-x86 CPU.
+    # Applied once to the submodule's working tree (skipped if already applied).
+    find_package(Git REQUIRED)
+    set(FBOW_PATCH ${THIRDPARTY_DIRECTORY}/patches/fbow_non_x86.patch)
+    execute_process(
+        COMMAND ${GIT_EXECUTABLE} apply --reverse --check ${FBOW_PATCH}
+        WORKING_DIRECTORY ${THIRDPARTY_DIRECTORY}/fbow
+        RESULT_VARIABLE FBOW_PATCH_APPLIED
+        OUTPUT_QUIET ERROR_QUIET)
+    if(NOT FBOW_PATCH_APPLIED EQUAL 0)
+        execute_process(
+            COMMAND ${GIT_EXECUTABLE} apply ${FBOW_PATCH}
+            WORKING_DIRECTORY ${THIRDPARTY_DIRECTORY}/fbow
+            RESULT_VARIABLE FBOW_PATCH_RESULT)
+        if(NOT FBOW_PATCH_RESULT EQUAL 0)
+            message(FATAL_ERROR "Failed to apply ${FBOW_PATCH} to ${THIRDPARTY_DIRECTORY}/fbow")
+        endif()
+        message(STATUS "Applied ${FBOW_PATCH}")
+    endif()
 endif()
 add_subdirectory(${THIRDPARTY_DIRECTORY}/fbow)
 set(FBOW_INCLUDE_DIR ${THIRDPARTY_DIRECTORY}/fbow/src)

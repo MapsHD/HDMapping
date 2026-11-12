@@ -1,7 +1,9 @@
 include(FetchContent)
+# Tarball of the tag rather than a git clone: the foxglove/mcap monorepo's history
+# is ~140 MB, the snapshot under 1 MB (only the header-only C++ library is used).
 FetchContent_Declare(mcap
-        GIT_REPOSITORY https://github.com/foxglove/mcap.git
-        GIT_TAG releases/cpp/v1.4.0   # pin a real tag
+        URL https://github.com/foxglove/mcap/archive/refs/tags/releases/cpp/v1.4.0.tar.gz
+        URL_HASH SHA256=64ff3e51119f37ffcfaf9deecbd987a7cb4d4d9035d74a3fd3773395a470fda1
 )
 FetchContent_MakeAvailable(mcap)
 

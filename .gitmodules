@@ -62,3 +62,6 @@
 [submodule "3rdparty/libE57Format"]
 	path = 3rdparty/libE57Format
 	url = https://github.com/asmaloney/libE57Format.git
+[submodule "3rdparty/fbow"]
+	path = 3rdparty/fbow
+	url = https://github.com/rmsalinas/fbow.git

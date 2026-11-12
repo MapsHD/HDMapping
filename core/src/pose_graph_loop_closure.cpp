@@ -1259,7 +1259,7 @@ void PoseGraphLoopClosure::FuseTrajectoryWithTUM(PointClouds& point_clouds_conta
     }
 }
 
-void PoseGraphLoopClosure::run_icp(
+bool PoseGraphLoopClosure::run_icp(
     PointClouds& point_clouds_container,
     int index_active_edge,
     float search_radius,
@@ -1324,5 +1324,20 @@ void PoseGraphLoopClosure::run_icp(
     if (icp.compute(source, target, search_radius, number_of_iterations, m_pose))
     {
         edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+        return true;
     }
+    return false;
+}
+
+std::vector<float> PoseGraphLoopClosure::icp_search_radii(float start_radius)
+{
+    std::vector<float> radii{ start_radius };
+    for (const float radius : { 2.0f, 1.0f, 0.5f, 0.25f, 0.1f })
+    {
+        if (radius < start_radius * 0.999f)
+        {
+            radii.push_back(radius);
+        }
+    }
+    return radii;
 }

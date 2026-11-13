@@ -23,6 +23,14 @@ struct VisualizationParams
 
 Color jetColor(float t); // t in [0,1]
 
+//! What Renderer::renderImageOverlay draws into the Image View.
+enum class ImageOverlay
+{
+    Points, //!< the photo, projected points on top
+    None, //!< the photo alone, for picking an image pixel
+    LidarIntensity, //!< no photo: the projected points coloured by intensity, nearest on top, for picking a LiDAR point
+};
+
 class Renderer
 {
 public:
@@ -42,8 +50,6 @@ public:
 
     // Render image + GPU-projected point overlay into imageTex.
     // If the displayed image is rectified, pass applyDistortion=false.
-    // showOverlay=false draws just the plain image (e.g. while picking, so
-    // projected points don't obscure the pixel the user is aiming for).
     void renderImageOverlay(
         const Texture2D& img,
         int imgW,
@@ -52,7 +58,11 @@ public:
         const Extrinsics& E,
         bool applyDistortion,
         const VisualizationParams& vp,
-        bool showOverlay = true);
+        ImageOverlay overlay = ImageOverlay::Points);
+
+    //! Whether the GPU shaders draw cloud point `index` at "Draw decimation"
+    //! `drawDecim`, so a CPU pick can skip exactly the points not shown.
+    static bool isPointDrawn(size_t index, int drawDecim);
 
     // Draw 3D point cloud into current BeginMode3D context (GPU shader path).
     // For colorMode 3 (camera RGB) pass the displayed image texture and the

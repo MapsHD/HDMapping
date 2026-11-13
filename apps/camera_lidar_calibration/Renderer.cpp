@@ -163,7 +163,7 @@ void Renderer::renderImageOverlay(
     const Extrinsics& E,
     bool applyDistortion,
     const VisualizationParams& vp,
-    bool showOverlay)
+    ImageOverlay overlay)
 {
     if (!imageTexValid)
         return;
@@ -171,10 +171,12 @@ void Renderer::renderImageOverlay(
     BeginTextureMode(imageTex);
     ClearBackground(BLACK);
 
-    DrawTexturePro(
-        img, Rectangle{ 0, 0, (float)imgW, (float)imgH }, Rectangle{ 0, 0, (float)texW, (float)texH }, Vector2{ 0, 0 }, 0.f, WHITE);
+    const bool intensityImage = overlay == ImageOverlay::LidarIntensity;
+    if (!intensityImage)
+        DrawTexturePro(
+            img, Rectangle{ 0, 0, (float)imgW, (float)imgH }, Rectangle{ 0, 0, (float)texW, (float)texH }, Vector2{ 0, 0 }, 0.f, WHITE);
 
-    if (showOverlay && cloudCount > 0 && projShaderValid)
+    if (overlay != ImageOverlay::None && cloudCount > 0 && projShaderValid)
     {
         rlDrawRenderBatchActive(); // flush the image quad before raw GL draw
 
@@ -216,6 +218,12 @@ void Renderer::renderImageOverlay(
             }
         }
         float depthRange[2] = { vp.depthMin, vp.depthMax };
+        // The intensity image is the points alone: opaque, coloured by
+        // intensity whatever the colour mode, nearest point on top.
+        const int colorMode = intensityImage ? 1 : vp.colorMode;
+        const float opacity = intensityImage ? 1.f : vp.opacity;
+        if (intensityImage)
+            rlEnableDepthTest();
 
         rlEnableShader(projShader.id);
         rlSetUniformMatrix(locPrjXform, xform);
@@ -228,16 +236,25 @@ void Renderer::renderImageOverlay(
         rlSetUniform(locPrjXi, &xiVal, RL_SHADER_UNIFORM_FLOAT, 1);
         rlSetUniform(locPrjThetaMax, &thetaMax, RL_SHADER_UNIFORM_FLOAT, 1);
         rlSetUniform(locPrjDepthRange, depthRange, RL_SHADER_UNIFORM_VEC2, 1);
-        rlSetUniform(locPrjOpacity, &vp.opacity, RL_SHADER_UNIFORM_FLOAT, 1);
+        rlSetUniform(locPrjOpacity, &opacity, RL_SHADER_UNIFORM_FLOAT, 1);
         rlSetUniform(locPrjPointSize, &vp.pointSize, RL_SHADER_UNIFORM_FLOAT, 1);
-        rlSetUniform(locPrjColorMode, &vp.colorMode, RL_SHADER_UNIFORM_INT, 1);
+        rlSetUniform(locPrjColorMode, &colorMode, RL_SHADER_UNIFORM_INT, 1);
         rlSetUniform(locPrjDecim, &vp.drawDecim, RL_SHADER_UNIFORM_INT, 1);
 
         raylib_widgets::drawPointBufferParts(cloudParts);
         rlDisableShader();
+        if (intensityImage)
+            rlDisableDepthTest();
     }
 
     EndTextureMode();
+}
+
+bool Renderer::isPointDrawn(size_t index, int drawDecim)
+{
+    // Mirrors the shaders' gl_VertexID % drawDecim, and gl_VertexID restarts
+    // in every buffer part.
+    return drawDecim <= 1 || (index % raylib_widgets::kMaxVerticesPerPart) % static_cast<size_t>(drawDecim) == 0;
 }
 
 void Renderer::draw3DCloud(

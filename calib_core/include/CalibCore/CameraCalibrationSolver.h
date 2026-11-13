@@ -35,9 +35,13 @@ namespace calib
     //! @param fixTranslation pin tx/ty/tz at their initial values and optimize
     //!        orientation only (3-DOF) -- useful when the camera position
     //!        relative to the LiDAR is already known precisely
+    //! @param fixRotation pin om/fi/ka at their initial values and optimize
+    //!        position only (3-DOF) -- useful when the camera orientation is
+    //!        already known precisely
     //! @return false, leaving extrinsicsInOut unchanged, for fewer than 3
     //!         correspondences, fewer correspondences than free parameters
-    //!         (3 with fixTranslation, else 6), or a singular system
+    //!         (3 with fixTranslation or fixRotation, else 6), both fix flags
+    //!         set (nothing left to solve), or a singular system
     //! @note Pinhole only: the reused observation equations are a pure
     //!       rectilinear perspective projection, with no distortion and no
     //!       unified-sphere term. @see solveExtrinsicsCeres
@@ -46,7 +50,8 @@ namespace calib
         const Intrinsics& K,
         Extrinsics& extrinsicsInOut,
         double* outRmsPixels = nullptr,
-        bool fixTranslation = false);
+        bool fixTranslation = false,
+        bool fixRotation = false);
 
     //! CameraModel::Mei and CameraModel::Fisheye counterpart to
     //! @ref solveExtrinsicsFromCorrespondences. No vendored analytic Jacobian
@@ -63,8 +68,9 @@ namespace calib
     //!        dropped
     //! @param outRmsPixels optionally receives the RMS reprojection error
     //! @param fixTranslation as in @ref solveExtrinsicsFromCorrespondences
+    //! @param fixRotation as in @ref solveExtrinsicsFromCorrespondences
     //! @return false on failure, with the reason in errorMessage -- including
-    //!         any other K.model
+    //!         any other K.model, or both fix flags set
     //! @note Needs -DCALIB_ENABLE_CERES=ON (OFF by default). Built without it
     //!       this always returns false and says so, so callers never need an
     //!       \#ifdef of their own.
@@ -74,6 +80,7 @@ namespace calib
         Extrinsics& extrinsicsInOut,
         std::string& errorMessage,
         double* outRmsPixels = nullptr,
-        bool fixTranslation = false);
+        bool fixTranslation = false,
+        bool fixRotation = false);
 
 } // namespace calib

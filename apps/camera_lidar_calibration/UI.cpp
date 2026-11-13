@@ -561,6 +561,12 @@ void UI::panelExtrinsics(AppState& state)
         ImGui::SetTooltip(
             "Blocks tx/ty/tz from being edited here or changed by\n\"Solve Extrinsics from Pairs\" -- use when the camera\nposition is "
             "already known and only orientation needs solving.");
+    ImGui::SameLine();
+    ImGui::Checkbox("Lock rotation", &state.lockRotation);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip(
+            "Blocks om/fi/ka from being edited here or changed by\n\"Solve Extrinsics from Pairs\" -- use when the camera\norientation is "
+            "already known and only position needs solving.");
 
     ImGui::Text("Camera position in world (m):");
     ImGui::BeginDisabled(state.lockTranslation);
@@ -571,29 +577,35 @@ void UI::panelExtrinsics(AppState& state)
 
     ImGui::Spacing();
     ImGui::Text("Camera orientation in world, om/fi/ka (deg):");
+    ImGui::BeginDisabled(state.lockRotation);
     dragFloat("om", &E.om, 0.1f, -180.f, 180.f, "%.2f");
     dragFloat("fi", &E.fi, 0.1f, -180.f, 180.f, "%.2f");
     dragFloat("ka", &E.ka, 0.1f, -180.f, 180.f, "%.2f");
+    ImGui::EndDisabled();
     helpMarker(
         "R_wc = Rx(om)*Ry(fi)*Rz(ka): camera orientation in LiDAR world.\nT_lidar2cam = R_wc^T * (p - C).\nAt fi=+/-90 deg (gimbal lock), "
         "om and ka are not individually\nunique -- only om+ka (or om-ka) is determined.");
 
     ImGui::Spacing();
+    ImGui::BeginDisabled(state.lockTranslation && state.lockRotation);
     if (ImGui::Button("Reset Extrinsics", ImVec2(-1, 0)))
     {
-        // Respect the translation lock: only reset orientation while locked.
-        Extrinsics defaults;
-        if (state.lockTranslation)
+        // Respect the locks: reset only the unlocked half.
+        const Extrinsics defaults;
+        if (!state.lockTranslation)
+        {
+            E.tx = defaults.tx;
+            E.ty = defaults.ty;
+            E.tz = defaults.tz;
+        }
+        if (!state.lockRotation)
         {
             E.om = defaults.om;
             E.fi = defaults.fi;
             E.ka = defaults.ka;
         }
-        else
-        {
-            E = defaults;
-        }
     }
+    ImGui::EndDisabled();
     ImGui::PopItemWidth();
 
     // Show current rotation matrix
@@ -691,12 +703,15 @@ void UI::panelCorrespondences(AppState& state)
         state.removePair(removeIndex);
 
     ImGui::Spacing();
-    ImGui::BeginDisabled(state.pairs.size() < 3);
+    const bool allLocked = state.lockTranslation && state.lockRotation;
+    ImGui::BeginDisabled(state.pairs.size() < 3 || allLocked);
     if (ImGui::Button("Solve Extrinsics from Pairs", ImVec2(-1, 0)))
         state.solvePairs();
     ImGui::EndDisabled();
     if (state.pairs.size() < 3)
         ImGui::TextDisabled("At least 3 pairs needed");
+    else if (allLocked)
+        ImGui::TextDisabled("Translation and rotation are both locked");
     if (state.lastSolveRmsPixels >= 0.0)
         ImGui::Text("Last solve RMS reprojection error: %.2f px", state.lastSolveRmsPixels);
 }

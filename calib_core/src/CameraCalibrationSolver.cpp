@@ -51,14 +51,18 @@ namespace calib
         const Intrinsics& K,
         Extrinsics& extrinsicsInOut,
         double* outRmsPixels,
-        bool fixTranslation)
+        bool fixTranslation,
+        bool fixRotation)
     {
         // Free parameters are always a contiguous slice of the full
         // [tx,ty,tz,om,fi,ka] (columns 0-5 of the 2x9 jacobian): all 6 of
-        // them normally, or just [om,fi,ka] (columns 3-5) when translation
-        // is pinned -- tx/ty/tz then never appear in the normal equations
-        // at all, so they cannot move.
-        const int nParams = fixTranslation ? 3 : 6;
+        // them normally, just [om,fi,ka] (columns 3-5) when translation is
+        // pinned, or just [tx,ty,tz] (columns 0-2) when rotation is pinned
+        // -- the pinned ones then never appear in the normal equations at
+        // all, so they cannot move.
+        if (fixTranslation && fixRotation)
+            return false;
+        const int nParams = (fixTranslation || fixRotation) ? 3 : 6;
         const int colOffset = fixTranslation ? 3 : 0;
         if (static_cast<int>(correspondences.size()) < 3 || static_cast<int>(correspondences.size()) * 2 < nParams)
             return false;
@@ -129,8 +133,8 @@ namespace calib
 
                 // Only the free-parameter columns -- the 3D points
                 // (columns 6-8) are fixed observations, not solved for, and
-                // translation (columns 0-2) is skipped entirely when
-                // fixTranslation is set.
+                // translation (columns 0-2) or rotation (columns 3-5) is
+                // skipped entirely when its fix flag is set.
                 Eigen::MatrixXd A = -jFull.block(0, colOffset, 2, nParams);
 
                 AtA += A.transpose() * A;
@@ -153,21 +157,9 @@ namespace calib
 
                 Eigen::VectorXd x = lu.solve(AtB);
                 double tx2 = tx, ty2 = ty, tz2 = tz, om2 = om, fi2 = fi, ka2 = ka;
-                if (fixTranslation)
-                {
-                    om2 += x(0);
-                    fi2 += x(1);
-                    ka2 += x(2);
-                }
-                else
-                {
-                    tx2 += x(0);
-                    ty2 += x(1);
-                    tz2 += x(2);
-                    om2 += x(3);
-                    fi2 += x(4);
-                    ka2 += x(5);
-                }
+                double* const all[6] = { &tx2, &ty2, &tz2, &om2, &fi2, &ka2 };
+                for (int k = 0; k < nParams; ++k)
+                    *all[colOffset + k] += x(k);
                 double newCost = sumSquaredResiduals(rotated, fx, fy, cx, cy, tx2, ty2, tz2, om2, fi2, ka2);
 
                 if (newCost < cost)

@@ -157,6 +157,11 @@ bool AppState::solvePairs()
         statusMsg = "Need at least 3 pairs to solve";
         return false;
     }
+    if (lockTranslation && lockRotation)
+    {
+        statusMsg = "Translation and rotation are both locked -- nothing to solve";
+        return false;
+    }
 
     std::vector<calib::PointPixelCorrespondence> corr;
     corr.reserve(pairs.size());
@@ -175,8 +180,8 @@ bool AppState::solvePairs()
     // Mei and Fisheye use solveExtrinsicsCeres instead. See
     // CameraCalibrationSolver.h.
     bool ok = (intrinsics.model == CameraModel::Mei || intrinsics.model == CameraModel::Fisheye)
-        ? calib::solveExtrinsicsCeres(corr, intrinsics, extrinsics, solveErr, &rms, lockTranslation)
-        : calib::solveExtrinsicsFromCorrespondences(corr, intrinsics, extrinsics, &rms, lockTranslation);
+        ? calib::solveExtrinsicsCeres(corr, intrinsics, extrinsics, solveErr, &rms, lockTranslation, lockRotation)
+        : calib::solveExtrinsicsFromCorrespondences(corr, intrinsics, extrinsics, &rms, lockTranslation, lockRotation);
     if (!ok)
     {
         statusMsg = !solveErr.empty() ? ("Solve failed: " + solveErr) : "Solve failed (degenerate correspondences)";
@@ -184,8 +189,12 @@ bool AppState::solvePairs()
     }
 
     lastSolveRmsPixels = rms;
-    statusMsg =
-        lockTranslation ? "Solved rotation (translation locked): RMS reprojection error " : "Solved extrinsics: RMS reprojection error ";
+    if (lockTranslation)
+        statusMsg = "Solved rotation (translation locked): RMS reprojection error ";
+    else if (lockRotation)
+        statusMsg = "Solved translation (rotation locked): RMS reprojection error ";
+    else
+        statusMsg = "Solved extrinsics: RMS reprojection error ";
     statusMsg += std::to_string(rms) + " px";
     if (!imageRectified && intrinsicsLoaded == false)
         statusMsg += " (no intrinsics loaded -- distortion assumed zero)";

@@ -94,16 +94,25 @@ void UI::draw(AppState& state)
 
     // Alt/Cmd = toggle Camera RGB ↔ Intensity (works anywhere in the window).
     // Cmd (Super) alongside Alt for macOS, where Option is awkward to use as
-    // a modifier (it composes special characters).
-    if (ImGui::IsKeyPressed(ImGuiKey_LeftAlt) || ImGui::IsKeyPressed(ImGuiKey_RightAlt) || ImGui::IsKeyPressed(ImGuiKey_LeftSuper) ||
-        ImGui::IsKeyPressed(ImGuiKey_RightSuper))
+    // a modifier (it composes special characters). Fires on release, unless
+    // Shift joined in: Shift+Alt is the Image View's LiDAR-pick chord.
+    const bool altDown = ImGui::IsKeyDown(ImGuiKey_LeftAlt) || ImGui::IsKeyDown(ImGuiKey_RightAlt) ||
+        ImGui::IsKeyDown(ImGuiKey_LeftSuper) || ImGui::IsKeyDown(ImGuiKey_RightSuper);
+    if (altDown && io.KeyShift)
+        altChorded = true;
+    if (altWasDown && !altDown)
     {
-        auto& cm = state.vizParams.colorMode;
-        if (cm == 3)
-            cm = 1; // RGB → Intensity
-        else
-            cm = 3; // anything → RGB
+        if (!altChorded)
+        {
+            auto& cm = state.vizParams.colorMode;
+            if (cm == 3)
+                cm = 1; // RGB → Intensity
+            else
+                cm = 3; // anything → RGB
+        }
+        altChorded = false;
     }
+    altWasDown = altDown;
 
     panelStatus(state);
     ImGui::Spacing();
@@ -172,9 +181,15 @@ void UI::drawImageView(AppState& state)
     // Shift is the modifier that dedicates the mouse to picking, mirroring
     // App.cpp's 3D-view picking and the CTRL-to-pick convention
     // core/src/control_points.cpp already uses elsewhere in this codebase.
+    // Adding Alt picks the LiDAR point instead, in the intensity image
+    // App::draw renders here meanwhile.
     const bool picking = ImGui::GetIO().KeyShift;
+    const bool pickingLidar = picking && ImGui::GetIO().KeyAlt;
     ImGui::TextColored(
-        ImVec4(1, 1, 0, 0.8f), picking ? "Shift+click to pick a point" : "Scroll: zoom | Drag: pan with middle | Dbl-click: reset zoom");
+        ImVec4(1, 1, 0, 0.8f),
+        pickingLidar  ? "LiDAR intensity image: Shift+Alt+click to pick a LiDAR point"
+            : picking ? "Shift+click to pick a pixel | add Alt to pick a LiDAR point"
+                      : "Scroll: zoom | Drag: pan with middle | Dbl-click: reset zoom");
 
     ImGui::BeginChild("image_scroll", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
@@ -207,7 +222,10 @@ void UI::drawImageView(AppState& state)
             if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
             {
                 ImVec2 p = screenToImg(io.MousePos);
-                state.setPendingImagePoint(std::clamp(p.x, 0.f, imgW), std::clamp(p.y, 0.f, imgH));
+                if (pickingLidar)
+                    state.pickLidarPointAtPixel(p.x, p.y);
+                else
+                    state.setPendingImagePoint(std::clamp(p.x, 0.f, imgW), std::clamp(p.y, 0.f, imgH));
             }
         }
         else if (ImGui::IsMouseDragging(ImGuiMouseButton_Middle))
@@ -270,6 +288,29 @@ void UI::drawImageView(AppState& state)
             ImVec2 s = imgToScreen(ImVec2(state.pairs[state.selectedPairIndex].u, state.pairs[state.selectedPairIndex].v));
             dl->AddLine(ImVec2(s.x - 18, s.y), ImVec2(s.x + 18, s.y), IM_COL32(255, 0, 255, 255), 2.f);
             dl->AddLine(ImVec2(s.x, s.y - 18), ImVec2(s.x, s.y + 18), IM_COL32(255, 0, 255, 255), 2.f);
+        }
+
+        // In the intensity image, also the LiDAR side of each pair,
+        // projected through the current calibration (cyan squares).
+        if (pickingLidar)
+        {
+            const Intrinsics K = state.displayIntrinsics();
+            const Eigen::Matrix3f R_wc = omFiKaToMat3(state.extrinsics.om, state.extrinsics.fi, state.extrinsics.ka);
+            const Eigen::Vector3f C(state.extrinsics.tx, state.extrinsics.ty, state.extrinsics.tz);
+            auto lidarMarker = [&](float x, float y, float z, ImU32 color, const char* label)
+            {
+                float u, v, depth;
+                if (!projectPoint(x, y, z, K, R_wc, C, u, v, depth))
+                    return;
+                ImVec2 s = imgToScreen(ImVec2(u, v));
+                dl->AddRect(ImVec2(s.x - 6, s.y - 6), ImVec2(s.x + 6, s.y + 6), color, 0.f, 0, 2.f);
+                if (label)
+                    dl->AddText(ImVec2(s.x + 8, s.y - 8), color, label);
+            };
+            for (size_t i = 0; i < state.pairs.size(); i++)
+                lidarMarker(state.pairs[i].px, state.pairs[i].py, state.pairs[i].pz, IM_COL32(0, 255, 255, 255), std::to_string(i).c_str());
+            if (state.pendingHasCloud)
+                lidarMarker(state.pendingPair.px, state.pendingPair.py, state.pendingPair.pz, IM_COL32(255, 140, 0, 255), nullptr);
         }
     }
 
@@ -653,7 +694,9 @@ void UI::panelVisualization(AppState& state)
 // ControlPoints::imgui (core/src/control_points.cpp).
 void UI::panelCorrespondences(AppState& state)
 {
-    ImGui::TextWrapped("Hold Shift and click a point in the Image View or the 3D View. Picking both sides completes a pair.");
+    ImGui::TextWrapped(
+        "Shift+click the pixel in the Image View, and the LiDAR point in the 3D View -- or Shift+Alt+click it in the Image View, "
+        "which shows the LiDAR intensity image while both are held. Picking both sides completes a pair.");
 
     ImGui::Text("Pending pair:");
     ImGui::SameLine();

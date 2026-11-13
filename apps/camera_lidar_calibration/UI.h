@@ -25,6 +25,11 @@ private:
     float imgZoom = 1.f; // 1 = actual size (1 image px = 1 screen px)
     int lastImgW = 0, lastImgH = 0; // detects a newly-loaded image, to reset imgZoom
 
+    //! Alt's colour-mode toggle fires on release, and only when Shift was not
+    //! part of the chord (Shift+Alt picks in the LiDAR intensity image).
+    bool altWasDown = false;
+    bool altChorded = false;
+
     void drawImageView(AppState& state);
     void panelMenuBar(AppState& state);
     void panelFiles(AppState& state);

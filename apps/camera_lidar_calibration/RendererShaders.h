@@ -146,6 +146,7 @@ uniform float xi;          // CameraModel::Mei only
 uniform float thetaMax;    // calib::fisheyeMaxTheta, CameraModel::Fisheye only
 uniform float pointSize;
 uniform int drawDecim;     // draw only every Nth point; 1 = draw all
+uniform vec2 depthRange;   // shared with kProjFS
 out float fragDepth;
 out float fragIntensity;
 void main() {
@@ -196,10 +197,15 @@ void main() {
     }
     vec2 uv = K.xy * d + K.zw;                     // pixel coords
 
+    // Depth across depthRange, for the LiDAR intensity image's depth test
+    // (the only pass that enables one). Clamped so it never clips a point
+    // kProjFS would keep -- kProjFS discards out-of-range depths itself.
+    float z = clamp(2.0 * (fragDepth - depthRange.x) / max(depthRange.y - depthRange.x, 1e-6) - 1.0, -1.0, 1.0);
+
     // pixel -> clip space (y down, like raylib's render-texture ortho)
     gl_Position = vec4((2.0*uv.x/imgSize.x - 1.0) * w,
                        -(2.0*uv.y/imgSize.y - 1.0) * w,
-                       0.0,
+                       z * w,
                        w);
     gl_PointSize = pointSize;
 }

@@ -7,11 +7,13 @@
 #include <RaylibWidgets/CompassRuler.h>
 #include <RaylibWidgets/PointPicking.h>
 #include <RaylibWidgets/WindowFit.h>
+#include <algorithm>
 #include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
+#include <limits>
 #include <nlohmann/json.hpp>
 #include <opencv2/calib3d.hpp>
 #include <opencv2/imgcodecs.hpp>
@@ -108,7 +110,7 @@ void AppState::setPendingImagePoint(float u, float v)
     }
     else
     {
-        statusMsg = "Image point set -- Shift+click the matching point in the 3D View";
+        statusMsg = "Image point set -- Shift+click the matching point in the 3D View, or Shift+Alt+click it in the Image View";
     }
 }
 
@@ -137,6 +139,69 @@ void AppState::clearPending()
     pendingPair = CorrespondencePair{};
     pendingHasImage = pendingHasCloud = false;
     statusMsg = "Pending pick cleared";
+}
+
+Intrinsics AppState::displayIntrinsics() const
+{
+    Intrinsics K = intrinsics;
+    if (imageRectified)
+    {
+        K.k1 = K.k2 = K.k3 = K.k4 = K.k5 = K.k6 = 0.f;
+        K.p1 = K.p2 = 0.f;
+    }
+    return K;
+}
+
+bool AppState::pickLidarPointAtPixel(float u, float v)
+{
+    if (cloud.empty())
+    {
+        statusMsg = "No point cloud loaded";
+        return false;
+    }
+
+    // Same projection, depth range and decimation as the GPU pass that drew
+    // the intensity image (Renderer::renderImageOverlay), so the pick is the
+    // point under the cursor. Points are square splats, pointSize px wide.
+    const Intrinsics K = displayIntrinsics();
+    const Eigen::Matrix3f R_wc = omFiKaToMat3(extrinsics.om, extrinsics.fi, extrinsics.ka);
+    const Eigen::Vector3f C(extrinsics.tx, extrinsics.ty, extrinsics.tz);
+    const float half = std::max(vizParams.pointSize, 1.f) * 0.5f;
+    constexpr float kNearbyPx = 8.f;
+
+    long covering = -1, nearby = -1;
+    float coveringDepth = std::numeric_limits<float>::max();
+    float nearbyDist2 = kNearbyPx * kNearbyPx;
+    for (size_t i = 0; i < cloud.points.size(); ++i)
+    {
+        if (!Renderer::isPointDrawn(i, vizParams.drawDecim))
+            continue;
+        const auto& p = cloud.points[i];
+        float pu, pv, depth;
+        if (!projectPoint(p.x, p.y, p.z, K, R_wc, C, pu, pv, depth) || depth < vizParams.depthMin || depth > vizParams.depthMax)
+            continue;
+        const float du = pu - u, dv = pv - v;
+        if (std::fabs(du) <= half && std::fabs(dv) <= half && depth < coveringDepth)
+        {
+            covering = static_cast<long>(i);
+            coveringDepth = depth;
+        }
+        if (du * du + dv * dv < nearbyDist2)
+        {
+            nearby = static_cast<long>(i);
+            nearbyDist2 = du * du + dv * dv;
+        }
+    }
+
+    const long hit = covering >= 0 ? covering : nearby;
+    if (hit < 0)
+    {
+        statusMsg = "No LiDAR point at that pixel";
+        return false;
+    }
+    const auto& p = cloud.points[static_cast<size_t>(hit)];
+    setPendingCloudPoint(p.x, p.y, p.z);
+    return true;
 }
 
 void AppState::removePair(int index)
@@ -791,6 +856,13 @@ static bool shiftHeld()
     return IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
 }
 
+// Alt on top of Shift turns the Image View into the LiDAR intensity image,
+// to pick the LiDAR point there instead of the pixel.
+static bool altHeld()
+{
+    return IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT);
+}
+
 // Loads one dropped file by extension -- the same extension -> action mapping as main.cpp's
 // preloadByExt(), but applied immediately (the window is already running) instead of queued for
 // App::run()'s startup pass. `sawCloud` tracks whether a *.laz/*.las has already landed in this
@@ -949,8 +1021,9 @@ void App::draw()
     float viewH = (float)GetScreenHeight() - menuBarH;
 
     // ── Image + projection overlay (GPU, into render texture)
-    // Hide the projected-point overlay while Shift is held (picking mode)
-    // so it doesn't obscure the pixel the user is aiming for.
+    // Shift (picking a pixel) hides the projected points so they don't
+    // obscure the pixel the user is aiming for; Shift+Alt (picking a LiDAR
+    // point) shows those points alone, as an intensity image.
     if (state.imageLoaded)
         state.renderer.renderImageOverlay(
             state.imageTexture,
@@ -960,7 +1033,9 @@ void App::draw()
             state.extrinsics,
             !state.imageRectified,
             state.vizParams,
-            !shiftHeld());
+            !shiftHeld()    ? ImageOverlay::Points
+                : altHeld() ? ImageOverlay::LidarIntensity
+                            : ImageOverlay::None);
 
     // ── 3D scene renders as the raylib background, filling the whole view
     BeginDrawing();

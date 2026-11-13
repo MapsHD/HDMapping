@@ -100,6 +100,14 @@ struct AppState
     void setPendingImagePoint(float u, float v); // completes the pair if a cloud point is already pending
     void setPendingCloudPoint(float px, float py, float pz); // completes the pair if an image point is already pending
     void clearPending(); // discards the in-progress pending pick, if any
+    //! Makes the LiDAR point drawn at pixel (u, v) of the Image View's
+    //! intensity image (Shift+Alt) the pending cloud point: the nearest one
+    //! whose splat covers the pixel, else the closest within a few pixels.
+    //! @return false, with the reason in statusMsg, when there is none
+    bool pickLidarPointAtPixel(float u, float v);
+    //! `intrinsics` as the displayed image needs them: distortion zeroed when
+    //! the image is rectified.
+    Intrinsics displayIntrinsics() const;
     void removePair(int index);
     bool solvePairs(); // solves extrinsics from `pairs`, updates statusMsg
 

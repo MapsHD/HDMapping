@@ -446,12 +446,16 @@ void drawMiniCompassWithRuler()
     // Rows 0/1 of the world-to-eye rotation are the world directions of screen right/up.
     const Eigen::Matrix3f& R = viewLocal.rotation();
     Color rulerColor = ColorFromNormalized(Vector4{ 1.0f - bg_color.x, 1.0f - bg_color.y, 1.0f - bg_color.z, 1.0f });
+    // Stay above ImGui bars docked to the bottom edge (BeginViewportSideBar).
+    const ImGuiViewport* vp = ImGui::GetMainViewport();
+    const float bottomInset = std::max(0.f, (vp->Pos.y + vp->Size.y) - (vp->WorkPos.y + vp->WorkSize.y));
     raylib_widgets::drawCompassRuler(
         Vector3{ R(0, 0), R(0, 1), R(0, 2) },
         Vector3{ R(1, 0), R(1, 1), R(1, 2) },
         camera.euler.translate.z,
         rulerColor,
-        raylib_widgets::CompassAxisLabels{ "X (long.)", "Y (lat.)", "Z (vert.)" });
+        raylib_widgets::CompassAxisLabels{ "X (long.)", "Y (lat.)", "Z (vert.)" },
+        bottomInset);
 }
 
 void draw_ellipse(const Eigen::Affine3d& transform, Eigen::Vector3f color)

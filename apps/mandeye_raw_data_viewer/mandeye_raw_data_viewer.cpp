@@ -20,12 +20,15 @@
 #include <Core/raylib_utils.hpp>
 #include <Core/transformations.h>
 
+#include <RaylibWidgets/Timeline.h>
+
 #include <Eigen/Eigen>
 
 #include "../lidar_odometry_step_1/lidar_odometry.h"
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
 #include <algorithm>
 #include <cmath>
+#include <ctime>
 #include <filesystem>
 
 #include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
@@ -97,6 +100,13 @@ bool fusionConventionNed = false;
 int number_of_points_threshold = 20000;
 bool is_init = false;
 int index_rendered_points_local = -1;
+
+// Playback bar (bottom of the window). The playhead is a time in seconds since the
+// first chunk's start; index_rendered_points_local follows it while playing/scrubbing.
+double playhead_sec = 0.0;
+bool playback_playing = false;
+float playback_speed = 1.0f;
+int playhead_index = -1; //!< chunk the playhead last matched; another index means it was picked elsewhere
 // std::vector<std::vector<Point3Di>> all_points_local;
 // std::vector<std::vector<Point3Di>> all_points_local;
 // std::vector<std::vector<int>> all_lidar_ids;
@@ -887,7 +897,7 @@ std::vector<std::pair<Eigen::Vector3d, Eigen::Matrix3d>> get_mean_cov()
 
 // Re-chunks the already-loaded points (g_points_per_file / g_timestamps_cache / g_poses_cache)
 // into all_data using the current number_of_points_threshold. Smaller thresholds mean each
-// Index step in the toolbar covers less time, giving finer time navigation.
+// Index step in the playback bar covers less time, giving finer time navigation.
 void rebuildAllData(bool preserve_position)
 {
     double preserved_time = 0.0;
@@ -1006,6 +1016,11 @@ void rebuildAllData(bool preserve_position)
         is_init = false;
         index_rendered_points_local = -1;
     }
+
+    // re-anchor the playhead on the (re)selected chunk; a new dataset starts paused
+    playhead_index = -1;
+    if (!preserve_position)
+        playback_playing = false;
 }
 
 void loadFiles(std::vector<std::string> input_file_names)
@@ -1378,7 +1393,7 @@ void settings_gui()
         {
             ImGui::BeginTooltip();
             ImGui::Text("Max number of points per rendered chunk (one 'Index' step).");
-            ImGui::Text("Lower = shorter time span per chunk = finer time navigation with the Index slider.");
+            ImGui::Text("Lower = shorter time span per chunk = finer time navigation in the playback bar.");
             ImGui::EndTooltip();
         }
         ImGui::BeginDisabled(!is_init);
@@ -1534,6 +1549,170 @@ void settings_gui()
         }
     }
 
+    ImGui::End();
+}
+
+//! Absolute LiDAR time of chunk `i`'s first point [s].
+static double chunkStartSec(int i)
+{
+    return all_data[i].points_local.front().timestamp;
+}
+
+//! Time the playback bar spans [s]: from the first chunk's start to the last chunk's last point.
+static double playbackDurationSec()
+{
+    return std::max(0.0, all_data.back().points_local.back().timestamp - chunkStartSec(0));
+}
+
+//! Chunk shown at the playhead: the last one starting at or before it.
+//! @param t time since the first chunk's start [s]
+static int chunkAtSec(double t)
+{
+    const double abs_t = chunkStartSec(0) + t;
+    const auto it = std::upper_bound(
+        all_data.begin(),
+        all_data.end(),
+        abs_t,
+        [](double lhs, const AllData& rhs)
+        {
+            return lhs < rhs.points_local.front().timestamp;
+        });
+    return std::max(0, static_cast<int>(std::distance(all_data.begin(), it)) - 1);
+}
+
+//! "YYYY-MM-DD HH:MM:SS.mmm UTC" for a Unix-epoch time; empty when `sec` is not one.
+//! LiDARs synced to PTP/GNSS count from 1970; unsynced ones count from power-on, which
+//! stays far below the year-2000 cutoff.
+static std::string epochToUtcString(double sec)
+{
+    if (!(sec >= 946684800.0 && sec < 4102444800.0)) // 2000-01-01 .. 2100-01-01
+        return {};
+    const long long totalMs = std::llround(sec * 1000.0);
+    const std::time_t whole = static_cast<std::time_t>(totalMs / 1000);
+    std::tm tm{};
+#ifdef _WIN32
+    gmtime_s(&tm, &whole);
+#else
+    gmtime_r(&whole, &tm);
+#endif
+    char buf[48];
+    const size_t n = std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &tm);
+    std::snprintf(buf + n, sizeof(buf) - n, ".%03d UTC", static_cast<int>(totalMs % 1000));
+    return buf;
+}
+
+//! Plays or pauses, replaying from the start once the end was reached -- shared by the
+//! Play/Pause button and Space.
+static void togglePlayback()
+{
+    if (!playback_playing && playhead_sec >= playbackDurationSec())
+    {
+        playhead_sec = 0.0;
+        index_rendered_points_local = 0;
+        playhead_index = 0;
+    }
+    playback_playing = !playback_playing;
+}
+
+//! Re-anchors the playhead on a chunk picked elsewhere (arrow keys, index field, Rebin),
+//! handles Space and advances the playhead while playing. Needs a valid index_rendered_points_local.
+static void updatePlayback()
+{
+    const ImGuiIO& io = ImGui::GetIO();
+    if (index_rendered_points_local != playhead_index)
+        playhead_sec = chunkStartSec(index_rendered_points_local) - chunkStartSec(0);
+
+    if (!io.WantTextInput && ImGui::IsKeyPressed(ImGuiKey_Space, false))
+        togglePlayback();
+
+    if (playback_playing)
+    {
+        const double duration = playbackDurationSec();
+        playhead_sec += io.DeltaTime * playback_speed;
+        if (playhead_sec >= duration)
+        {
+            playhead_sec = duration;
+            playback_playing = false;
+        }
+        index_rendered_points_local = chunkAtSec(playhead_sec);
+    }
+    playhead_index = index_rendered_points_local;
+}
+
+//! Bar along the bottom of the window: Play/Pause, playhead time, speed, chunk index,
+//! chunk timestamp and a scrubbable timeline.
+static void playbackBar()
+{
+    const ImGuiStyle& style = ImGui::GetStyle();
+    const float timelineH = 18.f + ImGui::GetTextLineHeight();
+    const float barH = style.WindowPadding.y * 2.f + ImGui::GetFrameHeight() + style.ItemSpacing.y + timelineH;
+    // NoNav: Space must not also press a focused bar button, and the arrows keep stepping chunks.
+    if (ImGui::BeginViewportSideBar(
+            "##playback",
+            ImGui::GetMainViewport(),
+            ImGuiDir_Down,
+            barH,
+            ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNav))
+    {
+        const double duration = playbackDurationSec();
+
+        if (ImGui::Button(playback_playing ? "Pause" : "Play", ImVec2(60.f, 0.f)))
+            togglePlayback();
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Space");
+        ImGui::SameLine();
+        ImGui::Text("%7.1f / %.1f s", playhead_sec, duration);
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(160.f);
+        ImGui::SliderFloat("Speed", &playback_speed, 0.1f, 50.f, "%.1fx", ImGuiSliderFlags_Logarithmic);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Playback rate, as a multiple of real time (Ctrl+click to type)");
+
+        ImGui::SameLine();
+        ImGui::Dummy(ImVec2(20, 0));
+        ImGui::SameLine();
+        ImGui::TextUnformatted("Index:");
+        ImGui::SameLine();
+        int tempIndex = index_rendered_points_local;
+        ImGui::SetNextItemWidth(ImGuiNumberWidth);
+        if (ImGui::InputInt("##irpli", &tempIndex, 1, 10))
+            index_rendered_points_local = std::clamp(tempIndex, 0, static_cast<int>(all_data.size()) - 1);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", laz_files[indexes_to_filename[index_rendered_points_local]].c_str());
+        ImGui::SameLine();
+        ImGui::Text("/ %d", static_cast<int>(all_data.size()) - 1);
+
+        ImGui::SameLine();
+        ImGui::Dummy(ImVec2(20, 0));
+        ImGui::SameLine();
+        const double ts = chunkStartSec(index_rendered_points_local);
+        const std::string utc = epochToUtcString(ts);
+        if (utc.empty())
+            ImGui::Text("Timestamp: %.6f [s]", ts);
+        else
+            ImGui::Text("Timestamp: %s", utc.c_str());
+        if (ImGui::IsItemHovered())
+        {
+            if (utc.empty())
+                ImGui::SetTooltip("Click to copy to clipboard");
+            else
+                ImGui::SetTooltip("%.6f [s] since 1970-01-01 UTC\nClick to copy to clipboard", ts);
+        }
+        if (ImGui::IsItemClicked())
+        {
+            char tmp[64];
+            snprintf(tmp, sizeof(tmp), "%.6f", ts);
+            ImGui::SetClipboardText(tmp);
+        }
+
+        float progress = duration > 0.0 ? static_cast<float>(playhead_sec / duration) : 0.f;
+        if (raylib_widgets::timeline("##timeline", progress, duration, timelineH))
+        {
+            playhead_sec = progress * duration;
+            index_rendered_points_local = chunkAtSec(playhead_sec);
+            playhead_index = index_rendered_points_local;
+        }
+    }
     ImGui::End();
 }
 
@@ -1770,6 +1949,8 @@ void display()
             index_rendered_points_local = 0;
         if (index_rendered_points_local >= all_data.size())
             index_rendered_points_local = all_data.size() - 1;
+
+        updatePlayback();
     }
 
     // ask to load the nearest photo
@@ -1906,55 +2087,6 @@ void display()
         ImGui::SameLine();
         ImGui::Dummy(ImVec2(20, 0));
         ImGui::SameLine();
-
-        if (all_data.size() > 0)
-        {
-            int tempIndex = index_rendered_points_local;
-            ImGui::Text("Index: ");
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Index of rendered points local");
-            ImGui::SameLine();
-            ImGui::PushItemWidth(ImGuiNumberWidth);
-            ImGui::SliderInt("##irpls", &tempIndex, 0, static_cast<int>(all_data.size() - 1));
-            if (ImGui::IsItemHovered())
-            {
-                ImGui::BeginTooltip();
-                std::string fn = laz_files[indexes_to_filename[index_rendered_points_local]];
-                ImGui::Text(fn.c_str());
-                ImGui::EndTooltip();
-            }
-            ImGui::SameLine();
-            ImGui::InputInt("##irpli", &tempIndex, 1, 10);
-            if (ImGui::IsItemHovered())
-            {
-                ImGui::BeginTooltip();
-                std::string fn = laz_files[indexes_to_filename[index_rendered_points_local]];
-                ImGui::Text(fn.c_str());
-                ImGui::EndTooltip();
-            }
-            ImGui::PopItemWidth();
-
-            if ((tempIndex >= 0) && (tempIndex < all_data.size()))
-                index_rendered_points_local = tempIndex;
-
-            ImGui::SameLine();
-            double ts = all_data[index_rendered_points_local].points_local[0].timestamp; // * 1e9;
-            ImGui::Text("Timestamp: %.6f [ns]", ts);
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Click to copy to clipboard");
-            if (ImGui::IsItemClicked())
-            {
-                char tmp[64];
-                snprintf(tmp, sizeof(tmp), "%.6f", ts);
-                ImGui::SetClipboardText(tmp);
-            }
-
-            ImGui::SameLine();
-            ImGui::Dummy(ImVec2(20, 0));
-            ImGui::SameLine();
-        }
-
-        ImGui::SameLine();
         ImGui::Text("(%.1f FPS)", ImGui::GetIO().Framerate);
 
         ImGui::SameLine(
@@ -1974,6 +2106,9 @@ void display()
 
         ImGui::EndMainMenuBar();
     }
+
+    if (!all_data.empty())
+        playbackBar();
 
     info_window(infoLines, appShortcuts);
 

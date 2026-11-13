@@ -22,8 +22,10 @@ namespace raylib_widgets
     // or the first two rows of a world-to-eye rotation matrix).
     // zoomDistance: current camera distance/zoom, used to size the ruler.
     // rulerColor: contrast color for the ruler ticks/label (axis lines are
-    // always drawn in RGB = X/Y/Z). Call after 3D drawing ends (2D screen-space
-    // overlay).
-    void drawCompassRuler(Vector3 right, Vector3 up, float zoomDistance, Color rulerColor, CompassAxisLabels labels = {});
+    // always drawn in RGB = X/Y/Z). bottomInset: screen pixels to keep clear
+    // along the bottom edge (e.g. a bottom toolbar). Call after 3D drawing ends
+    // (2D screen-space overlay).
+    void drawCompassRuler(
+        Vector3 right, Vector3 up, float zoomDistance, Color rulerColor, CompassAxisLabels labels = {}, float bottomInset = 0.f);
 
 } // namespace raylib_widgets

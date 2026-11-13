@@ -377,3 +377,85 @@ void Renderer::drawAxes(float len)
     DrawLine3D({ 0, 0, 0 }, { 0, len, 0 }, GREEN); // Y (= LiDAR Z = up)
     DrawLine3D({ 0, 0, 0 }, { 0, 0, -len }, BLUE); // Z (= LiDAR Y)
 }
+
+// ── Sensor models ─────────────────────────────────────────────────────────────
+// Dimensions in millimetres, read off the Livox Mid-360 and Insta360 X5 CAD
+// models.
+namespace
+{
+    //! Pushes a local frame posed at (R, t) in the LiDAR frame onto the
+    //! matrix stack, with local lengths in millimetres. Pair with
+    //! rlPopMatrix().
+    //! @param R local axes in the LiDAR frame
+    //! @param t local origin in the LiDAR frame, metres
+    void pushPoseMm(const Eigen::Matrix3f& R, const Eigen::Vector3f& t)
+    {
+        Eigen::Matrix3f lidarToRaylib; // (x, y, z) -> (x, z, -y)
+        lidarToRaylib << 1.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f, -1.f, 0.f;
+        const Eigen::Matrix3f M = lidarToRaylib * R * 0.001f;
+        const Eigen::Vector3f T = lidarToRaylib * t;
+        const Matrix m = { M(0, 0), M(0, 1), M(0, 2), T(0), M(1, 0), M(1, 1), M(1, 2), T(1),
+                           M(2, 0), M(2, 1), M(2, 2), T(2), 0.f,     0.f,     0.f,     1.f };
+        rlPushMatrix();
+        rlMultMatrixf(MatrixToFloat(m));
+    }
+
+    void box(Vector3 lo, Vector3 hi, Color fill, Color edge)
+    {
+        const Vector3 centre = Vector3Scale(Vector3Add(lo, hi), 0.5f);
+        const Vector3 size = Vector3Subtract(hi, lo);
+        DrawCubeV(centre, size, fill);
+        DrawCubeWiresV(centre, size, edge);
+    }
+
+    void circleZ(float z, float r, Color color)
+    {
+        constexpr int kSegments = 32;
+        for (int i = 0; i < kSegments; ++i)
+        {
+            const float a0 = 2.f * PI * i / kSegments, a1 = 2.f * PI * (i + 1) / kSegments;
+            DrawLine3D({ r * cosf(a0), r * sinf(a0), z }, { r * cosf(a1), r * sinf(a1), z }, color);
+        }
+    }
+
+    //! Solid cone frustum along local z, outlined at both ends.
+    void coneZ(float z0, float z1, float r0, float r1, Color fill, Color edge)
+    {
+        DrawCylinderEx({ 0.f, 0.f, z0 }, { 0.f, 0.f, z1 }, r0, r1, 32, fill);
+        circleZ(z0, r0, edge);
+        circleZ(z1, r1, edge);
+    }
+} // namespace
+
+void Renderer::drawLidarModel()
+{
+    const Color body = { 150, 150, 155, 255 }, bodyEdge = { 70, 70, 75, 255 };
+    const Color connector = { 95, 95, 100, 255 };
+    const Color window = { 40, 40, 45, 255 }, windowEdge = { 120, 120, 125, 255 };
+
+    pushPoseMm(Eigen::Matrix3f::Identity(), Eigen::Vector3f::Zero());
+    box({ -32.5f, -32.5f, -26.f }, { 32.5f, 32.5f, 1.f }, body, bodyEdge);
+    box({ -40.f, -10.f, -21.f }, { -32.5f, 10.f, -4.f }, connector, bodyEdge);
+    coneZ(1.f, 4.f, 31.f, 31.f, body, bodyEdge);
+    coneZ(4.f, 14.f, 25.5f, 25.5f, window, windowEdge);
+    coneZ(14.f, 34.f, 25.5f, 15.f, window, windowEdge);
+    rlPopMatrix();
+}
+
+void Renderer::drawCameraModel(const Extrinsics& E)
+{
+    const Color body = { 70, 70, 75, 255 }, bodyEdge = { 150, 150, 155, 255 };
+    const Color glass = { 25, 25, 30, 255 };
+
+    // Local frame = the optical frame (x right, y down, z forward). The X5's
+    // optical centre sits midway between its two lenses, with the body
+    // running down the image.
+    pushPoseMm(omFiKaToMat3(E.om, E.fi, E.ka), Eigen::Vector3f(E.tx, E.ty, E.tz));
+    box({ -23.f, -21.5f, -12.5f }, { 23.f, 103.f, 12.5f }, body, bodyEdge);
+    for (const float side : { 1.f, -1.f })
+    {
+        coneZ(side * 12.5f, side * 15.f, 17.f, 17.f, body, side > 0.f ? YELLOW : bodyEdge);
+        DrawSphereEx({ 0.f, 0.f, side * 8.f }, 12.5f, 12, 24, glass);
+    }
+    rlPopMatrix();
+}

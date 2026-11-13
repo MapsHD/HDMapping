@@ -639,6 +639,12 @@ void UI::panelVisualization(AppState& state)
     ImGui::PopItemWidth();
 
     ImGui::Checkbox("Show compass/ruler (C)", &state.showCompassRuler);
+    ImGui::Checkbox("Lidar model", &state.showLidarModel);
+    ImGui::SameLine();
+    ImGui::Checkbox("Camera model", &state.showCameraModel);
+    helpMarker(
+        "Simplified, real-size Livox Mid-360 at the LiDAR origin (connector at the back, -x) and\nInsta360 X5 at the camera pose. "
+        "The yellow ring marks the lens these extrinsics describe.\nZoom in on the LiDAR origin to see them.");
 }
 
 // ── Correspondences ──────────────────────────────────────────────────────────

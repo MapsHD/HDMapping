@@ -23,6 +23,13 @@ struct VisualizationParams
 
 Color jetColor(float t); // t in [0,1]
 
+//! Camera hardware Renderer::drawCameraModel draws at the camera pose.
+enum class CameraBody
+{
+    Insta360X5, //!< dual-fisheye body, optical centre midway between its lenses
+    PcbCamera, //!< bare board camera in the Raspberry Pi camera format: 25 x 24 mm board, lens module, connector at the bottom
+};
+
 //! What Renderer::renderImageOverlay draws into the Image View.
 enum class ImageOverlay
 {
@@ -87,10 +94,10 @@ public:
     //! current BeginMode3D context; its connector marks the back (-x).
     void drawLidarModel();
 
-    //! Draws a simplified, real-size Insta360 X5 body at the camera pose in
-    //! the current BeginMode3D context. The lens these extrinsics describe
-    //! (optical +z) is ringed in the frustum's yellow.
-    void drawCameraModel(const Extrinsics& E);
+    //! Draws a simplified, real-size camera at the camera pose in the current
+    //! BeginMode3D context. The lens these extrinsics describe (optical +z) is
+    //! ringed in the frustum's yellow.
+    void drawCameraModel(const Extrinsics& E, CameraBody body);
 
 private:
     int texW = 0, texH = 0;

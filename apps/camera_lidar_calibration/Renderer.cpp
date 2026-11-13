@@ -442,6 +442,42 @@ namespace
         circleZ(z0, r0, edge);
         circleZ(z1, r1, edge);
     }
+
+    //! In the optical frame: the X5's optical centre sits midway between its
+    //! two lenses, with the body running down the image.
+    void drawInsta360X5()
+    {
+        const Color body = { 70, 70, 75, 255 }, bodyEdge = { 150, 150, 155, 255 };
+        const Color glass = { 25, 25, 30, 255 };
+
+        box({ -23.f, -21.5f, -12.5f }, { 23.f, 103.f, 12.5f }, body, bodyEdge);
+        for (const float side : { 1.f, -1.f })
+        {
+            coneZ(side * 12.5f, side * 15.f, 17.f, 17.f, body, side > 0.f ? YELLOW : bodyEdge);
+            DrawSphereEx({ 0.f, 0.f, side * 8.f }, 12.5f, 12, 24, glass);
+        }
+    }
+
+    //! In the optical frame: a Raspberry Pi format camera board (IMX519-style
+    //! autofocus module). The sensor sits ~4.3 mm (the lens' focal length)
+    //! behind the optical centre; the lens is 9.5 mm below the board's top
+    //! edge, the ribbon connector on the back at the bottom.
+    void drawPcbCamera()
+    {
+        const Color pcb = { 20, 110, 60, 255 }, pcbEdge = { 140, 200, 160, 255 };
+        const Color module = { 35, 35, 40, 255 }, moduleEdge = { 130, 130, 135, 255 };
+        const Color pad = { 200, 170, 80, 255 }, connector = { 60, 60, 60, 255 };
+        const Color glass = { 15, 15, 20, 255 };
+        constexpr float kSensorZ = -4.3f, kPcbT = 1.f;
+
+        box({ -12.5f, -9.5f, kSensorZ - kPcbT }, { 12.5f, 14.5f, kSensorZ }, pcb, pcbEdge);
+        for (const float x : { -10.5f, 10.5f })
+            for (const float y : { -7.5f, 5.f })
+                DrawCylinderEx({ x, y, kSensorZ - kPcbT - 0.05f }, { x, y, kSensorZ + 0.05f }, 1.2f, 1.2f, 12, pad);
+        box({ -10.5f, 10.f, kSensorZ - kPcbT - 3.f }, { 10.5f, 14.f, kSensorZ - kPcbT }, connector, moduleEdge);
+        box({ -4.25f, -4.25f, kSensorZ }, { 4.25f, 4.25f, 1.5f }, module, moduleEdge);
+        coneZ(1.5f, 2.2f, 2.5f, 2.5f, glass, YELLOW);
+    }
 } // namespace
 
 void Renderer::drawLidarModel()
@@ -459,20 +495,19 @@ void Renderer::drawLidarModel()
     rlPopMatrix();
 }
 
-void Renderer::drawCameraModel(const Extrinsics& E)
+void Renderer::drawCameraModel(const Extrinsics& E, CameraBody body)
 {
-    const Color body = { 70, 70, 75, 255 }, bodyEdge = { 150, 150, 155, 255 };
-    const Color glass = { 25, 25, 30, 255 };
-
-    // Local frame = the optical frame (x right, y down, z forward). The X5's
-    // optical centre sits midway between its two lenses, with the body
-    // running down the image.
+    // Local frame = the optical frame (x right, y down, z forward), origin at
+    // the optical centre.
     pushPoseMm(omFiKaToMat3(E.om, E.fi, E.ka), Eigen::Vector3f(E.tx, E.ty, E.tz));
-    box({ -23.f, -21.5f, -12.5f }, { 23.f, 103.f, 12.5f }, body, bodyEdge);
-    for (const float side : { 1.f, -1.f })
+    switch (body)
     {
-        coneZ(side * 12.5f, side * 15.f, 17.f, 17.f, body, side > 0.f ? YELLOW : bodyEdge);
-        DrawSphereEx({ 0.f, 0.f, side * 8.f }, 12.5f, 12, 24, glass);
+    case CameraBody::Insta360X5:
+        drawInsta360X5();
+        break;
+    case CameraBody::PcbCamera:
+        drawPcbCamera();
+        break;
     }
     rlPopMatrix();
 }

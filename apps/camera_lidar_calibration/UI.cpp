@@ -684,8 +684,22 @@ void UI::panelVisualization(AppState& state)
     ImGui::SameLine();
     ImGui::Checkbox("Camera model", &state.showCameraModel);
     helpMarker(
-        "Simplified, real-size Livox Mid-360 at the LiDAR origin (connector at the back, -x) and\nInsta360 X5 at the camera pose. "
-        "The yellow ring marks the lens these extrinsics describe.\nZoom in on the LiDAR origin to see them.");
+        "Simplified, real-size Livox Mid-360 at the LiDAR origin (connector at the back, -x) and\n"
+        "the camera body below at the camera pose. The yellow ring marks the lens these extrinsics describe.\n"
+        "Zoom in on the LiDAR origin to see them.");
+
+    // Order matches CameraBody's enumerators.
+    const char* bodies[] = { "Insta360 X5", "PCB camera" };
+    int body = static_cast<int>(state.cameraBody);
+    ImGui::BeginDisabled(!state.showCameraModel);
+    ImGui::PushItemWidth(-140.f);
+    if (ImGui::Combo("Camera body", &body, bodies, IM_ARRAYSIZE(bodies)))
+        state.cameraBody = static_cast<CameraBody>(body);
+    ImGui::PopItemWidth();
+    ImGui::EndDisabled();
+    helpMarker(
+        "PCB camera: a bare board in the Raspberry Pi camera format (25 x 24 mm, e.g. an IMX519\n"
+        "module), ribbon connector at the bottom of the image.");
 }
 
 // ── Correspondences ──────────────────────────────────────────────────────────

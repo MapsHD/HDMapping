@@ -1062,7 +1062,7 @@ void App::draw()
     if (state.showLidarModel)
         state.renderer.drawLidarModel();
     if (state.showCameraModel)
-        state.renderer.drawCameraModel(state.extrinsics);
+        state.renderer.drawCameraModel(state.extrinsics, state.cameraBody);
 
     // Grid on ground plane
     DrawGrid(20, 1.f);

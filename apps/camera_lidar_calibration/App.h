@@ -59,9 +59,10 @@ struct AppState
     VisualizationParams vizParams;
     bool showCompassRuler = true;
     //! Simplified real-size sensor models in the 3D view: a Mid-360 at the
-    //! LiDAR origin, an Insta360 X5 at the camera pose.
+    //! LiDAR origin, cameraBody at the camera pose.
     bool showLidarModel = true;
     bool showCameraModel = true;
+    CameraBody cameraBody = CameraBody::Insta360X5;
 
     // ── 3D camera ─────────────────────────────────────────────────────────────
     OrbitCamera orbit;

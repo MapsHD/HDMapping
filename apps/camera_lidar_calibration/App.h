@@ -89,6 +89,9 @@ struct AppState
     // disables the tx/ty/tz drag sliders in the Extrinsics panel so they
     // can't be nudged by accident while locked.
     bool lockTranslation = false;
+    //! Rotation counterpart of lockTranslation: the solve refines tx/ty/tz
+    //! only and the om/fi/ka sliders are disabled.
+    bool lockRotation = false;
 
     void setPendingImagePoint(float u, float v); // completes the pair if a cloud point is already pending
     void setPendingCloudPoint(float px, float py, float pz); // completes the pair if an image point is already pending

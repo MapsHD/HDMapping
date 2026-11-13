@@ -152,15 +152,21 @@ namespace calib
         Extrinsics& extrinsicsInOut,
         std::string& errorMessage,
         double* outRmsPixels,
-        bool fixTranslation)
+        bool fixTranslation,
+        bool fixRotation)
     {
         if (K.model != CameraModel::Mei && K.model != CameraModel::Fisheye)
         {
             errorMessage = std::string("The Ceres solver handles the mei and fisheye models only, not ") + modelToString(K.model);
             return false;
         }
+        if (fixTranslation && fixRotation)
+        {
+            errorMessage = "Translation and rotation are both locked -- nothing to solve";
+            return false;
+        }
 
-        const int nParams = fixTranslation ? 3 : 6;
+        const int nParams = (fixTranslation || fixRotation) ? 3 : 6;
         if (static_cast<int>(correspondences.size()) < 3 || static_cast<int>(correspondences.size()) * 2 < nParams)
         {
             errorMessage = "Need at least 3 correspondences";
@@ -179,6 +185,8 @@ namespace calib
         }
         if (fixTranslation)
             problem.SetParameterBlockConstant(txyz);
+        if (fixRotation)
+            problem.SetParameterBlockConstant(omfika);
 
         ceres::Solver::Options options;
         options.linear_solver_type = ceres::DENSE_QR;
@@ -218,12 +226,7 @@ namespace calib
 namespace calib
 {
     bool solveExtrinsicsCeres(
-        const std::vector<PointPixelCorrespondence>&,
-        const Intrinsics&,
-        Extrinsics&,
-        std::string& errorMessage,
-        double*,
-        bool)
+        const std::vector<PointPixelCorrespondence>&, const Intrinsics&, Extrinsics&, std::string& errorMessage, double*, bool, bool)
     {
         errorMessage =
             "Mei/fisheye extrinsics solving needs calib_core built with -DCALIB_ENABLE_CERES=ON (see calib_core/CMakeLists.txt)";

@@ -73,6 +73,15 @@ public:
     // Draw world axes at origin
     void drawAxes(float len = 2.f);
 
+    //! Draws a simplified, real-size Livox Mid-360 at the LiDAR origin in the
+    //! current BeginMode3D context; its connector marks the back (-x).
+    void drawLidarModel();
+
+    //! Draws a simplified, real-size Insta360 X5 body at the camera pose in
+    //! the current BeginMode3D context. The lens these extrinsics describe
+    //! (optical +z) is ringed in the frustum's yellow.
+    void drawCameraModel(const Extrinsics& E);
+
 private:
     int texW = 0, texH = 0;
 

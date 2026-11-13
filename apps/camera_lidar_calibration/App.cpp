@@ -984,6 +984,10 @@ void App::draw()
     if (state.imageLoaded)
         state.renderer.drawCameraFrustum(state.intrinsics, state.extrinsics, state.imageW, state.imageH);
     state.renderer.drawAxes(2.f);
+    if (state.showLidarModel)
+        state.renderer.drawLidarModel();
+    if (state.showCameraModel)
+        state.renderer.drawCameraModel(state.extrinsics);
 
     // Grid on ground plane
     DrawGrid(20, 1.f);

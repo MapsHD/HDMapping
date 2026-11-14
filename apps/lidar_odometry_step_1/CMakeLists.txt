@@ -32,7 +32,7 @@ if(WIN32)
 endif()
 
 add_executable(
-  lidar_odometry_step_1 lidar_odometry_gui.cpp ${SOURCES}
+  lidar_odometry_step_1 lidar_odometry_gui.cpp overlay_layers.cpp overlay_layers.h ${SOURCES}
   )
 
 target_compile_definitions(lidar_odometry_step_1 PRIVATE WITH_GUI=1)

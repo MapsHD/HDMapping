@@ -61,7 +61,6 @@ target_link_libraries(
           lidar_odometry_step_1
           PRIVATE
           step1_run_report
-          core_e57
           # core_raylib_utils brings in core_raylib (core, raylib), raylib_widgets and rlImGui.
           core_raylib_utils
           imgui_raylib

@@ -12,11 +12,13 @@
 #include <laszip/laszip_api.h>
 #include <raymath.h>
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cctype>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <deque>
 #include <filesystem>
@@ -24,10 +26,13 @@
 #include <functional>
 #include <future>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
+#include <string>
 #include <unordered_set>
+#include <vector>
 
 namespace step1_render
 {
@@ -200,6 +205,7 @@ namespace step1_render
             }
         };
 
+        // Session loaders retain complete inputs. Stream display data to enforce the point budget and cancellation.
         void readLas(Layer& layer, const LoadSettings& settings, LoadProgress& progress)
         {
             LasReader reader;
@@ -238,6 +244,7 @@ namespace step1_render
 
         using PointVisitor = std::function<void(const Eigen::Vector3d&)>;
 
+        // Preserve file order and bounded retained memory; the shared TUM loader materializes and sorts all poses.
         uint64_t readText(const fs::path& path, LoadProgress& progress, const PointVisitor& visit)
         {
             std::ifstream input(path);
@@ -382,6 +389,8 @@ namespace step1_render
             }
         }
 
+        // ScanRenderer has no native RGB or independent intensity shading for each color mode.
+        // Reuse the shared buffer parts and GLSL palettes with this position/RGB/intensity layout.
         constexpr const char* vertexShader = R"(#version 330
 layout(location=0) in vec3 vertexPosition;
 layout(location=1) in vec3 vertexColor;
@@ -577,7 +586,7 @@ void main() {
         void upload(Layer& layer)
         {
             std::vector<float> vertices;
-            vertices.reserve(layer.cloud.points_local.size() * 7);
+            vertices.resize(layer.cloud.points_local.size() * 7);
             const float range = std::max(1.f, layer.intensityMax - layer.intensityMin);
             for (size_t i = 0; i < layer.cloud.points_local.size(); ++i)
             {
@@ -585,15 +594,9 @@ void main() {
                 const Eigen::Vector3d& color = layer.cloud.colors[i];
                 if (!p.cast<float>().allFinite())
                     throw std::runtime_error("Overlay coordinates exceed GPU range; choose a finite nearby offset");
-                vertices.insert(
-                    vertices.end(),
-                    { static_cast<float>(p.x()),
-                      static_cast<float>(p.y()),
-                      static_cast<float>(p.z()),
-                      static_cast<float>(color.x()),
-                      static_cast<float>(color.y()),
-                      static_cast<float>(color.z()),
-                      (layer.cloud.intensities[i] - layer.intensityMin) / range });
+                Eigen::Map<Eigen::Vector3f>(vertices.data() + i * 7) = p.cast<float>();
+                Eigen::Map<Eigen::Vector3f>(vertices.data() + i * 7 + 3) = color.cast<float>();
+                vertices[i * 7 + 6] = (layer.cloud.intensities[i] - layer.intensityMin) / range;
             }
             auto parts = raylib_widgets::uploadPointBufferParts(vertices.data(), layer.cloud.points_local.size(), { 3, 3, 1 });
             clearGpu(layer);

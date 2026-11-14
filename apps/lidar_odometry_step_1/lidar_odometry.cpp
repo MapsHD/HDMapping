@@ -4,7 +4,6 @@
 #include "tbb/tbb.h"
 #include <mutex>
 
-#include "trajectory_laz.h"
 #include <Core/system_info.hpp>
 #include <Fusion.h>
 #include <HDMapping/SessionPaths.h>
@@ -1258,14 +1257,7 @@ static bool write_result_files(
     // Save parameters to TOML file (loadable parameters only)
     success = save_parameters_toml(params, outwd, elapsed_time_s) && success;
 
-    std::string trajectory_error;
-    if (!step1_export::trajectoryLaz(outwd / "trajectory_step1.laz", worker_data, trajectory_error))
-    {
-        success = false;
-        std::cerr << "Trajectory LAZ export failed: " << trajectory_error << '\n';
-        if (params.run_report)
-            params.run_report->fail("Trajectory LAZ export failed: " + trajectory_error);
-    }
+    // Save processing results and complex data to JSON file
     return success;
 }
 

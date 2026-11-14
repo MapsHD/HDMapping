@@ -115,6 +115,68 @@ if (MSVC)
     target_compile_options(mcap_to_laz PRIVATE /bigobj)
 endif()
 
+# bag_to_laz / laz_to_bag: the ROS1 bag twins of mcap_to_laz / laz_to_mcap,
+# built from the same sources with a define that swaps the reader (writer) for
+# rosbags/Ros1Bag -- no ROS installation needed. Reading compressed chunks needs
+# ros1bag_compression and mcap (see cmake/dependencies.cmake); on Windows only
+# uncompressed bags are read.
+add_executable(
+        bag_to_laz mcap_to_laz.cpp
+        ${REPOSITORY_DIRECTORY}/rosbags/Ros1Bag.h ${REPOSITORY_DIRECTORY}/rosbags/Ros1Bag.cpp
+        ${REPOSITORY_DIRECTORY}/rosbags/McapWriter.h ${REPOSITORY_DIRECTORY}/rosbags/McapWriter.cpp
+        ${REPOSITORY_DIRECTORY}/rosbags/MandeyeSessionWriter.h ${REPOSITORY_DIRECTORY}/rosbags/MandeyeSessionWriter.cpp
+)
+target_compile_definitions(bag_to_laz PRIVATE HDMAPPING_IMPORT_ROS1_BAG)
+target_include_directories(
+        bag_to_laz
+        PRIVATE ${REPOSITORY_DIRECTORY}/rosbags
+        ${LASZIP_INCLUDE_DIR}/LASzip/include)
+target_link_libraries(
+        bag_to_laz
+        PRIVATE
+        mcap
+        ros1bag_compression
+        spdlog::spdlog
+        ${PLATFORM_LASZIP_LIB}
+        ${PLATFORM_MISCELLANEOUS_LIBS})
+
+add_executable(
+        laz_to_bag laz_to_mcap.cpp
+        ${REPOSITORY_DIRECTORY}/apps/lidar_odometry_step_1/lidar_odometry_utils.h
+        ${REPOSITORY_DIRECTORY}/apps/lidar_odometry_step_1/lidar_odometry_utils.cpp
+        ${REPOSITORY_DIRECTORY}/rosbags/Ros1Bag.h ${REPOSITORY_DIRECTORY}/rosbags/Ros1Bag.cpp
+        ${REPOSITORY_DIRECTORY}/rosbags/McapWriter.h ${REPOSITORY_DIRECTORY}/rosbags/McapWriter.cpp
+)
+target_compile_definitions(laz_to_bag PRIVATE HDMAPPING_EXPORT_ROS1_BAG)
+target_include_directories(
+        laz_to_bag
+        PRIVATE ${REPOSITORY_DIRECTORY}/apps/lidar_odometry_step_1
+        ${REPOSITORY_DIRECTORY}/core/include
+        ${REPOSITORY_DIRECTORY}/rosbags
+        ${THIRDPARTY_DIRECTORY} # csv.hpp (used by load_imu)
+        ${THIRDPARTY_DIRECTORY}/glm
+        ${EIGEN3_INCLUDE_DIR}
+        ${THIRDPARTY_DIRECTORY}/tomlplusplus/include
+        ${THIRDPARTY_DIRECTORY}/json/include
+        ${LASZIP_INCLUDE_DIR}/LASzip/include
+        ${THIRDPARTY_DIRECTORY}/observation_equations/codes
+        ${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp)
+target_link_libraries(
+        laz_to_bag
+        PRIVATE
+        mcap
+        ros1bag_compression
+        unordered_dense::unordered_dense
+        spdlog::spdlog
+        ${PLATFORM_LASZIP_LIB}
+        ${PLATFORM_MISCELLANEOUS_LIBS}
+        ${CORE_LIBRARIES})
+
+if (MSVC)
+    target_compile_options(bag_to_laz PRIVATE /bigobj)
+    target_compile_options(laz_to_bag PRIVATE /bigobj)
+endif()
+
 # ouster_pcap_to_laz: Ouster pcap + metadata JSON -> mandeye session directory.
 # Same writer as mcap_to_laz; the pcap/packet decoding is rosbags/OusterPcapReader,
 # so laszip + nlohmann json + spdlog is the whole dependency set.
@@ -140,6 +202,48 @@ target_link_libraries(
 if (MSVC)
     target_compile_options(laz_to_mcap PRIVATE /bigobj)
 endif()
+
+# bow_loop_closure_detect: headless verification tool for the automatic
+# image-based (fbow) loop closure detector shared with step 2's GUI --
+# loads a step-2 session + a CAMERA_0 folder and prints candidate pairs as
+# CSV, without needing the interactive GUI. Links core_no_gui (WITH_GUI=0)
+# since it only needs PointClouds/Session, not the ImGui-dependent
+# ManualPoseGraphLoopClosure/observation_picking pieces core (WITH_GUI=1)
+# adds.
+add_executable(
+  bow_loop_closure_detect bow_loop_closure_detect.cpp
+  ${REPOSITORY_DIRECTORY}/apps/multi_view_tls_registration/bow_loop_closure_detector.h
+  ${REPOSITORY_DIRECTORY}/apps/multi_view_tls_registration/bow_loop_closure_detector.cpp
+)
+
+target_compile_definitions(bow_loop_closure_detect PRIVATE
+    WITH_GUI=0
+    -DFBOW_VOCABULARY_PATH="${THIRDPARTY_DIRECTORY}/fbow/vocabularies/orb_mur.fbow")
+
+target_include_directories(
+  bow_loop_closure_detect PRIVATE
+  ${REPOSITORY_DIRECTORY}/core/include
+  ${REPOSITORY_DIRECTORY}/apps/multi_view_tls_registration
+  ${EIGEN3_INCLUDE_DIR}
+  ${LASZIP_INCLUDE_DIR}/LASzip/include
+  ${THIRDPARTY_DIRECTORY}/json/include
+  ${THIRDPARTY_DIRECTORY}/observation_equations/codes
+  ${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp
+  ${THIRDPARTY_DIRECTORY}/Fusion/Fusion
+  ${EXTERNAL_LIBRARIES_DIRECTORY}/include
+  ${FBOW_INCLUDE_DIR}
+  ${OpenCV_INCLUDE_DIRS})
+
+target_link_libraries(
+  bow_loop_closure_detect PRIVATE
+  core_no_gui
+  fbow
+  ${OpenCV_LIBS}
+  ${PLATFORM_LASZIP_LIB}
+  vqf
+  Fusion
+  ${PLATFORM_MISCELLANEOUS_LIBS}
+  spdlog::spdlog)
 
 # session_to_mcap: a processed lidar_odometry_step_1 session (session.json)
 # -> MCAP exporter (undistorted lidar in the map frame + /tf map->lidar,
@@ -189,6 +293,35 @@ if (MSVC)
     target_compile_options(session_to_mcap PRIVATE /bigobj)
 endif()
 
+# session_intensity_panoramas: a session's lidar intensity rendered as 360-degree
+# panoramas seen from the lidar, one every N seconds, named like camera frames
+# (intensity_<ns>.jpg) so the BoW loop closure can use them. Reads Core::Session,
+# so it links core_no_gui (WITH_GUI=0) like session_to_mcap.
+add_executable(session_intensity_panoramas session_intensity_panoramas.cpp)
+
+target_compile_definitions(session_intensity_panoramas PRIVATE WITH_GUI=0)
+
+target_include_directories(
+  session_intensity_panoramas PRIVATE
+  ${REPOSITORY_DIRECTORY}/core/include
+  ${EIGEN3_INCLUDE_DIR}
+  ${LASZIP_INCLUDE_DIR}/LASzip/include
+  ${THIRDPARTY_DIRECTORY}/json/include
+  ${THIRDPARTY_DIRECTORY}/observation_equations/codes
+  ${OpenCV_INCLUDE_DIRS})
+
+target_link_libraries(
+  session_intensity_panoramas PRIVATE
+  core_no_gui
+  ${OpenCV_LIBS}
+  ${PLATFORM_LASZIP_LIB}
+  ${PLATFORM_MISCELLANEOUS_LIBS}
+  spdlog::spdlog)
+
+if (MSVC)
+    target_compile_definitions(session_intensity_panoramas PRIVATE _USE_MATH_DEFINES)
+endif()
+
 # These are built whenever BUILD_WITH_CLI_TOOLS is ON (the default), so they
 # ship in the DEB package alongside the GUI apps.
 hdmapping_install_app(
@@ -202,4 +335,5 @@ hdmapping_install_app(
   laz_to_mcap
   mcap_to_laz
   ouster_pcap_to_laz
+  session_intensity_panoramas
   session_to_mcap)

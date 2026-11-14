@@ -12,6 +12,8 @@
 
 #include <spdlog/spdlog.h>
 
+#include "console_progress.h"
+
 namespace fs = std::filesystem;
 
 bool check_path_ext(const char* path, const char* ext)
@@ -40,7 +42,7 @@ bool convert_and_save(const char* from, const char* to)
     }
 
     laszip_point* point = nullptr;
-    if (laszip_get_point_pointer(header, &point))
+    if (laszip_get_point_pointer(laszip_reader, &point))
     {
         return false;
     }
@@ -51,11 +53,12 @@ bool convert_and_save(const char* from, const char* to)
 
     std::vector<uint8_t> pointsBinary(point_count * PointSizeBytes);
 
+    ConsoleProgress progress("Reading points", static_cast<uint64_t>(point_count));
     laszip_I64 point_read_count = 0;
 
     while (point_read_count < point_count)
     {
-        if (laszip_read_point(header))
+        if (laszip_read_point(laszip_reader))
         {
             return false;
         }
@@ -63,14 +66,22 @@ bool convert_and_save(const char* from, const char* to)
         uint8_t* pointerTimstamp = pointDataPtr + sizeof(float) * 4;
         uint8_t* pointDataEndPtr = pointDataPtr + PointSizeBytes;
 
-        std::span<float> xyzi(reinterpret_cast<float*>(pointDataPtr), 3);
+        std::span<float> xyzi(reinterpret_cast<float*>(pointDataPtr), 4);
         xyzi[0] = static_cast<float>(header->x_offset + header->x_scale_factor * static_cast<double>(point->X));
-        xyzi[1] = static_cast<float>(header->y_offset + header->x_scale_factor * static_cast<double>(point->Y));
-        xyzi[2] = static_cast<float>(header->z_offset + header->x_scale_factor * static_cast<double>(point->Z));
+        xyzi[1] = static_cast<float>(header->y_offset + header->y_scale_factor * static_cast<double>(point->Y));
+        xyzi[2] = static_cast<float>(header->z_offset + header->z_scale_factor * static_cast<double>(point->Z));
         xyzi[3] = static_cast<float>(point->intensity);
         const double ts = point->gps_time;
         memcpy(pointerTimstamp, &ts, sizeof(double));
         point_read_count++;
+        progress.update(static_cast<uint64_t>(point_read_count));
+    }
+    progress.finish(static_cast<uint64_t>(point_read_count));
+
+    if (laszip_close_reader(laszip_reader) || laszip_destroy(laszip_reader))
+    {
+        spdlog::error("Failed closing LASzip reader");
+        return false;
     }
 
     if (std::ofstream to_file = std::ofstream(to, std::ios::out | std::ios::binary))
@@ -88,6 +99,12 @@ bool convert_and_save(const char* from, const char* to)
         to_file << "DATA binary\n";
 
         to_file.write((const char*)pointsBinary.data(), pointsBinary.size());
+        to_file.close();
+        if (!to_file)
+        {
+            spdlog::error("Failed writing PCD output {}", to);
+            return false;
+        }
     }
     else
     {

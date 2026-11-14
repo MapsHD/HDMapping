@@ -36,17 +36,12 @@ void AppState::rebuildImageTexture()
     // directly to the raw image (see Renderer.cpp/RendererShaders.h).
     if (intrinsicsLoaded && intrinsics.model == CameraModel::Pinhole)
     {
-        cv::Mat K = (cv::Mat_<double>(3, 3) << intrinsics.fx, 0, intrinsics.cx, 0, intrinsics.fy, intrinsics.cy, 0, 0, 1);
+        // cv::Matx rather than the Mat_ comma initializer, which OpenCV 5 rejects for float values.
+        cv::Mat K(cv::Matx33d(intrinsics.fx, 0, intrinsics.cx, 0, intrinsics.fy, intrinsics.cy, 0, 0, 1));
         // OpenCV distCoeffs order: k1 k2 p1 p2 k3 k4 k5 k6 (rational model)
-        cv::Mat D =
-            (cv::Mat_<double>(1, 8) << intrinsics.k1,
-             intrinsics.k2,
-             intrinsics.p1,
-             intrinsics.p2,
-             intrinsics.k3,
-             intrinsics.k4,
-             intrinsics.k5,
-             intrinsics.k6);
+        cv::Mat D(
+            cv::Matx<double, 1, 8>(
+                intrinsics.k1, intrinsics.k2, intrinsics.p1, intrinsics.p2, intrinsics.k3, intrinsics.k4, intrinsics.k5, intrinsics.k6));
 
         cv::Mat map1, map2;
         cv::initUndistortRectifyMap(K, D, cv::Mat(), K, originalImage.size(), CV_16SC2, map1, map2);

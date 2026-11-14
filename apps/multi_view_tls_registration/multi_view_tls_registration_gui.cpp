@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 // This app used to be built on GLUT + legacy immediate-mode OpenGL
@@ -87,7 +88,15 @@
 #include <map>
 #include <tuple>
 
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
+
+#include <atomic>
+#include <mutex>
+#include <thread>
+
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
+#include "bow_loop_closure_detector.h"
 #include "multi_view_tls_registration.h"
 
 #include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
@@ -618,6 +627,16 @@ void view_kbd_shortcuts()
 
     ImGuiIO& io = ImGui::GetIO();
 
+    // 1-9: point size. Like N / P these also work while a window has focus, but not while a text field is being edited.
+    if (!io.WantTextInput && !io.KeyCtrl && !io.KeyAlt && !io.KeyShift)
+    {
+        for (int size = 1; size <= 9; size++)
+        {
+            if (ImGui::IsKeyPressed(static_cast<ImGuiKey>(ImGuiKey_0 + size)))
+                app_state.point_size = size;
+        }
+    }
+
     if (io.WantCaptureKeyboard)
         return;
 
@@ -700,25 +719,6 @@ void view_kbd_shortcuts()
         app_state.camera.isOrtho = !app_state.camera.isOrtho;
     if (ImGui::IsKeyPressed(ImGuiKey_X, false))
         app_state.show_axes = !app_state.show_axes;
-
-    if (ImGui::IsKeyPressed(ImGuiKey_1))
-        app_state.point_size = 1;
-    if (ImGui::IsKeyPressed(ImGuiKey_2))
-        app_state.point_size = 2;
-    if (ImGui::IsKeyPressed(ImGuiKey_3))
-        app_state.point_size = 3;
-    if (ImGui::IsKeyPressed(ImGuiKey_4))
-        app_state.point_size = 4;
-    if (ImGui::IsKeyPressed(ImGuiKey_5))
-        app_state.point_size = 5;
-    if (ImGui::IsKeyPressed(ImGuiKey_6))
-        app_state.point_size = 6;
-    if (ImGui::IsKeyPressed(ImGuiKey_7))
-        app_state.point_size = 7;
-    if (ImGui::IsKeyPressed(ImGuiKey_8))
-        app_state.point_size = 8;
-    if (ImGui::IsKeyPressed(ImGuiKey_9))
-        app_state.point_size = 9;
 }
 
 // Drawing itself lives in raylib_widgets::drawCompassRuler (shared with the
@@ -914,11 +914,11 @@ static const std::vector<ShortcutEntry> appShortcuts = { { "Normal keys", "A", "
                                                          { "", "Ctrl+L", "manual Loop closure" },
                                                          { "", "M", "" },
                                                          { "", "Ctrl+M", "Measure distance" },
-                                                         { "", "N", "" },
+                                                         { "", "N", "Next edge (manual loop closure, BoW preview)" },
                                                          { "", "Ctrl+N", "" },
                                                          { "", "O", "Ortographic view" },
                                                          { "", "Ctrl+O", "Open/load session/data" },
-                                                         { "", "P", "" },
+                                                         { "", "P", "Previous edge (manual loop closure, BoW preview)" },
                                                          { "", "Ctrl+P", "Pose graph slam" },
                                                          { "", "Q", "" },
                                                          { "", "Ctrl+Q", "" },
@@ -1006,6 +1006,7 @@ bool is_rpf_gui = false;
 bool is_pose_graph_slam = false;
 bool is_manual_analisys = false;
 bool is_loop_closure_gui = false;
+bool is_bow_loop_closure_gui = false;
 bool is_lio_segments_gui = false;
 bool is_settings_gui = true;
 bool is_translate_gui = false;
@@ -1112,8 +1113,56 @@ float m_gizmo[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 
 bool manipulate_only_marked_gizmo = false;
 
+// Segment gizmo drag in progress (same scheme as multi_session_registration's
+// session_drag_preview_poses): while ImGuizmo::IsUsing(), the moved scans'
+// m_pose stays untouched -- writing it every frame made ScanRenderer::syncPoses()
+// re-transform and re-upload every moved scan's points each frame. Instead the
+// in-progress poses live here and are drawn from the cached GPU buffers; they
+// are committed to m_pose once, when the drag ends.
+// gizmo_drag_preview_poses[k] is the preview pose of scan gizmo_drag_first_index + k.
+int gizmo_drag_first_index = -1;
+std::vector<Eigen::Affine3d> gizmo_drag_preview_poses;
+
+bool isGizmoDragging()
+{
+    return gizmo_drag_first_index >= 0;
+}
+
 Session session;
 PointClouds::PointCloudDimensions session_dims;
+
+// Writes the in-progress drag poses into the scans and ends the drag.
+void commitGizmoDrag()
+{
+    if (!isGizmoDragging())
+    {
+        return;
+    }
+    auto& pcs = session.point_clouds_container.point_clouds;
+    for (size_t k = 0; k < gizmo_drag_preview_poses.size(); k++)
+    {
+        const size_t j = static_cast<size_t>(gizmo_drag_first_index) + k;
+        if (j >= pcs.size())
+        {
+            break;
+        }
+        PointCloud& pc = pcs[j];
+        pc.m_pose = gizmo_drag_preview_poses[k];
+        pc.pose = pose_tait_bryan_from_affine_matrix(pc.m_pose);
+        pc.gui_translation[0] = static_cast<float>(pc.pose.px);
+        pc.gui_translation[1] = static_cast<float>(pc.pose.py);
+        pc.gui_translation[2] = static_cast<float>(pc.pose.pz);
+        pc.gui_rotation[0] = static_cast<float>(pc.pose.om * RAD_TO_DEG);
+        pc.gui_rotation[1] = static_cast<float>(pc.pose.fi * RAD_TO_DEG);
+        pc.gui_rotation[2] = static_cast<float>(pc.pose.ka * RAD_TO_DEG);
+        // Rebuild right away: this frame's syncPoses() already ran (top of
+        // display()) and the preview is off from now on, so without this the
+        // scan is drawn once more at its pre-drag pose -- a visible jump back.
+        scan_renderer.rebuild(j, pc);
+    }
+    gizmo_drag_first_index = -1;
+    gizmo_drag_preview_poses.clear();
+}
 bool session_loaded = false;
 std::vector<std::string> geoids;
 std::string selected_geoid_model;
@@ -1906,6 +1955,414 @@ void observation_picking_gui()
     ImGui::End();
 }
 
+// ── Automatic image-based (fbow) loop closure detection ─────────────────────
+// Candidates are only ever surfaced for manual review here (montage preview +
+// per-row "Add edge") -- never auto-added to the pose graph -- per
+// BOW_PLACE_RECOGNITION_HANDOFF.md's documented false-positive risk on
+// repetitive scenes. Detection itself runs on a background thread (ORB
+// extraction over hundreds of frames must not block the render loop); it only
+// reads session.point_clouds_container (poses/timestamps), never mutates it,
+// mirroring TrajectoryViewer.cpp's imgViewThread pattern for its own
+// background image work.
+namespace
+{
+    struct BowLoopClosureState
+    {
+        //! One row per camera folder (CAMERA_0, or an Insta360's cam_front and cam_back); empty rows are skipped.
+        std::vector<std::array<char, 1024>> camera_dirs = std::vector<std::array<char, 1024>>(1);
+        bow_loop_closure::DetectorParams params;
+
+        std::atomic<bool> detecting{ false };
+        std::thread detect_thread;
+
+        std::mutex results_mutex;
+        std::vector<bow_loop_closure::Candidate> results;
+        std::vector<bow_loop_closure::CameraFrame> frames;
+        std::vector<std::string> camera_names; //!< folder name per CameraFrame::camera
+        std::string status;
+
+        int selected_candidate = -1;
+        bool scroll_to_selected = false; //!< scroll the list to selected_candidate on the next frame
+        bool window_focused = false; //!< the BoW window had focus last frame, see bow_preview_takes_edge_hotkeys()
+        Texture2D montage_tex{};
+        bool montage_tex_valid = false;
+    };
+    BowLoopClosureState bow_state;
+
+    void bow_loop_closure_start_detection()
+    {
+        if (bow_state.detecting.load())
+            return;
+        if (bow_state.detect_thread.joinable())
+            bow_state.detect_thread.join();
+
+        bow_state.detecting = true;
+        {
+            std::lock_guard<std::mutex> lk(bow_state.results_mutex);
+            bow_state.status = "Detecting...";
+            bow_state.results.clear();
+            bow_state.selected_candidate = -1;
+        }
+
+        std::vector<std::string> camera_dirs;
+        std::vector<std::string> camera_names;
+        for (const auto& dir : bow_state.camera_dirs)
+        {
+            if (dir[0] == '\0')
+                continue;
+            camera_dirs.emplace_back(dir.data());
+            std::filesystem::path path(camera_dirs.back());
+            if (!path.has_filename())
+                path = path.parent_path(); // ".../cam_front/"
+            camera_names.push_back(path.filename().string());
+        }
+        bow_loop_closure::DetectorParams params = bow_state.params;
+
+        bow_state.detect_thread = std::thread(
+            [camera_dirs, camera_names, params]()
+            {
+                auto frames = bow_loop_closure::loadCameraFrames(camera_dirs);
+                std::vector<bow_loop_closure::Candidate> candidates;
+                std::string status;
+
+                if (frames.empty())
+                {
+                    status = "No camera frames found in the camera folders";
+                }
+                else
+                {
+                    auto chunk_frames =
+                        bow_loop_closure::associateFramesToChunks(session.point_clouds_container, frames, params.max_frame_time_gap_ns);
+                    try
+                    {
+                        auto vocabulary = bow_loop_closure::loadVocabulary(bow_loop_closure::defaultVocabularyPath());
+                        candidates =
+                            bow_loop_closure::detectCandidates(session.point_clouds_container, frames, chunk_frames, params, vocabulary);
+                        status = std::to_string(candidates.size()) + " candidates found";
+                    } catch (const std::exception& e)
+                    {
+                        status = e.what();
+                    }
+                }
+
+                std::lock_guard<std::mutex> lk(bow_state.results_mutex);
+                bow_state.frames = std::move(frames);
+                bow_state.camera_names = camera_names;
+                bow_state.results = std::move(candidates);
+                bow_state.status = status;
+                bow_state.detecting = false;
+            });
+    }
+
+    // Uploads `mat` (BGR, as cv::imread/drawMatches produce) as the montage
+    // preview texture -- same LoadTextureFromImage/UnloadTexture pattern as
+    // TrajectoryViewer.cpp's imgViewTex.
+    void bow_loop_closure_upload_montage(cv::Mat mat)
+    {
+        if (mat.empty())
+            return;
+        cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
+        if (!mat.isContinuous())
+            mat = mat.clone();
+
+        if (bow_state.montage_tex_valid)
+            UnloadTexture(bow_state.montage_tex);
+        Image ri = { mat.data, mat.cols, mat.rows, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8 };
+        bow_state.montage_tex = LoadTextureFromImage(ri);
+        bow_state.montage_tex_valid = bow_state.montage_tex.id > 0;
+    }
+
+    // Shows results[row] in the montage preview.
+    void bow_loop_closure_show_candidate(const std::vector<bow_loop_closure::Candidate>& results, int row)
+    {
+        bow_state.selected_candidate = row;
+        std::lock_guard<std::mutex> lk(bow_state.results_mutex);
+        cv::Mat montage = bow_loop_closure::buildCandidateMontage(results[row], bow_state.frames, bow_state.params);
+        bow_loop_closure_upload_montage(montage);
+    }
+
+    void bow_loop_closure_clear_preview()
+    {
+        bow_state.selected_candidate = -1;
+        if (bow_state.montage_tex_valid)
+            UnloadTexture(bow_state.montage_tex);
+        bow_state.montage_tex_valid = false;
+    }
+
+    // N / P step the BoW candidates instead of the manual loop closure's active edge while a candidate is
+    // shown and either the BoW window has focus or the active edge list is not shown.
+    bool bow_preview_takes_edge_hotkeys()
+    {
+        if (!is_bow_loop_closure_gui || bow_state.selected_candidate < 0)
+            return false;
+        const auto& loop_closure = session.pose_graph_loop_closure;
+        const bool active_edges_shown = is_loop_closure_gui && loop_closure.manipulate_active_edge && !loop_closure.edges.empty();
+        return bow_state.window_focused || !active_edges_shown;
+    }
+} // namespace
+
+void bow_loop_closure_gui()
+{
+    const bool edge_hotkeys = bow_preview_takes_edge_hotkeys();
+    ImGui::Begin("Automatic Image Loop Closure (BoW)", &is_bow_loop_closure_gui);
+    bow_state.window_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+
+    ImGui::Text("Camera folders (CAMERA_0, or an Insta360's cam_front and cam_back):");
+    int remove_camera_dir = -1;
+    for (size_t k = 0; k < bow_state.camera_dirs.size(); k++)
+    {
+        auto& dir = bow_state.camera_dirs[k];
+        ImGui::PushID(static_cast<int>(k));
+        ImGui::PushItemWidth(400);
+        ImGui::InputText("##bow_camera_dir", dir.data(), dir.size());
+        ImGui::PopItemWidth();
+        ImGui::SameLine();
+        if (ImGui::Button("Select..."))
+        {
+            std::string selected = mandeye::fd::SelectFolder("Select camera directory");
+            if (!selected.empty())
+                std::snprintf(dir.data(), dir.size(), "%s", selected.c_str());
+        }
+        if (bow_state.camera_dirs.size() > 1)
+        {
+            ImGui::SameLine();
+            if (ImGui::Button("Remove"))
+                remove_camera_dir = static_cast<int>(k);
+        }
+        ImGui::PopID();
+    }
+    if (remove_camera_dir >= 0)
+        bow_state.camera_dirs.erase(bow_state.camera_dirs.begin() + remove_camera_dir);
+    if (ImGui::Button("Add camera folder"))
+        bow_state.camera_dirs.emplace_back();
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Frames of all cameras are matched against each other, front vs back too");
+
+    ImGui::PushItemWidth(ImGuiNumberWidth);
+    ImGui::InputDouble("Min arc gap [m]", &bow_state.params.min_arc_gap_m);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Reject chunk pairs closer than this along the trajectory (excludes trivially-adjacent chunks)");
+    ImGui::InputDouble("Max XY dist [m]", &bow_state.params.max_xy_dist_m);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Reject chunk pairs farther apart in XY than this (plausible same-place threshold)");
+    ImGui::InputDouble("Min BoW score", &bow_state.params.min_bow_score, 0.0, 0.0, "%.4f");
+    ImGui::InputInt("Min inliers", &bow_state.params.min_inliers);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Minimum RANSAC-verified ORB match inliers to accept a candidate");
+    ImGui::InputInt("ORB features", &bow_state.params.orb_features);
+    ImGui::InputInt("Max image size [px]", &bow_state.params.max_image_size_px);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Downscale images whose longer side is larger than this before ORB (0 = full resolution)");
+    ImGui::PopItemWidth();
+
+    bool detecting = bow_state.detecting.load();
+    ImGui::BeginDisabled(detecting || session.point_clouds_container.point_clouds.empty());
+    if (ImGui::Button("Detect candidates"))
+        bow_loop_closure_start_detection();
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+
+    std::vector<bow_loop_closure::Candidate> results_copy;
+    std::vector<std::string> results_cameras; // "front/back" per row, only with several cameras
+    std::string status_copy;
+    {
+        std::lock_guard<std::mutex> lk(bow_state.results_mutex);
+        results_copy = bow_state.results;
+        status_copy = bow_state.status;
+        if (bow_state.camera_names.size() > 1)
+        {
+            for (const auto& c : results_copy)
+            {
+                results_cameras.push_back(
+                    "  cameras=" + bow_state.camera_names[bow_state.frames[c.frame_i].camera] + "/" +
+                    bow_state.camera_names[bow_state.frames[c.frame_j].camera]);
+            }
+        }
+    }
+    ImGui::Text("%s", status_copy.c_str());
+
+    ImGui::Separator();
+    ImGui::Text(
+        "Review candidates below before adding an edge -- appearance matching alone is known to produce\n"
+        "confident false positives on repetitive scenes (see BOW_PLACE_RECOGNITION_HANDOFF.md). Press\n"
+        "\"Show edge\" to preview a candidate's matched keypoints, \"Previous\"/\"Next edge\" there (or P / N)\n"
+        "to step through the candidates and \"Remove edge\" to drop a false positive.");
+
+    ImGui::BeginChild("BowResults", ImVec2(0, 260), true);
+    for (size_t row = 0; row < results_copy.size(); row++)
+    {
+        const auto& c = results_copy[row];
+        ImGui::PushID(static_cast<int>(row));
+
+        const bool shown = (bow_state.selected_candidate == static_cast<int>(row));
+        if (shown && bow_state.scroll_to_selected)
+        {
+            ImGui::SetScrollHereY(0.5f);
+            bow_state.scroll_to_selected = false;
+        }
+        if (shown)
+            ImGui::PushStyleColor(ImGuiCol_Button, orangeBorder);
+        if (ImGui::Button("Show edge"))
+            bow_loop_closure_show_candidate(results_copy, static_cast<int>(row));
+        if (shown)
+            ImGui::PopStyleColor();
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Preview this candidate's matched keypoints below");
+        ImGui::SameLine();
+        ImGui::Text(
+            "i=%d j=%d  xy=%.2fm  arc=%.2fm  score=%.3f  inliers=%d%s",
+            c.index_i,
+            c.index_j,
+            c.xy_dist_m,
+            c.arc_gap_m,
+            c.bow_score,
+            c.inliers,
+            results_cameras.empty() ? "" : results_cameras[row].c_str());
+        ImGui::SameLine();
+        if (ImGui::Button("Add edge"))
+        {
+            session.pose_graph_loop_closure.add_edge(session.point_clouds_container, c.index_i, c.index_j);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Preview in 3D"))
+        {
+            index_loop_closure_source = c.index_i;
+            index_loop_closure_target = c.index_j;
+            is_loop_closure_gui = true;
+        }
+
+        ImGui::PopID();
+    }
+    ImGui::EndChild();
+
+    if (!results_copy.empty())
+    {
+        if (ImGui::Button("Add all shown"))
+        {
+            for (const auto& c : results_copy)
+                session.pose_graph_loop_closure.add_edge(session.point_clouds_container, c.index_i, c.index_j);
+            {
+                std::lock_guard<std::mutex> lk(bow_state.results_mutex);
+                bow_state.results.clear();
+                bow_state.status = "Added " + std::to_string(results_copy.size()) + " edges to the pose graph";
+            }
+            bow_loop_closure_clear_preview();
+        }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Add every candidate as a pose graph edge and clear the list");
+        ImGui::SameLine();
+        if (ImGui::Button("Save all shown as montages..."))
+        {
+            std::string out_dir = mandeye::fd::SelectFolder("Select folder to save montages");
+            if (!out_dir.empty())
+            {
+                std::lock_guard<std::mutex> lk(bow_state.results_mutex);
+                for (const auto& c : results_copy)
+                {
+                    cv::Mat m = bow_loop_closure::buildCandidateMontage(c, bow_state.frames, bow_state.params);
+                    if (!m.empty())
+                    {
+                        std::string fn = out_dir + "/cand_" + std::to_string(c.index_i) + "_" + std::to_string(c.index_j) + ".png";
+                        cv::imwrite(fn, m);
+                    }
+                }
+                bow_state.status = "Saved " + std::to_string(results_copy.size()) + " montages to '" + out_dir + "'";
+            }
+        }
+    }
+
+    if (bow_state.montage_tex_valid)
+    {
+        ImGui::Separator();
+        ImGui::Text("Montage preview:");
+        const int selected = bow_state.selected_candidate;
+        if (selected >= 0 && selected < static_cast<int>(results_copy.size()))
+        {
+            const ImGuiIO& io = ImGui::GetIO();
+            const bool keys = edge_hotkeys && !io.WantTextInput && !io.KeyCtrl && !io.KeyAlt && !io.KeyShift;
+            const bool key_previous = keys && ImGui::IsKeyPressed(ImGuiKey_P);
+            const bool key_next = keys && ImGui::IsKeyPressed(ImGuiKey_N);
+
+            ImGui::SameLine();
+            ImGui::BeginDisabled(selected == 0);
+            if ((ImGui::Button("< Previous edge") || key_previous) && selected > 0)
+            {
+                bow_loop_closure_show_candidate(results_copy, selected - 1);
+                bow_state.scroll_to_selected = true;
+            }
+            ImGui::EndDisabled();
+            ImGui::SameLine();
+            ImGui::BeginDisabled(selected + 1 >= static_cast<int>(results_copy.size()));
+            if ((ImGui::Button("Next edge >") || key_next) && selected + 1 < static_cast<int>(results_copy.size()))
+            {
+                bow_loop_closure_show_candidate(results_copy, selected + 1);
+                bow_state.scroll_to_selected = true;
+            }
+            ImGui::EndDisabled();
+            ImGui::SameLine();
+            ImGui::Text("%d of %zu", selected + 1, results_copy.size());
+            ImGui::SameLine();
+            if (ImGui::Button("Save montage..."))
+            {
+                const auto& c = results_copy[selected];
+                std::string default_name = "cand_" + std::to_string(c.index_i) + "_" + std::to_string(c.index_j) + ".png";
+                std::string out_file = mandeye::fd::SaveFileDialog("Save montage", { "PNG image (*.png)", "*.png" }, ".png", default_name);
+                if (!out_file.empty())
+                {
+                    std::lock_guard<std::mutex> lk(bow_state.results_mutex);
+                    cv::Mat m = bow_loop_closure::buildCandidateMontage(c, bow_state.frames, bow_state.params);
+                    if (!m.empty())
+                        cv::imwrite(out_file, m);
+                }
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Remove edge"))
+            {
+                const auto& shown = results_copy[selected];
+                std::vector<bow_loop_closure::Candidate> remaining;
+                int next_row = selected;
+                {
+                    std::lock_guard<std::mutex> lk(bow_state.results_mutex);
+                    auto& results = bow_state.results;
+                    const auto it = std::find_if(
+                        results.begin(),
+                        results.end(),
+                        [&shown](const bow_loop_closure::Candidate& c)
+                        {
+                            return c.index_i == shown.index_i && c.index_j == shown.index_j;
+                        });
+                    if (it != results.end())
+                        next_row = static_cast<int>(results.erase(it) - results.begin());
+                    remaining = results;
+                }
+                // Show the candidate that took its place, or the new last one.
+                if (remaining.empty())
+                {
+                    bow_loop_closure_clear_preview();
+                }
+                else
+                {
+                    bow_loop_closure_show_candidate(remaining, std::min(next_row, static_cast<int>(remaining.size()) - 1));
+                    bow_state.scroll_to_selected = true;
+                }
+            }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip(
+                    "Remove this candidate from the list and show the next one; an edge already added to the pose graph stays there");
+        }
+        if (bow_state.montage_tex_valid)
+        {
+            ImVec2 avail = ImGui::GetContentRegionAvail();
+            float aspect = static_cast<float>(bow_state.montage_tex.height) / static_cast<float>(bow_state.montage_tex.width);
+            int dispW = static_cast<int>(avail.x);
+            int dispH = static_cast<int>(avail.x * aspect);
+            rlImGuiImageSize(&bow_state.montage_tex, dispW, dispH);
+        }
+    }
+
+    ImGui::End();
+}
+
 void loop_closure_gui()
 {
     ImGui::Begin("Manual Pose Graph Loop Closure", &is_loop_closure_gui);
@@ -1948,6 +2405,7 @@ void loop_closure_gui()
         ImGui::PopItemWidth();
 
         int prev_index_active_edge = session.pose_graph_loop_closure.index_active_edge;
+        session.pose_graph_loop_closure.edge_hotkeys = !bow_preview_takes_edge_hotkeys();
         session.pose_graph_loop_closure.Gui(
             session.point_clouds_container,
             index_loop_closure_source,
@@ -2186,22 +2644,14 @@ void lio_segments_gui()
                             session.point_clouds_container.point_clouds[j].gizmo = false;
                         }
                     }
-                    m_gizmo[0] = (float)session.point_clouds_container.point_clouds[i].m_pose(0, 0);
-                    m_gizmo[1] = (float)session.point_clouds_container.point_clouds[i].m_pose(1, 0);
-                    m_gizmo[2] = (float)session.point_clouds_container.point_clouds[i].m_pose(2, 0);
-                    m_gizmo[3] = (float)session.point_clouds_container.point_clouds[i].m_pose(3, 0);
-                    m_gizmo[4] = (float)session.point_clouds_container.point_clouds[i].m_pose(0, 1);
-                    m_gizmo[5] = (float)session.point_clouds_container.point_clouds[i].m_pose(1, 1);
-                    m_gizmo[6] = (float)session.point_clouds_container.point_clouds[i].m_pose(2, 1);
-                    m_gizmo[7] = (float)session.point_clouds_container.point_clouds[i].m_pose(3, 1);
-                    m_gizmo[8] = (float)session.point_clouds_container.point_clouds[i].m_pose(0, 2);
-                    m_gizmo[9] = (float)session.point_clouds_container.point_clouds[i].m_pose(1, 2);
-                    m_gizmo[10] = (float)session.point_clouds_container.point_clouds[i].m_pose(2, 2);
-                    m_gizmo[11] = (float)session.point_clouds_container.point_clouds[i].m_pose(3, 2);
-                    m_gizmo[12] = (float)session.point_clouds_container.point_clouds[i].m_pose(0, 3);
-                    m_gizmo[13] = (float)session.point_clouds_container.point_clouds[i].m_pose(1, 3);
-                    m_gizmo[14] = (float)session.point_clouds_container.point_clouds[i].m_pose(2, 3);
-                    m_gizmo[15] = (float)session.point_clouds_container.point_clouds[i].m_pose(3, 3);
+                    // Not while dragging: m_pose stays frozen at its pre-drag value until
+                    // the drag ends, so re-seeding m_gizmo from it would break the drag.
+                    if (!isGizmoDragging())
+                    {
+                        // m_gizmo is column-major 4x4, same as Eigen's default storage.
+                        Eigen::Map<Eigen::Matrix4f> gizmo_map(m_gizmo);
+                        gizmo_map = session.point_clouds_container.point_clouds[i].m_pose.matrix().cast<float>();
+                    }
                 }
 
                 if (session.point_clouds_container.point_clouds[i].visible)
@@ -2606,6 +3056,14 @@ std::string lowerExtension(const std::filesystem::path& path)
     return ext;
 }
 
+// Next file dialog opens in the folder of a file loaded without one (drag & drop, command line).
+void setLocationHintFromFile(const fs::path& file)
+{
+    std::error_code ec;
+    const fs::path absolute = fs::absolute(file, ec);
+    mandeye::fd::SetLastLocationHint((ec ? file : absolute).parent_path().string());
+}
+
 // Accepts a Mandeye JSON Session file (*.mjs/*.json) -- shared by the drag & drop handler in main()'s loop and
 // the CLI argv handling below, so both accept the same input and report unsupported drops the same way.
 void loadSessionFromPath(const std::string& path)
@@ -2624,6 +3082,7 @@ void loadSessionFromPath(const std::string& path)
         return;
     }
 
+    setLocationHintFromFile(path);
     session_file_name = path;
     loadSession(path);
 }
@@ -2731,20 +3190,20 @@ void finalizeScanSession(const std::string& sourceDir, bool fillInSession)
     {
         {
             int counter = 1;
-            Eigen::Vector3d mean(session.point_clouds_container.point_clouds[0].points_local[0]);
-            for (auto& pc : session.point_clouds_container.point_clouds)
-            {
-                if (pc.points_local.size() > 100)
-                {
-                    // spdlog::info("mean " << mean << std::endl;
-                    for (size_t i = 100; i < pc.points_local.size(); i += 100)
-                    {
-                        mean += pc.points_local[i];
-                        counter++;
-                    }
-                }
-            }
-            mean /= counter;
+            // Eigen::Vector3d mean(session.point_clouds_container.point_clouds[0].points_local[0]);
+            // for (auto& pc : session.point_clouds_container.point_clouds)
+            //{
+            //     if (pc.points_local.size() > 100)
+            //     {
+            //         // spdlog::info("mean " << mean << std::endl;
+            //         for (size_t i = 100; i < pc.points_local.size(); i += 100)
+            //         {
+            //             mean += pc.points_local[i];
+            //             counter++;
+            //         }
+            //     }
+            // }
+            // mean /= counter;
 
             for (auto& pc : session.point_clouds_container.point_clouds)
             {
@@ -2761,7 +3220,7 @@ void finalizeScanSession(const std::string& sourceDir, bool fillInSession)
                     //}
 
                     // mean /= counter;
-                    m.translation() = mean;
+                    // m.translation() = mean;
 
                     PointCloud::LocalTrajectoryNode node;
                     node.imu_diff_angle_om_fi_ka_deg = { 0, 0, 0 };
@@ -2771,10 +3230,10 @@ void finalizeScanSession(const std::string& sourceDir, bool fillInSession)
 
                     pc.local_trajectory.push_back(node);
 
-                    for (auto& p : pc.points_local)
-                    {
-                        p -= mean;
-                    }
+                    // for (auto& p : pc.points_local)
+                    //{
+                    //     p -= mean;
+                    // }
                 }
 
                 pc.m_initial_pose = m;
@@ -3034,6 +3493,7 @@ void loadDroppedFiles(const std::vector<std::string>& paths)
             else
                 spdlog::warn("Ignoring non-e57 file dropped alongside e57 file(s): '{}'", p);
         }
+        setLocationHintFromFile(e57_paths.back());
         loadE57Files(e57_paths, fillInSession);
         return;
     }
@@ -4770,6 +5230,105 @@ void draw_section_preview()
         pose.matrix() = Eigen::Map<const Eigen::Matrix4f>(m).cast<double>();
 }
 
+// Commits a drag that is still in progress if its gizmo won't be processed
+// this frame (gizmo unticked, LIO segments editor closed, control points /
+// loop closure opened, scans reloaded), rather than leave a stale preview.
+void commitGizmoDragIfOrphaned()
+{
+    if (!isGizmoDragging())
+    {
+        return;
+    }
+    const auto& pcs = session.point_clouds_container.point_clouds;
+    if (!is_lio_segments_gui || session.control_points.is_imgui || is_loop_closure_gui ||
+        static_cast<size_t>(gizmo_drag_first_index) >= pcs.size() || !pcs[gizmo_drag_first_index].gizmo)
+    {
+        commitGizmoDrag();
+    }
+}
+
+// LIO segments editor gizmo: moves the segment whose "gizmo" checkbox is set
+// (and, unless "Manipulate only marked gizmo", every segment after it).
+// While dragging only gizmo_drag_preview_poses is updated; the poses are
+// committed once, when the drag ends (see commitGizmoDrag()).
+void lioSegmentsGizmo()
+{
+    for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
+    {
+        if (session.point_clouds_container.point_clouds[i].gizmo)
+        {
+            auto& pcs = session.point_clouds_container.point_clouds;
+
+            // Seed from the stored pose unless mid-drag (then m_gizmo is
+            // ImGuizmo's own last output and m_pose is still the pre-drag pose).
+            if (!isGizmoDragging())
+            {
+                Eigen::Map<Eigen::Matrix4f> gizmo_map(m_gizmo);
+                gizmo_map = pcs[i].m_pose.matrix().cast<float>();
+            }
+
+            ImGuiIO& io = ImGui::GetIO();
+            // ImGuizmo -----------------------------------------------
+            ImGuizmo::BeginFrame();
+            ImGuizmo::Enable(true);
+            ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
+
+            if (!app_state.camera.isOrtho)
+            {
+                // Named-field copy (not a raw struct memcpy): Matrix's
+                // declared field order isn't guaranteed to match the
+                // m0..m15 column-major numbering its names imply.
+                Matrix projMat = rlGetMatrixProjection();
+                Matrix modelMat = rlGetMatrixModelview();
+                float projection[16] = { projMat.m0,  projMat.m1,  projMat.m2,  projMat.m3, projMat.m4,  projMat.m5,
+                                         projMat.m6,  projMat.m7,  projMat.m8,  projMat.m9, projMat.m10, projMat.m11,
+                                         projMat.m12, projMat.m13, projMat.m14, projMat.m15 };
+                float modelview[16] = { modelMat.m0,  modelMat.m1,  modelMat.m2,  modelMat.m3, modelMat.m4,  modelMat.m5,
+                                        modelMat.m6,  modelMat.m7,  modelMat.m8,  modelMat.m9, modelMat.m10, modelMat.m11,
+                                        modelMat.m12, modelMat.m13, modelMat.m14, modelMat.m15 };
+
+                ImGuizmo::Manipulate(
+                    &modelview[0],
+                    &projection[0],
+                    ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y,
+                    ImGuizmo::WORLD,
+                    m_gizmo,
+                    NULL);
+            }
+            else
+                ImGuizmo::Manipulate(
+                    app_state.camera.orthoGizmoView,
+                    app_state.camera.orthoProjection,
+                    ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z,
+                    ImGuizmo::WORLD,
+                    m_gizmo,
+                    NULL);
+
+            if (ImGuizmo::IsUsing())
+            {
+                // Mid-drag: only update the preview chain (CPU-only); m_pose is
+                // left untouched so syncPoses() doesn't re-upload the moved scans.
+                // Each following scan keeps its offset to the previous one,
+                // taken from the still-unmodified m_pose values.
+                const size_t last = manipulate_only_marked_gizmo ? i + 1 : pcs.size();
+                gizmo_drag_first_index = static_cast<int>(i);
+                gizmo_drag_preview_poses.resize(last - i);
+                gizmo_drag_preview_poses[0] = Eigen::Affine3d(Eigen::Map<const Eigen::Matrix4f>(m_gizmo).cast<double>());
+                for (size_t j = i + 1; j < last; j++)
+                {
+                    gizmo_drag_preview_poses[j - i] = gizmo_drag_preview_poses[j - i - 1] * (pcs[j - 1].m_pose.inverse() * pcs[j].m_pose);
+                }
+            }
+            else
+            {
+                // Drag just ended (no-op otherwise): commit once -- the only
+                // frame the moved scans' GPU buffers get rebuilt.
+                commitGizmoDrag();
+            }
+        }
+    }
+}
+
 void display()
 {
     // Safety net: rebuilds any scan whose m_pose no longer matches its
@@ -4972,117 +5531,43 @@ void display()
     if (session.ground_control_points.is_imgui)
         session.ground_control_points.imgui(session.point_clouds_container);
 
+    // Commits a still-running drag whose gizmo won't be processed this frame.
+    commitGizmoDragIfOrphaned();
+
     if (!session.control_points.is_imgui)
     {
         if (!is_loop_closure_gui)
         {
-            for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
+            if (is_lio_segments_gui)
             {
-                if (session.point_clouds_container.point_clouds[i].gizmo)
+                lioSegmentsGizmo();
+            }
+
+            // Scans being dragged are drawn below at their preview pose, straight
+            // from the cached GPU buffers, so hide them from the regular draw.
+            // (With "show with initial pose" the drag isn't visible anyway.)
+            auto& pcs = session.point_clouds_container.point_clouds;
+            const bool drawDragPreview = isGizmoDragging() && !session.point_clouds_container.show_with_initial_pose;
+            std::vector<char> previewWasVisible;
+            if (drawDragPreview)
+            {
+                previewWasVisible.resize(gizmo_drag_preview_poses.size());
+                for (size_t k = 0; k < gizmo_drag_preview_poses.size() && gizmo_drag_first_index + k < pcs.size(); k++)
                 {
-                    std::vector<Eigen::Affine3d> all_m_poses;
-                    for (size_t j = 0; j < session.point_clouds_container.point_clouds.size(); j++)
-                    {
-                        all_m_poses.push_back(session.point_clouds_container.point_clouds[j].m_pose);
-                    }
-
-                    ImGuiIO& io = ImGui::GetIO();
-                    // ImGuizmo -----------------------------------------------
-                    ImGuizmo::BeginFrame();
-                    ImGuizmo::Enable(true);
-                    ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
-
-                    if (!app_state.camera.isOrtho)
-                    {
-                        // Named-field copy (not a raw struct memcpy): Matrix's
-                        // declared field order isn't guaranteed to match the
-                        // m0..m15 column-major numbering its names imply.
-                        Matrix projMat = rlGetMatrixProjection();
-                        Matrix modelMat = rlGetMatrixModelview();
-                        float projection[16] = { projMat.m0,  projMat.m1,  projMat.m2,  projMat.m3, projMat.m4,  projMat.m5,
-                                                 projMat.m6,  projMat.m7,  projMat.m8,  projMat.m9, projMat.m10, projMat.m11,
-                                                 projMat.m12, projMat.m13, projMat.m14, projMat.m15 };
-                        float modelview[16] = { modelMat.m0,  modelMat.m1,  modelMat.m2,  modelMat.m3, modelMat.m4,  modelMat.m5,
-                                                modelMat.m6,  modelMat.m7,  modelMat.m8,  modelMat.m9, modelMat.m10, modelMat.m11,
-                                                modelMat.m12, modelMat.m13, modelMat.m14, modelMat.m15 };
-
-                        ImGuizmo::Manipulate(
-                            &modelview[0],
-                            &projection[0],
-                            ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y,
-                            ImGuizmo::WORLD,
-                            m_gizmo,
-                            NULL);
-                    }
-                    else
-                        ImGuizmo::Manipulate(
-                            app_state.camera.orthoGizmoView,
-                            app_state.camera.orthoProjection,
-                            ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z,
-                            ImGuizmo::WORLD,
-                            m_gizmo,
-                            NULL);
-
-                    session.point_clouds_container.point_clouds[i].m_pose(0, 0) = m_gizmo[0];
-                    session.point_clouds_container.point_clouds[i].m_pose(1, 0) = m_gizmo[1];
-                    session.point_clouds_container.point_clouds[i].m_pose(2, 0) = m_gizmo[2];
-                    session.point_clouds_container.point_clouds[i].m_pose(3, 0) = m_gizmo[3];
-                    session.point_clouds_container.point_clouds[i].m_pose(0, 1) = m_gizmo[4];
-                    session.point_clouds_container.point_clouds[i].m_pose(1, 1) = m_gizmo[5];
-                    session.point_clouds_container.point_clouds[i].m_pose(2, 1) = m_gizmo[6];
-                    session.point_clouds_container.point_clouds[i].m_pose(3, 1) = m_gizmo[7];
-                    session.point_clouds_container.point_clouds[i].m_pose(0, 2) = m_gizmo[8];
-                    session.point_clouds_container.point_clouds[i].m_pose(1, 2) = m_gizmo[9];
-                    session.point_clouds_container.point_clouds[i].m_pose(2, 2) = m_gizmo[10];
-                    session.point_clouds_container.point_clouds[i].m_pose(3, 2) = m_gizmo[11];
-                    session.point_clouds_container.point_clouds[i].m_pose(0, 3) = m_gizmo[12];
-                    session.point_clouds_container.point_clouds[i].m_pose(1, 3) = m_gizmo[13];
-                    session.point_clouds_container.point_clouds[i].m_pose(2, 3) = m_gizmo[14];
-                    session.point_clouds_container.point_clouds[i].m_pose(3, 3) = m_gizmo[15];
-                    session.point_clouds_container.point_clouds[i].pose =
-                        pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[i].m_pose);
-
-                    session.point_clouds_container.point_clouds[i].gui_translation[0] =
-                        (float)session.point_clouds_container.point_clouds[i].pose.px;
-                    session.point_clouds_container.point_clouds[i].gui_translation[1] =
-                        (float)session.point_clouds_container.point_clouds[i].pose.py;
-                    session.point_clouds_container.point_clouds[i].gui_translation[2] =
-                        (float)session.point_clouds_container.point_clouds[i].pose.pz;
-
-                    session.point_clouds_container.point_clouds[i].gui_rotation[0] =
-                        (float)(session.point_clouds_container.point_clouds[i].pose.om * RAD_TO_DEG);
-                    session.point_clouds_container.point_clouds[i].gui_rotation[1] =
-                        (float)(session.point_clouds_container.point_clouds[i].pose.fi * RAD_TO_DEG);
-                    session.point_clouds_container.point_clouds[i].gui_rotation[2] =
-                        (float)(session.point_clouds_container.point_clouds[i].pose.ka * RAD_TO_DEG);
-
-                    if (!manipulate_only_marked_gizmo)
-                    {
-                        Eigen::Affine3d curr_m_pose = session.point_clouds_container.point_clouds[i].m_pose;
-                        for (size_t j = i + 1; j < session.point_clouds_container.point_clouds.size(); j++)
-                        {
-                            curr_m_pose = curr_m_pose * (all_m_poses[j - 1].inverse() * all_m_poses[j]);
-                            session.point_clouds_container.point_clouds[j].m_pose = curr_m_pose;
-                            session.point_clouds_container.point_clouds[j].pose =
-                                pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[j].m_pose);
-
-                            session.point_clouds_container.point_clouds[j].gui_translation[0] =
-                                (float)session.point_clouds_container.point_clouds[j].pose.px;
-                            session.point_clouds_container.point_clouds[j].gui_translation[1] =
-                                (float)session.point_clouds_container.point_clouds[j].pose.py;
-                            session.point_clouds_container.point_clouds[j].gui_translation[2] =
-                                (float)session.point_clouds_container.point_clouds[j].pose.pz;
-
-                            session.point_clouds_container.point_clouds[j].gui_rotation[0] =
-                                (float)(session.point_clouds_container.point_clouds[j].pose.om * RAD_TO_DEG);
-                            session.point_clouds_container.point_clouds[j].gui_rotation[1] =
-                                (float)(session.point_clouds_container.point_clouds[j].pose.fi * RAD_TO_DEG);
-                            session.point_clouds_container.point_clouds[j].gui_rotation[2] =
-                                (float)(session.point_clouds_container.point_clouds[j].pose.ka * RAD_TO_DEG);
-                        }
-                    }
+                    PointCloud& pc = pcs[gizmo_drag_first_index + k];
+                    previewWasVisible[k] = pc.visible;
+                    pc.visible = false;
                 }
             }
+
+            // Colormap settings shared by the regular draw and the drag preview,
+            // so dragged scans keep the same coloring as the rest of the scene.
+            const ScanColorMode colorMode = scanColorModeFromScheme(csPointCloud);
+            const float elevationMin = static_cast<float>(session_dims.z_min);
+            const float elevationMax = static_cast<float>(session_dims.z_max);
+            const Eigen::Vector3d distanceCenter(
+                app_state.camera.euler.rotationCenter.x, app_state.camera.euler.rotationCenter.y, app_state.camera.euler.rotationCenter.z);
+            const float distanceMax = static_cast<float>(std::max({ session_dims.length, session_dims.width, session_dims.height, 1.0 }));
 
             // Was PointClouds::render() (legacy-GL, in `core`, shared with
             // GLUT apps) -- replaced with scan_renderer, which is kept in
@@ -5091,14 +5576,11 @@ void display()
             scan_renderer.draw(
                 session.point_clouds_container.point_clouds,
                 static_cast<float>(app_state.point_size),
-                scanColorModeFromScheme(csPointCloud),
-                static_cast<float>(session_dims.z_min),
-                static_cast<float>(session_dims.z_max),
-                Eigen::Vector3d(
-                    app_state.camera.euler.rotationCenter.x,
-                    app_state.camera.euler.rotationCenter.y,
-                    app_state.camera.euler.rotationCenter.z),
-                static_cast<float>(std::max({ session_dims.length, session_dims.width, session_dims.height, 1.0 })),
+                colorMode,
+                elevationMin,
+                elevationMax,
+                distanceCenter,
+                distanceMax,
                 app_state.viewer_decimate_point_cloud,
                 session.point_clouds_container.xz_intersection,
                 session.point_clouds_container.yz_intersection,
@@ -5114,6 +5596,49 @@ void display()
                 session.point_clouds_container.xy_intersection,
                 session.point_clouds_container.show_with_initial_pose,
                 session.point_clouds_container.imu_to_lio_diff_scale);
+
+            if (drawDragPreview)
+            {
+                for (size_t k = 0; k < gizmo_drag_preview_poses.size() && gizmo_drag_first_index + k < pcs.size(); k++)
+                {
+                    const size_t idx = gizmo_drag_first_index + k;
+                    PointCloud& pc = pcs[idx];
+                    pc.visible = previewWasVisible[k];
+                    if (!pc.visible)
+                    {
+                        continue;
+                    }
+                    const Eigen::Affine3d& previewPose = gizmo_drag_preview_poses[k];
+                    scan_renderer.drawCachedWithTransform(
+                        idx,
+                        previewPose * pc.m_pose.inverse(),
+                        ColorFromNormalized(Vector4{ pc.render_color[0], pc.render_color[1], pc.render_color[2], 1.f }),
+                        static_cast<float>(app_state.point_size),
+                        colorMode,
+                        elevationMin,
+                        elevationMax,
+                        distanceCenter,
+                        distanceMax,
+                        session.point_clouds_container.xz_intersection,
+                        session.point_clouds_container.yz_intersection,
+                        session.point_clouds_container.xy_intersection,
+                        static_cast<float>(session.point_clouds_container.intersection_width));
+
+                    // Lightweight trajectory preview (the cached trajectory buffer is
+                    // at the pre-drag pose); the full overlay returns on commit.
+                    rlBegin(RL_LINES);
+                    rlColor3f(pc.traj_color[0], pc.traj_color[1], pc.traj_color[2]);
+                    for (size_t t = 1; t < pc.local_trajectory.size(); t++)
+                    {
+                        for (size_t n : { t - 1, t })
+                        {
+                            const Eigen::Vector3d p = (previewPose * pc.local_trajectory[n].m_pose).translation();
+                            rlVertex3f(static_cast<float>(p.x()), static_cast<float>(p.y()), static_cast<float>(p.z()));
+                        }
+                    }
+                    rlEnd();
+                }
+            }
 
             observationPickingRender(observation_picking);
 
@@ -5221,24 +5746,7 @@ void display()
                         m_gizmo,
                         NULL);
 
-                Eigen::Affine3d m_g = Eigen::Affine3d::Identity();
-
-                m_g(0, 0) = m_gizmo[0];
-                m_g(1, 0) = m_gizmo[1];
-                m_g(2, 0) = m_gizmo[2];
-                m_g(3, 0) = m_gizmo[3];
-                m_g(0, 1) = m_gizmo[4];
-                m_g(1, 1) = m_gizmo[5];
-                m_g(2, 1) = m_gizmo[6];
-                m_g(3, 1) = m_gizmo[7];
-                m_g(0, 2) = m_gizmo[8];
-                m_g(1, 2) = m_gizmo[9];
-                m_g(2, 2) = m_gizmo[10];
-                m_g(3, 2) = m_gizmo[11];
-                m_g(0, 3) = m_gizmo[12];
-                m_g(1, 3) = m_gizmo[13];
-                m_g(2, 3) = m_gizmo[14];
-                m_g(3, 3) = m_gizmo[15];
+                const Eigen::Affine3d m_g(Eigen::Map<const Eigen::Matrix4f>(m_gizmo).cast<double>());
 
                 const int& index_src = session.pose_graph_loop_closure.edges[session.pose_graph_loop_closure.index_active_edge].index_from;
 
@@ -5249,7 +5757,14 @@ void display()
         }
     }
 
+    const int point_size_before_shortcuts = app_state.point_size;
     view_kbd_shortcuts();
+    // As View > Point cloud > Points size does: the active edge's moved scans are drawn with their own size.
+    if (app_state.point_size != point_size_before_shortcuts)
+    {
+        for (auto& point_cloud : session.point_clouds_container.point_clouds)
+            point_cloud.point_size = app_state.point_size;
+    }
 
     // No synthetic key/Ctrl release after handling a shortcut here: rlImGui
     // only forwards modifier edges, so a faked Ctrl release is never undone
@@ -5356,6 +5871,7 @@ void display()
 
                 if (ImGui::MenuItem("Open las/laz"))
                     openLaz(fillInSession);
+
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Create session from las/laz file(s)");
 
@@ -5391,6 +5907,7 @@ void display()
 
                     if (ImGui::MenuItem("Open las/laz"))
                         openLaz(fillInSession);
+
                     if (ImGui::IsItemHovered())
                         ImGui::SetTooltip("Replace the current session with one created from las/laz file(s)");
 
@@ -6096,6 +6613,10 @@ void display()
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Manually connect overlapping scan sections");
 
+                ImGui::MenuItem("Automatic Image Loop Closure (BoW)", nullptr, &is_bow_loop_closure_gui);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Detect loop closure candidates from CAMERA_0 images (fbow); review before adding edges");
+
                 ImGui::Separator();
                 ImGui::MenuItem("LIO segments editor", "Ctrl+E", &is_lio_segments_gui, !is_loop_closure_gui);
                 if (ImGui::IsItemHovered())
@@ -6200,6 +6721,24 @@ void display()
             }
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Intersection menu");
+
+            auto& loop_closure = session.pose_graph_loop_closure;
+            ImGui::BeginDisabled(loop_closure.icp_all_edges_run.running);
+            if (ImGui::Button("Compute Pose Graph SLAM"))
+            {
+                loop_closure.compute_pose_graph_slam(
+                    session.point_clouds_container, tls_registration.gnss, session.ground_control_points, session.control_points);
+            }
+            ImGui::EndDisabled();
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            {
+                ImGui::SetTooltip(
+                    "Manual Loop Closure's \"Compute Pose Graph SLAM\": optimize the poses with the %zu loop closure edges\n"
+                    "(and GNSS, GCPs, CPs). Keep initial trajectory curvature: %s.%s",
+                    loop_closure.edges.size(),
+                    loop_closure.keep_initial_trajectory_curvature ? "on" : "off",
+                    loop_closure.icp_all_edges_run.running ? "\nWaiting for \"ICP all edges\" to finish." : "");
+            }
         }
 
         if (ImGui::BeginMenu("View"))
@@ -6562,6 +7101,9 @@ void display()
 
     if (is_loop_closure_gui)
         loop_closure_gui();
+
+    if (is_bow_loop_closure_gui)
+        bow_loop_closure_gui();
 
     if (is_lio_segments_gui)
         lio_segments_gui();
@@ -7284,6 +7826,11 @@ int main(int argc, char* argv[])
             display();
             EndDrawing();
         }
+
+        if (bow_state.detect_thread.joinable())
+            bow_state.detect_thread.join();
+        if (bow_state.montage_tex_valid)
+            UnloadTexture(bow_state.montage_tex);
 
         rlImGuiShutdown();
         CloseWindow();

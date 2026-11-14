@@ -592,8 +592,48 @@ inline std::vector<McapPoint> decodeLivoxCustomMsg(
     return points;
 }
 
-inline std::vector<McapPoint> decodePc2(
-	const uint8_t* data, size_t size, Pc2Preset preset = Pc2Preset::Auto, std::string* warning = nullptr)
+// Matches one PointCloud2 field description onto `msg`, as decodePc2() does for
+// each entry of the `fields` array. Unrecognized names and array fields are ignored.
+inline void addPc2Field(Pc2Layout& msg, const std::string& name, uint32_t offset, Pc2Type type, uint32_t count)
+{
+	// count > 1 is an array field (never used for the scalars below).
+	if(count != 1 || pc2TypeSize(type) == 0)
+		return;
+
+	const Pc2Field field{offset, type};
+	if(name == "x")
+		msg.x = field;
+	else if(name == "y")
+		msg.y = field;
+	else if(name == "z")
+		msg.z = field;
+	else if(name == "intensity")
+		msg.intensity = field;
+	else if(name == "ring")
+		msg.ring = field;
+	else if(name == "laser_id")
+		msg.laser_id = field;
+	else if(name == "time")
+		msg.time = field;
+	else if(name == "t")
+		msg.t = field;
+	else if(name == "timestamp")
+		msg.timestamp = field;
+}
+
+// The point records of one PointCloud2, whatever its serialization: `msg` is the
+// layout built from the message's fields array (point_step included), `n_fields`
+// how many fields that array had, `stamp_s` the header stamp. Shared by
+// decodePc2() (ROS2/CDR) and the ROS1 bag reader, so both apply the same presets,
+// time-field rules and warnings.
+inline std::vector<McapPoint> decodePc2Points(
+	const Pc2Layout& msg,
+	uint32_t n_fields,
+	double stamp_s,
+	const uint8_t* rawData,
+	size_t dataLen,
+	Pc2Preset preset = Pc2Preset::Auto,
+	std::string* warning = nullptr)
 {
 	const auto warn = [&](std::string message) {
 		if(warning && warning->empty())
@@ -601,75 +641,11 @@ inline std::vector<McapPoint> decodePc2(
 	};
 
 	std::vector<McapPoint> points;
-	CdrReader r(data, size);
-
-	const int32_t stamp_sec = r.read_i32();
-	const uint32_t stamp_nsec = r.read_u32();
-	r.read_string(); // frame_id
-
-	const double stamp_s = static_cast<double>(stamp_sec) + static_cast<double>(stamp_nsec) * 1e-9;
-
-	r.read_u32(); // height
-	r.read_u32(); // width -- the record count is derived from data/point_step instead
-
-	Pc2Layout msg;
-	const uint32_t nFields = r.read_u32();
-	for(uint32_t i = 0; i < nFields; ++i)
-	{
-		const std::string name = r.read_string();
-		const uint32_t offset = r.read_u32();
-		const auto type = static_cast<Pc2Type>(r.read_u8());
-		const uint32_t count = r.read_u32();
-
-		// count > 1 is an array field (never used for the scalars below).
-		if(count != 1 || pc2TypeSize(type) == 0)
-			continue;
-
-		const Pc2Field field{offset, type};
-		if(name == "x")
-			msg.x = field;
-		else if(name == "y")
-			msg.y = field;
-		else if(name == "z")
-			msg.z = field;
-		else if(name == "intensity")
-			msg.intensity = field;
-		else if(name == "ring")
-			msg.ring = field;
-		else if(name == "laser_id")
-			msg.laser_id = field;
-		else if(name == "time")
-			msg.time = field;
-		else if(name == "t")
-			msg.t = field;
-		else if(name == "timestamp")
-			msg.timestamp = field;
-	}
-
-	const bool is_bigendian = r.read_bool();
-	msg.point_step = r.read_u32();
-	r.read_u32(); // row_step
-
-	const uint32_t dataLen = r.read_u32();
-	const uint8_t* rawData = r.read_raw(dataLen);
-
-	if(!rawData)
-	{
-		warn("PointCloud2 data array is truncated");
-		return points;
-	}
-	if(is_bigendian)
-	{
-		// No real ROS2 bag sets this; byte-swapping every field to support a
-		// hypothetical one would be untestable, so refuse rather than misread.
-		warn("PointCloud2 is big-endian, which is not supported");
-		return points;
-	}
 
 	Pc2Layout layout;
 	if(pc2PresetLayout(preset, layout))
 	{
-		if(nFields > 0)
+		if(n_fields > 0)
 		{
 			const std::string diff = detail::comparePc2Layouts(layout, msg);
 			if(!diff.empty())
@@ -698,12 +674,12 @@ inline std::vector<McapPoint> decodePc2(
 		return points;
 	}
 
-	const uint32_t nPts = dataLen / layout.point_step;
+	const size_t nPts = dataLen / layout.point_step;
 	points.reserve(nPts);
 
-	for(uint32_t i = 0; i < nPts; ++i)
+	for(size_t i = 0; i < nPts; ++i)
 	{
-		const uint8_t* p = rawData + static_cast<size_t>(i) * layout.point_step;
+		const uint8_t* p = rawData + i * layout.point_step;
 
 		McapPoint pt{};
 		pt.x = static_cast<float>(readPc2Field(p, layout.x));
@@ -740,6 +716,59 @@ inline std::vector<McapPoint> decodePc2(
 	}
 
 	return points;
+}
+
+inline std::vector<McapPoint> decodePc2(
+	const uint8_t* data, size_t size, Pc2Preset preset = Pc2Preset::Auto, std::string* warning = nullptr)
+{
+	const auto warn = [&](std::string message) {
+		if(warning && warning->empty())
+			*warning = std::move(message);
+	};
+
+	CdrReader r(data, size);
+
+	const int32_t stamp_sec = r.read_i32();
+	const uint32_t stamp_nsec = r.read_u32();
+	r.read_string(); // frame_id
+
+	const double stamp_s = static_cast<double>(stamp_sec) + static_cast<double>(stamp_nsec) * 1e-9;
+
+	r.read_u32(); // height
+	r.read_u32(); // width -- the record count is derived from data/point_step instead
+
+	Pc2Layout msg;
+	const uint32_t nFields = r.read_u32();
+	for(uint32_t i = 0; i < nFields; ++i)
+	{
+		const std::string name = r.read_string();
+		const uint32_t offset = r.read_u32();
+		const auto type = static_cast<Pc2Type>(r.read_u8());
+		const uint32_t count = r.read_u32();
+		addPc2Field(msg, name, offset, type, count);
+	}
+
+	const bool is_bigendian = r.read_bool();
+	msg.point_step = r.read_u32();
+	r.read_u32(); // row_step
+
+	const uint32_t dataLen = r.read_u32();
+	const uint8_t* rawData = r.read_raw(dataLen);
+
+	if(!rawData)
+	{
+		warn("PointCloud2 data array is truncated");
+		return {};
+	}
+	if(is_bigendian)
+	{
+		// No real ROS2 bag sets this; byte-swapping every field to support a
+		// hypothetical one would be untestable, so refuse rather than misread.
+		warn("PointCloud2 is big-endian, which is not supported");
+		return {};
+	}
+
+	return decodePc2Points(msg, nFields, stamp_s, rawData, dataLen, preset, warning);
 }
 
 // sensor_msgs/msg/Imu → McapImuSample (one sample per CDR message)

@@ -151,6 +151,63 @@ include(${THIRDPARTY_DIRECTORY_BINARY}/OpenCV/CMakeLists.txt)
 find_package(OpenCV REQUIRED)
 message(STATUS "OpenCV include dir: ${OpenCV_INCLUDE_DIRS}, OpenCV libs: ${OpenCV_LIBS}")
 
+# fbow - Fast Bag-of-Words image retrieval (needs OpenCV, added above)
+set(BUILD_UTILS OFF CACHE BOOL "" FORCE)
+# fbow's own CMakeLists defaults USE_SSE3/USE_AVX to ON unconditionally (only
+# guards -O2 vs -O3 by CMAKE_SYSTEM_PROCESSOR, not the x86 vector flags), which
+# fails on arm64 (e.g. Apple Silicon) where -msse3/-mavx aren't valid clang flags.
+if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|i686|x86)$")
+    set(USE_SSE3 OFF CACHE BOOL "" FORCE)
+    set(USE_AVX OFF CACHE BOOL "" FORCE)
+    # fbow's sources include <immintrin.h> and use cpuid unless built for
+    # Android; the patch takes those portable paths on any non-x86 CPU.
+    # Applied once to the submodule's working tree (skipped if already applied).
+    find_package(Git REQUIRED)
+    set(FBOW_PATCH ${THIRDPARTY_DIRECTORY}/patches/fbow_non_x86.patch)
+    execute_process(
+        COMMAND ${GIT_EXECUTABLE} apply --reverse --check ${FBOW_PATCH}
+        WORKING_DIRECTORY ${THIRDPARTY_DIRECTORY}/fbow
+        RESULT_VARIABLE FBOW_PATCH_APPLIED
+        OUTPUT_QUIET ERROR_QUIET)
+    if(NOT FBOW_PATCH_APPLIED EQUAL 0)
+        execute_process(
+            COMMAND ${GIT_EXECUTABLE} apply ${FBOW_PATCH}
+            WORKING_DIRECTORY ${THIRDPARTY_DIRECTORY}/fbow
+            RESULT_VARIABLE FBOW_PATCH_RESULT)
+        if(NOT FBOW_PATCH_RESULT EQUAL 0)
+            message(FATAL_ERROR "Failed to apply ${FBOW_PATCH} to ${THIRDPARTY_DIRECTORY}/fbow")
+        endif()
+        message(STATUS "Applied ${FBOW_PATCH}")
+    endif()
+endif()
+# fbow's CMakeLists leaks global cache entries that would break every target
+# added after it (same trap as Xerces above):
+#   option(BUILD_SHARED_LIBS ... ON) -- flips raylib, glad, ... to shared libs
+#     that hide their bundled glfw/glad symbols (undefined glfw*/glad_gl* at link);
+#   WIN32: EXECUTABLE/LIBRARY/RUNTIME_OUTPUT_PATH -- redirect every later
+#     target's output (e.g. vqf.lib no longer under lib/Release).
+# Pin BUILD_SHARED_LIBS=OFF so fbow builds static and the option() is a no-op,
+# then restore/remove those cache entries once fbow is configured.
+if(DEFINED CACHE{BUILD_SHARED_LIBS})
+    set(_hd_bsl_prev "$CACHE{BUILD_SHARED_LIBS}")
+    set(_hd_bsl_restore ON)
+else()
+    set(_hd_bsl_restore OFF)
+endif()
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "HDMapping links fbow statically" FORCE)
+set(FBOW_DEVINSTALL OFF CACHE BOOL "" FORCE)
+add_subdirectory(${THIRDPARTY_DIRECTORY}/fbow)
+if(_hd_bsl_restore)
+    set(BUILD_SHARED_LIBS "${_hd_bsl_prev}" CACHE BOOL "Build shared libraries" FORCE)
+else()
+    unset(BUILD_SHARED_LIBS CACHE)
+endif()
+unset(EXECUTABLE_OUTPUT_PATH CACHE)
+unset(LIBRARY_OUTPUT_PATH CACHE)
+unset(RUNTIME_OUTPUT_PATH CACHE)
+set(FBOW_INCLUDE_DIR ${THIRDPARTY_DIRECTORY}/fbow/src)
+message(STATUS "Using bundled fbow from: ${THIRDPARTY_DIRECTORY}/fbow")
+
 # PROJ - Cartographic projections library
 include(${THIRDPARTY_DIRECTORY_BINARY}/Proj/CMakeLists.txt)
 message(STATUS "PROJ include dir: ${PROJ_INCLUDE_DIR}, PROJ library: ${PROJ_LIBRARY}")
@@ -271,6 +328,15 @@ message(STATUS "Using external library: WGS84toCartesian")
 
 # mcap - support for ROS 2 bag export
 add_subdirectory(${THIRDPARTY_DIRECTORY}/mcap)
+
+# rosbags/Ros1Bag reads bz2 chunks through libbz2. Like mcap's LZ4/ZSTD, this is
+# skipped on Windows: no package manager provides it there, so Ros1Bag.cpp compiles out
+# all chunk compression on MCAP_COMPRESSION_NO_LZ4 and reads uncompressed bags only.
+add_library(ros1bag_compression INTERFACE)
+if(NOT WIN32)
+    find_package(BZip2 REQUIRED)
+    target_link_libraries(ros1bag_compression INTERFACE BZip2::BZip2)
+endif()
 
 message(STATUS "==== Dependencies Configuration Complete ====")
 

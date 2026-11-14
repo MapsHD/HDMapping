@@ -82,7 +82,26 @@ enum class PointCloudLayout
 	Velodyne, // x,y,z,intensity,ring,time -- point_step = 26 (no laser_id)
 	Ouster, // x,y,z,intensity,t,reflectivity,ring,ambient -- point_step = 26
 	Hesai, // x,y,z,intensity,timestamp,ring -- point_step = 26
+	Canonical, // x,y,z,intensity,ring,time(float32),t -- point_step = 28 (benchmark canonical bag)
 };
+
+// One PointCloud2 field of a layout; datatype as in sensor_msgs/PointField
+// (2 UINT8, 4 UINT16, 6 UINT32, 7 FLOAT32, 8 FLOAT64).
+struct PointCloudField
+{
+	const char* name;
+	uint32_t offset;
+	uint8_t datatype;
+};
+
+// The field table and point_step of `layout` (the tables below), and the
+// PointCloud2 `data` bytes for `points` in it. Relative per-point times are
+// taken from points.front(), so `points` should be sorted by timestamp.
+// McapFileWriter uses these, and so does the ROS1 bag writer, so both formats
+// carry identical records.
+std::vector<PointCloudField> pointCloudFields(PointCloudLayout layout);
+uint32_t pointCloudPointStep(PointCloudLayout layout);
+std::vector<uint8_t> packPointCloud(const std::vector<McapPoint>& points, PointCloudLayout layout);
 
 struct McapWriterOptions
 {
@@ -144,6 +163,16 @@ struct McapWriterOptions
 //     intensity  float32  offset 12
 //     timestamp  float64  offset 16  (seconds, ABSOLUTE -- not relative to the message stamp, per Hesai convention)
 //     ring       uint16   offset 24
+//   Canonical (point_step = 28, the benchmark's canonical spinning-lidar bag; its float32
+//   `time` is what FAST-LIO/LIO-SAM Velodyne point types read -- PCL matches fields by
+//   name and datatype, so the float64 `time` of the Velodyne layout above reads as 0 there):
+//     x          float32  offset  0
+//     y          float32  offset  4
+//     z          float32  offset  8
+//     intensity  float32  offset 12
+//     ring       uint16   offset 16  (2 bytes padding follow)
+//     time       float32  offset 20  (seconds, relative to the message stamp)
+//     t          uint32   offset 24  (nanoseconds, relative to the message stamp)
 class McapFileWriter
 {
 public:

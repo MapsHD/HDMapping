@@ -6,6 +6,8 @@
 #include <Core/structures.h>
 #include <Core/transformations.h>
 
+#include "console_progress.h"
+
 inline void split(std::string& str, char delim, std::vector<std::string>& out)
 {
     size_t start;
@@ -41,11 +43,16 @@ int main(int argc, char* argv[])
             return false;
         }
 
+        const uint64_t file_bytes = std::filesystem::file_size(trj_path);
+        ConsoleProgress progress("Reading trajectory (bytes)", file_bytes);
+
         std::string s;
         getline(infile, s); // csv header
         while (!infile.eof())
         {
             getline(infile, s);
+            if (infile.good())
+                progress.update(static_cast<uint64_t>(infile.tellg()));
             std::vector<std::string> strs;
             split(s, ' ', strs);
 
@@ -68,6 +75,9 @@ int main(int argc, char* argv[])
 
                 ltn.timestamps.second = 0.0;
                 ltn.imu_om_fi_ka = { 0, 0, 0 };
+
+                ltn.timestamps.first *= atof(argv[3]);
+
                 local_trajectory.push_back(ltn);
             }
 
@@ -122,6 +132,7 @@ int main(int argc, char* argv[])
             }
         }
 
+        progress.finish(file_bytes);
         std::cout << local_trajectory.size() << " local nodes" << std::endl;
         infile.close();
 

@@ -1,0 +1,89 @@
+diff --git a/src/cpu.h b/src/cpu.h
+index 7dcb7e3..7b73e7e 100644
+--- a/src/cpu.h
++++ b/src/cpu.h
+@@ -4,7 +4,11 @@
+ #include <cstdint>
+ #include <cstring>
+ #include <string>
+-#ifdef __ANDROID__
++// No x86 SIMD/cpuid off x86 (Android, arm64 e.g. Apple Silicon): portable code paths only.
++#if defined(__ANDROID__) || !(defined(__x86_64__) || defined(_M_X64) || defined(__i386) || defined(_M_IX86))
++#define FBOW_NO_X86 1
++#endif
++#ifdef FBOW_NO_X86
+ 
+ #else
+ #if defined(__x86_64__) || defined(_M_X64) || defined(__i386) || defined(_M_IX86)
+@@ -48,7 +52,7 @@ private:
+     static bool inline detect_OS_AVX512();
+     static inline uint64_t xgetbv(unsigned int x);
+ };
+-#ifdef __ANDROID__
++#ifdef FBOW_NO_X86
+ 
+ void cpu::cpuid(int32_t out[4], int32_t x){}
+ #else
+@@ -91,7 +95,7 @@ bool  cpu::detect_OS_x64(){ return true;}
+ ////////////////////////////////////////////////////////////////////////////////
+ bool cpu::detect_OS_AVX(){
+     //  Copied from: http://stackoverflow.com/a/22521619/922184
+-#ifndef __ANDROID__
++#ifndef FBOW_NO_X86
+ 
+     bool avxSupported = false;
+     int cpuInfo[4]; cpuid(cpuInfo, 1);
+@@ -105,7 +109,7 @@ bool cpu::detect_OS_AVX(){
+ }
+ bool cpu::detect_OS_AVX512(){
+ 
+-#ifndef __ANDROID__
++#ifndef FBOW_NO_X86
+     if (!detect_OS_AVX())
+         return false;
+     uint64_t xcrFeatureMask = xgetbv(_XCR_XFEATURE_ENABLED_MASK);
+@@ -118,7 +122,7 @@ bool cpu::detect_OS_AVX512(){
+ std::string cpu::get_vendor_string(){ int32_t CPUInfo[4]; char name[13];cpuid(CPUInfo, 0); memcpy(name + 0, &CPUInfo[1], 4);memcpy(name + 4, &CPUInfo[3], 4); memcpy(name + 8, &CPUInfo[2], 4); name[12] = '\0'; return name;}
+ void cpu::detect_host(){
+ 
+-#ifndef __ANDROID__
++#ifndef FBOW_NO_X86
+ 
+     OS_x64 = detect_OS_x64();
+     OS_AVX = detect_OS_AVX();
+@@ -136,6 +140,9 @@ void cpu::detect_host(){
+     if (nIds >= 0x00000001){ cpuid(info, 0x00000001); HW_MMX    = (info[3] & ((int)1 << 23)) != 0; HW_SSE    = (info[3] & ((int)1 << 25)) != 0; HW_SSE2   = (info[3] & ((int)1 << 26)) != 0; HW_SSE3   = (info[2] & ((int)1 <<  0)) != 0; HW_SSSE3  = (info[2] & ((int)1 <<  9)) != 0; HW_SSE41  = (info[2] & ((int)1 << 19)) != 0; HW_SSE42  = (info[2] & ((int)1 << 20)) != 0; HW_AES    = (info[2] & ((int)1 << 25)) != 0; HW_AVX    = (info[2] & ((int)1 << 28)) != 0; HW_FMA3   = (info[2] & ((int)1 << 12)) != 0; HW_RDRAND = (info[2] & ((int)1 << 30)) != 0;    }
+     if (nIds >= 0x00000007){ cpuid(info, 0x00000007); HW_AVX2         = (info[1] & ((int)1 <<  5)) != 0; HW_BMI1         = (info[1] & ((int)1 <<  3)) != 0; HW_BMI2         = (info[1] & ((int)1 <<  8)) != 0; HW_ADX          = (info[1] & ((int)1 << 19)) != 0; HW_MPX          = (info[1] & ((int)1 << 14)) != 0; HW_SHA          = (info[1] & ((int)1 << 29)) != 0; HW_PREFETCHWT1  = (info[2] & ((int)1 <<  0)) != 0; HW_AVX512_F     = (info[1] & ((int)1 << 16)) != 0; HW_AVX512_CD    = (info[1] & ((int)1 << 28)) != 0; HW_AVX512_PF    = (info[1] & ((int)1 << 26)) != 0; HW_AVX512_ER    = (info[1] & ((int)1 << 27)) != 0; HW_AVX512_VL    = (info[1] & ((int)1 << 31)) != 0; HW_AVX512_BW    = (info[1] & ((int)1 << 30)) != 0; HW_AVX512_DQ    = (info[1] & ((int)1 << 17)) != 0; HW_AVX512_IFMA  = (info[1] & ((int)1 << 21)) != 0; HW_AVX512_VBMI  = (info[2] & ((int)1 <<  1)) != 0;    }
+     if (nExIds >= 0x80000001){ cpuid(info, 0x80000001); HW_x64   = (info[3] & ((int)1 << 29)) != 0; HW_ABM   = (info[2] & ((int)1 <<  5)) != 0; HW_SSE4a = (info[2] & ((int)1 <<  6)) != 0; HW_FMA4  = (info[2] & ((int)1 << 16)) != 0; HW_XOP   = (info[2] & ((int)1 << 11)) != 0; }
++#else
++    // 64-bit words for the hamming distance (ORB) on 64-bit non-x86 CPUs.
++    HW_x64 = sizeof(void*) == 8;
+ #endif
+ }
+ 
+diff --git a/src/fbow.h b/src/fbow.h
+index 02d9c2d..cd8bf41 100644
+--- a/src/fbow.h
++++ b/src/fbow.h
+@@ -6,10 +6,10 @@
+ #include <map>
+ #include <memory>
+ #include <bitset>
+-#ifndef __ANDROID__
++#include "cpu.h"
++#ifndef FBOW_NO_X86
+ #include <immintrin.h>
+ #endif
+-#include "cpu.h"
+ namespace fbow{
+ 
+ //float initialized to zero.
+@@ -241,7 +241,7 @@ private:
+             return d;
+         }
+     };
+-#ifdef __ANDROID__
++#ifdef FBOW_NO_X86
+     //fake elements to allow compilation
+     struct L2_avx_generic:public Lx<uint64_t,float,32>{inline float computeDist(uint64_t *ptr){return std::numeric_limits<float>::max();}};
+     struct L2_se3_generic:public Lx<uint64_t,float,32>{inline float computeDist(uint64_t *ptr){return std::numeric_limits<float>::max();}};

@@ -858,6 +858,7 @@ bool OusterPcapReader::read(const Callbacks& callbacks)
 		if(!d.in.read(reinterpret_cast<char*>(d.record.data()), captured))
 			break; // torn final record
 		++d.stats.records;
+		d.stats.bytes_read += sizeof(record_header) + captured;
 		d.handleFrame(d.record.data(), d.record.size());
 	}
 	for(const auto& [key, datagram] : d.pending)

@@ -11,6 +11,8 @@
 
 #include <spdlog/spdlog.h>
 
+#include "console_progress.h"
+
 bool load_pc(PointCloud& pc, const std::string& input_file_name)
 {
     laszip_POINTER laszip_reader;
@@ -56,6 +58,7 @@ bool load_pc(PointCloud& pc, const std::string& input_file_name)
     std::cout << (is_compressed ? "" : "un") << "compressed file '" << (std::filesystem::path(input_file_name).filename().string())
               << "' contains " << npoints << " points" << std::endl;
 
+    ConsoleProgress progress("Reading points", static_cast<uint64_t>(npoints));
     laszip_I64 p_count = 0;
 
     while (p_count < npoints)
@@ -86,9 +89,12 @@ bool load_pc(PointCloud& pc, const std::string& input_file_name)
         pc.colors.push_back(color);
 
         p_count++;
+        progress.update(static_cast<uint64_t>(p_count));
     }
+    progress.finish(static_cast<uint64_t>(p_count));
 
     laszip_close_reader(laszip_reader);
+    laszip_destroy(laszip_reader);
 
     return true;
 }
@@ -109,14 +115,16 @@ int main(int argc, char* argv[])
         return 2;
     }
 
+    // exportLaz() treats timestamps as seconds and writes them as nanoseconds (x 1e9),
+    // so divide by 1e9 to keep the input's units.
     for (auto& t : pc.timestamps)
     {
-        t *= atof(argv[2]);
+        t *= atof(argv[3]) / 1e9;
     }
 
     if (!exportLaz(argv[2], pc.points_local, pc.intensities, pc.timestamps))
     {
-        std::cout << "Problem with saving: '" << argv[3] << std::endl;
+        std::cout << "Problem with saving: '" << argv[2] << "'" << std::endl;
     }
 
     return 0;

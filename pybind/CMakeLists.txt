@@ -185,6 +185,8 @@ target_link_libraries(
 
     core_no_gui
 
+    spdlog::spdlog
+
     ${PLATFORM_LASZIP_LIB}
 
     vqf

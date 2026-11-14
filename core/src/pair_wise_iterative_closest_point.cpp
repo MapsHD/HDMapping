@@ -5,6 +5,8 @@
 #include <Core/structures.h>
 #include <Core/transformations.h>
 
+#include <tbb/parallel_for_each.h>
+
 #include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian_simplified.h>
 
 inline void point_to_point_source_to_target_tait_bryan_wc_AtPA_simplified_4(
@@ -144,40 +146,62 @@ bool PairWiseICP::compute(
     std::cout << "PairWiseICP::compute" << std::endl;
     bool multithread = true;
 
+    // The target and the search radius don't change between iterations, so its bucket index is built once.
+    std::vector<std::pair<uint64_t, uint32_t>> indexes;
+
+    for (int i = 0; i < target.size(); i++)
+    {
+        uint64_t index = get_rgd_index_3d(target[i], { search_radious, search_radious, search_radious });
+        indexes.emplace_back(index, i);
+    }
+
+    // Ties broken by point index: std::sort leaves the order within a bucket to the standard library, and the
+    // search below skips each bucket's last point, so without this the result differs between platforms.
+    std::sort(
+        indexes.begin(),
+        indexes.end(),
+        [](const std::pair<uint64_t, uint32_t>& a, const std::pair<uint64_t, uint32_t>& b)
+        {
+            return a.first != b.first ? a.first < b.first : a.second < b.second;
+        });
+
+    std::unordered_map<uint64_t, std::pair<uint32_t, uint32_t>> buckets;
+
+    for (uint32_t i = 0; i < indexes.size(); i++)
+    {
+        uint64_t index_of_bucket = indexes[i].first;
+        if (buckets.contains(index_of_bucket))
+        {
+            buckets[index_of_bucket].second = i;
+        }
+        else
+        {
+            buckets[index_of_bucket].first = i;
+            buckets[index_of_bucket].second = i;
+        }
+    }
+
+    // Target points in bucket order, so a bucket's points are read from contiguous memory.
+    std::vector<Eigen::Vector3d> target_sorted(indexes.size());
+    for (size_t i = 0; i < indexes.size(); i++)
+    {
+        target_sorted[i] = target[indexes[i].second];
+    }
+    const double search_radious_squared = search_radious * search_radious;
+
+    // Normal equations are summed per block of source points, then the blocks in order: no lock per point, and
+    // the same sum on every run and machine.
+    struct NormalEquations
+    {
+        Eigen::Matrix<double, 6, 6> AtPA = Eigen::Matrix<double, 6, 6>::Zero();
+        Eigen::Matrix<double, 6, 1> AtPB = Eigen::Matrix<double, 6, 1>::Zero();
+        int counter_nn = 0;
+    };
+    constexpr size_t number_of_blocks = 256;
+    const size_t block_size = (source.size() + number_of_blocks - 1) / number_of_blocks;
+
     for (int iter = 0; iter < number_of_iterations; iter++)
     {
-        std::vector<std::pair<uint64_t, uint32_t>> indexes;
-
-        for (int i = 0; i < target.size(); i++)
-        {
-            uint64_t index = get_rgd_index_3d(target[i], { search_radious, search_radious, search_radious });
-            indexes.emplace_back(index, i);
-        }
-
-        std::sort(
-            indexes.begin(),
-            indexes.end(),
-            [](const std::pair<uint64_t, uint32_t>& a, const std::pair<uint64_t, uint32_t>& b)
-            {
-                return a.first < b.first;
-            });
-
-        std::unordered_map<uint64_t, std::pair<uint32_t, uint32_t>> buckets;
-
-        for (uint32_t i = 0; i < indexes.size(); i++)
-        {
-            uint64_t index_of_bucket = indexes[i].first;
-            if (buckets.contains(index_of_bucket))
-            {
-                buckets[index_of_bucket].second = i;
-            }
-            else
-            {
-                buckets[index_of_bucket].first = i;
-                buckets[index_of_bucket].second = i;
-            }
-        }
-
         std::cout << "iteration: " << iter + 1 << " of: " << number_of_iterations << std::endl;
         Eigen::MatrixXd AtPA(6, 6);
         AtPA.setZero();
@@ -185,10 +209,10 @@ bool PairWiseICP::compute(
         AtPB.setZero();
         Eigen::Vector3d b(search_radious, search_radious, search_radious);
 
-        std::mutex mutex;
-        int counter_nn = 0;
+        const TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(m_pose_result);
+        std::vector<NormalEquations> block_sums(number_of_blocks);
 
-        const auto hessian_fun = [&](const Eigen::Vector3d& source_i)
+        const auto hessian_fun = [&](const Eigen::Vector3d& source_i, NormalEquations& sum)
         {
             if (source_i.norm() < 0.1)
             {
@@ -197,8 +221,7 @@ bool PairWiseICP::compute(
 
             Eigen::Vector3d source_point_global = m_pose_result * source_i;
 
-            double min_dist = 1000000000.0;
-            Eigen::Vector3d target_i;
+            double min_dist_squared = 1000000000.0;
             Eigen::Vector3d target_i_nn;
             bool nn_found = false;
             for (double x = -search_radious; x <= search_radious; x += search_radious)
@@ -211,19 +234,19 @@ bool PairWiseICP::compute(
                         uint64_t index_of_bucket =
                             get_rgd_index_3d(source_point_global_ext, { search_radious, search_radious, search_radious });
 
-                        if (buckets.contains(index_of_bucket))
+                        const auto bucket = buckets.find(index_of_bucket);
+                        if (bucket != buckets.end())
                         {
-                            for (int index = buckets[index_of_bucket].first; index < buckets[index_of_bucket].second; index++)
+                            for (int index = bucket->second.first; index <= bucket->second.second; index++)
                             {
-                                int index_element_target = indexes[index].second;
-                                target_i = target[index_element_target];
-                                double d = (source_point_global - target_i).norm();
+                                const Eigen::Vector3d& target_i = target_sorted[index];
+                                const double d_squared = (source_point_global - target_i).squaredNorm();
 
-                                if (d < search_radious)
+                                if (d_squared < search_radious_squared)
                                 {
-                                    if (d < min_dist)
+                                    if (d_squared < min_dist_squared)
                                     {
-                                        min_dist = d;
+                                        min_dist_squared = d_squared;
                                         nn_found = true;
                                         target_i_nn = target_i;
                                     }
@@ -238,7 +261,6 @@ bool PairWiseICP::compute(
             if (nn_found)
             {
                 const Eigen::Vector3d& p_s = source_i;
-                const TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(m_pose_result);
 
                 Eigen::Matrix<double, 6, 6, Eigen::RowMajor> AtPA_;
                 point_to_point_source_to_target_tait_bryan_wc_AtPA_simplified(
@@ -287,26 +309,39 @@ bool PairWiseICP::compute(
                     target_i_nn.y(),
                     target_i_nn.z());
 
-                std::unique_lock lck(mutex);
-                AtPA.block<6, 6>(0, 0) += AtPA_;
-                AtPB.block<6, 1>(0, 0) -= AtPB_;
-                counter_nn++;
+                sum.AtPA += AtPA_;
+                sum.AtPB -= AtPB_;
+                sum.counter_nn++;
+            }
+        };
+
+        const auto block_fun = [&](NormalEquations& sum)
+        {
+            const size_t block = &sum - block_sums.data();
+            const size_t begin = std::min(source.size(), block * block_size);
+            const size_t end = std::min(source.size(), begin + block_size);
+            for (size_t i = begin; i < end; i++)
+            {
+                hessian_fun(source[i], sum);
             }
         };
 
         if (multithread)
         {
-            std::for_each(
-#if USE_EXECUTION_PAR_UNSEQ
-                std::execution::par_unseq,
-#endif
-                std::begin(source),
-                std::end(source),
-                hessian_fun);
+            // TBB rather than std::execution, which AppleClang's libc++ doesn't run in parallel.
+            tbb::parallel_for_each(block_sums.begin(), block_sums.end(), block_fun);
         }
         else
         {
-            std::for_each(std::begin(source), std::end(source), hessian_fun);
+            std::for_each(block_sums.begin(), block_sums.end(), block_fun);
+        }
+
+        int counter_nn = 0;
+        for (const auto& sum : block_sums)
+        {
+            AtPA += sum.AtPA;
+            AtPB += sum.AtPB;
+            counter_nn += sum.counter_nn;
         }
 
         if (AtPB(0, 0) == 0.0 && AtPB(1, 0) == 0.0 && AtPB(2, 0) == 0.0 && AtPB(3, 0) == 0.0 && AtPB(4, 0) == 0.0 && AtPB(5, 0) == 0.0)
@@ -395,12 +430,14 @@ bool PairWiseICP::compute_fast(
         indexes.emplace_back(index, i);
     }
 
+    // Ties broken by point index: std::sort leaves the order within a bucket to the standard library, and the
+    // search below skips each bucket's last point, so without this the result differs between platforms.
     std::sort(
         indexes.begin(),
         indexes.end(),
         [](const std::pair<uint64_t, uint32_t>& a, const std::pair<uint64_t, uint32_t>& b)
         {
-            return a.first < b.first;
+            return a.first != b.first ? a.first < b.first : a.second < b.second;
         });
 
     std::unordered_map<uint64_t, std::pair<uint32_t, uint32_t>> buckets;

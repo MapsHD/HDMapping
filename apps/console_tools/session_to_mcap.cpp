@@ -31,6 +31,8 @@
 
 #include <spdlog/spdlog.h>
 
+#include "console_progress.h"
+
 namespace fs = std::filesystem;
 
 namespace
@@ -468,6 +470,7 @@ int main(const int argc, const char** argv)
     size_t total_points = 0;
     std::vector<rosbags::McapTransform> all_tf;
     MessageSplitter splitter(writer, msg_hz);
+    const ConsoleProgress progress("Chunks", clouds.size());
     for (size_t idx = 0; idx < clouds.size(); ++idx)
     {
         const auto& pc = clouds[idx];
@@ -481,7 +484,7 @@ int main(const int argc, const char** argv)
         sort_points_by_timestamp(points);
         total_points += points.size();
         splitter.add(points);
-        spdlog::info("[{}/{}] {}: {} points", idx + 1, clouds.size(), pc.file_name, points.size());
+        spdlog::info("[{}] {}: {} points", progress.status(idx + 1), pc.file_name, points.size());
 
         const auto tf = to_mcap_transforms(pc);
         all_tf.insert(all_tf.end(), tf.begin(), tf.end());

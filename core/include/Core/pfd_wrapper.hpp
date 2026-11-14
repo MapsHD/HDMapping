@@ -61,6 +61,7 @@ namespace mandeye::fd
         const std::string& defaultExtension = "",
         const std::string& defaultFileName = "");
     std::string SelectFolder(const std::string& title);
+    void SetLastLocationHint(const std::string& locationHint);
 
     void OutOfMemMessage();
 } // namespace mandeye::fd

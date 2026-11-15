@@ -80,6 +80,7 @@ struct LidarOdometryParams
     std::function<void(const Eigen::Vector3d&)> publish_processing_head; // completed worker, never the predicted tail
 
     // filter points
+    bool skip_first_file = true; // drop the first LAZ file's points during load (IMU data is kept)
     double filter_threshold_xy_inner = 0.3; // filtering points during load
     double filter_threshold_xy_outer = 70.0; // filtering points during load
     double decimation = 0.01; // filtering points during load

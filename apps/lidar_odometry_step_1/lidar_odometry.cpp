@@ -66,9 +66,10 @@ static void write_calibration_validation(const fs::path& wdp, const std::vector<
 static constexpr double kLidarGapWarningS = 0.05;
 
 // Warns about gaps inside each file and between consecutive files (t_first/t_last are 0 for a file without
-// points). The first file is skipped, as its points are never used.
+// points). Files before first_file are skipped, as their points are never used.
 static void report_lidar_gaps(
     const std::vector<std::string>& files,
+    size_t first_file,
     const std::vector<std::vector<LidarGap>>& gaps_in_file,
     const std::vector<double>& t_first,
     const std::vector<double>& t_last)
@@ -84,7 +85,7 @@ static void report_lidar_gaps(
 
     double previous_last = 0.0;
     std::string previous_name;
-    for (size_t i = 1; i < gaps_in_file.size(); i++)
+    for (size_t i = first_file; i < gaps_in_file.size(); i++)
     {
         if (t_first[i] == 0.0 && t_last[i] == 0.0)
             continue;
@@ -371,6 +372,8 @@ bool load_data(
         }
 
         pointsPerFile.resize(minSize);
+        // the first file's points are dropped unless params.skip_first_file is off
+        const size_t firstUsedFile = params.skip_first_file ? 1 : 0;
 
         // --- Working directories
 
@@ -410,7 +413,7 @@ bool load_data(
             L.done.assign(minSize, 0);
             std::vector<std::vector<LidarGap>> gaps_in_file(minSize);
             tbb::parallel_for(
-                size_t(1), // upstream clears the first file's cloud after loading: it is never used
+                std::min(firstUsedFile, minSize), // a skipped file's cloud is never used
                 minSize,
                 [&](size_t i)
                 {
@@ -426,7 +429,7 @@ bool load_data(
                     }
                     gaps_in_file[i] = find_lidar_gaps(data, kLidarGapWarningS);
                 });
-            report_lidar_gaps(L.files, gaps_in_file, L.t_first, L.t_last);
+            report_lidar_gaps(L.files, firstUsedFile, gaps_in_file, L.t_first, L.t_last);
             if (params.save_calibration_validation && minSize > 0) // as the eager load: the first file, then dropped
                 write_calibration_validation(wdp, L.load(0), params);
             size_t totalPoints = 0;
@@ -472,9 +475,9 @@ bool load_data(
                 // Store results
                 pointsPerFile[i] = std::move(data);
             });
-        report_lidar_gaps(laz_files, gaps_in_file, t_first, t_last);
+        report_lidar_gaps(laz_files, firstUsedFile, gaps_in_file, t_first, t_last);
 
-        if (pointsPerFile.size() > 0)
+        if (params.skip_first_file && pointsPerFile.size() > 0)
             pointsPerFile.front().clear();
 
         // --- Summary

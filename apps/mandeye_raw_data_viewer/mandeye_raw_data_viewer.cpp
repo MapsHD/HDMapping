@@ -91,6 +91,7 @@ std::map<uint64_t, std::string> photo_files_ts;
 
 double filter_threshold_xy_inner = 0.0; // no filtering for raw viewing
 double filter_threshold_xy_outer = 300.0; // no filtering for raw viewing
+bool skip_first_file = true; // as step 1: the first LAZ file's points are dropped
 bool fusionConventionNwu = true;
 bool fusionConventionEnu = false;
 bool fusionConventionNed = false;
@@ -1015,6 +1016,7 @@ void loadFiles(std::vector<std::string> input_file_names)
     params.lazy_load_raw_clouds = false; // the viewer shows every cloud
     params.filter_threshold_xy_inner = filter_threshold_xy_inner;
     params.filter_threshold_xy_outer = filter_threshold_xy_outer;
+    params.skip_first_file = skip_first_file;
 
     std::vector<std::vector<Point3Di>> pointsPerFile;
     Imu imu_data;
@@ -1798,6 +1800,9 @@ void display()
                     openFiles();
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Select files for analyze");
+                ImGui::MenuItem("Skip first file", nullptr, &skip_first_file);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Drop the points of the first LAZ file on the next load, as step 1 does");
 
                 ImGui::EndPopup();
             }

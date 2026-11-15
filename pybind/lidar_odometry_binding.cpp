@@ -54,6 +54,7 @@ PYBIND11_MODULE(lidar_odometry_py, m)
     // Bind LidarOdometryParams
     py::class_<LidarOdometryParams>(m, "LidarOdometryParams")
         .def(py::init<>())
+        .def_readwrite("skip_first_file", &LidarOdometryParams::skip_first_file)
         .def_readwrite("filter_threshold_xy_inner", &LidarOdometryParams::filter_threshold_xy_inner)
         .def_readwrite("filter_threshold_xy_outer", &LidarOdometryParams::filter_threshold_xy_outer)
         .def_readwrite("m_g", &LidarOdometryParams::m_g)

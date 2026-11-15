@@ -879,6 +879,10 @@ void settings_gui()
             return;
         }
 
+        ImGui::Checkbox("Skip first file", &params.skip_first_file);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("drop the points of the first LAZ file during load (its IMU data is kept)");
+
         ImGui::PushItemWidth(ImGuiNumberWidth);
         ImGui::InputDouble("Filter threshold XY inner [m]", &params.filter_threshold_xy_inner, 0.0, 0.0, "%.3f");
         if (ImGui::IsItemHovered())

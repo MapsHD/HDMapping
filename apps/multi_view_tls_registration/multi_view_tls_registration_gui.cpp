@@ -1059,15 +1059,22 @@ struct SectionPlane
 {
     bool used = true;
     bool flip = false;
-    Eigen::Affine3d pose = Eigen::Affine3d::Identity();
+    Eigen::Affine3d local_pose = Eigen::Affine3d::Identity(); //!< relative to SectionTool::slab_pose
 };
+constexpr int kSectionGizmoSlab = 2;
 struct SectionTool
 {
     bool enabled = true;
     bool initialized = false;
+    Eigen::Affine3d slab_pose = Eigen::Affine3d::Identity(); //!< moves both planes together
     SectionPlane planes[2];
-    int gizmo_plane = -1;
+    int gizmo_plane = -1; //!< -1: none, 0/1: plane, kSectionGizmoSlab: both planes
     float display_half_size = 10.0f;
+
+    Eigen::Affine3d planeWorldPose(int i) const
+    {
+        return slab_pose * planes[i].local_pose;
+    }
 };
 SectionTool section_tool;
 
@@ -4891,12 +4898,14 @@ int sectionClipPlanes(Eigen::Vector4d out[2])
         return 0;
 
     int count = 0;
-    for (const auto& plane : section_tool.planes)
+    for (int i = 0; i < 2; i++)
     {
+        const SectionPlane& plane = section_tool.planes[i];
         if (!plane.used)
             continue;
-        const Eigen::Vector3d n = plane.pose.linear().col(2).normalized() * (plane.flip ? -1.0 : 1.0);
-        out[count++] = Eigen::Vector4d(n.x(), n.y(), n.z(), -n.dot(plane.pose.translation()));
+        const Eigen::Affine3d pose = section_tool.planeWorldPose(i);
+        const Eigen::Vector3d n = pose.linear().col(2).normalized() * (plane.flip ? -1.0 : 1.0);
+        out[count++] = Eigen::Vector4d(n.x(), n.y(), n.z(), -n.dot(pose.translation()));
     }
     return count;
 }
@@ -5087,11 +5096,12 @@ void section_gui()
     {
         section_tool.initialized = true;
         const Vector3& c = app_state.camera.euler.rotationCenter;
+        section_tool.slab_pose.translation() = Eigen::Vector3d(c.x, c.y, c.z);
         for (int i = 0; i < 2; i++)
         {
             SectionPlane& plane = section_tool.planes[i];
             plane.flip = (i == 1);
-            plane.pose.translation() = Eigen::Vector3d(c.x, c.y, c.z + (i == 0 ? -0.25 : 0.25));
+            plane.local_pose.translation() = Eigen::Vector3d(0.0, 0.0, i == 0 ? -0.25 : 0.25);
         }
     }
 
@@ -5102,6 +5112,10 @@ void section_gui()
         ImGui::SetTooltip("Hide points outside the section (also ignored when measuring)");
     ImGui::SameLine();
     ImGui::RadioButton("No gizmo", &section_tool.gizmo_plane, -1);
+    ImGui::SameLine();
+    ImGui::RadioButton("Slab", &section_tool.gizmo_plane, kSectionGizmoSlab);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Move/rotate both planes together");
 
     ImGui::Separator();
     for (int i = 0; i < 2; i++)
@@ -5120,15 +5134,16 @@ void section_gui()
             ImGui::SetTooltip("Swap which side of the plane is kept");
         ImGui::SameLine();
         if (ImGui::Button("Level"))
-            plane.pose.linear() = Eigen::Matrix3d::Identity();
+            plane.local_pose.linear() = section_tool.slab_pose.linear().transpose();
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Make the plane horizontal again (keeps its position)");
 
-        Eigen::Vector3d origin = plane.pose.translation();
+        const Eigen::Affine3d world_pose = section_tool.planeWorldPose(i);
+        Eigen::Vector3d origin = world_pose.translation();
         if (ImGui::InputScalarN("Origin [m]", ImGuiDataType_Double, origin.data(), 3, nullptr, nullptr, "%.3f"))
-            plane.pose.translation() = origin;
+            plane.local_pose.translation() = section_tool.slab_pose.inverse() * origin;
 
-        const Eigen::Vector3d n = plane.pose.linear().col(2).normalized() * (plane.flip ? -1.0 : 1.0);
+        const Eigen::Vector3d n = world_pose.linear().col(2).normalized() * (plane.flip ? -1.0 : 1.0);
         ImGui::Text("Kept side normal: %.3f %.3f %.3f", n.x(), n.y(), n.z());
 
         ImGui::PopID();
@@ -5161,10 +5176,11 @@ void draw_section_preview()
         {
             return Vector3{ static_cast<float>(v.x()), static_cast<float>(v.y()), static_cast<float>(v.z()) };
         };
-        const Eigen::Vector3d o = plane.pose.translation();
-        const Eigen::Vector3d ex = plane.pose.linear().col(0).normalized() * s;
-        const Eigen::Vector3d ey = plane.pose.linear().col(1).normalized() * s;
-        const Eigen::Vector3d n = plane.pose.linear().col(2).normalized() * (plane.flip ? -1.0 : 1.0);
+        const Eigen::Affine3d pose = section_tool.planeWorldPose(i);
+        const Eigen::Vector3d o = pose.translation();
+        const Eigen::Vector3d ex = pose.linear().col(0).normalized() * s;
+        const Eigen::Vector3d ey = pose.linear().col(1).normalized() * s;
+        const Eigen::Vector3d n = pose.linear().col(2).normalized() * (plane.flip ? -1.0 : 1.0);
         const Vector3 c[4] = { toV3(o - ex - ey), toV3(o + ex - ey), toV3(o + ex + ey), toV3(o - ex + ey) };
         const Color col = plane_colors[i];
 
@@ -5186,10 +5202,11 @@ void draw_section_preview()
     }
 
     const int gi = section_tool.gizmo_plane;
-    if (gi < 0 || gi > 1 || !section_tool.planes[gi].used)
+    const bool slab = gi == kSectionGizmoSlab;
+    if (!slab && (gi < 0 || gi > 1 || !section_tool.planes[gi].used))
         return;
 
-    Eigen::Affine3d& pose = section_tool.planes[gi].pose;
+    const Eigen::Affine3d pose = slab ? section_tool.slab_pose : section_tool.planeWorldPose(gi);
     float m[16];
     const Eigen::Matrix4f mf = pose.matrix().cast<float>();
     std::copy(mf.data(), mf.data() + 16, m);
@@ -5227,7 +5244,13 @@ void draw_section_preview()
     ImGuizmo::PopID();
 
     if (changed)
-        pose.matrix() = Eigen::Map<const Eigen::Matrix4f>(m).cast<double>();
+    {
+        const Eigen::Affine3d new_pose(Eigen::Map<const Eigen::Matrix4f>(m).cast<double>());
+        if (slab)
+            section_tool.slab_pose = new_pose;
+        else
+            section_tool.planes[gi].local_pose = section_tool.slab_pose.inverse() * new_pose;
+    }
 }
 
 // Commits a drag that is still in progress if its gizmo won't be processed

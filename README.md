@@ -131,6 +131,7 @@ project wiki: **https://github.com/MapsHD/HDMapping/wiki**
 - [[Annotated ground truth for LiDAR SLAM loop closures]](https://zenodo.org/records/18527593)
 - [[Depth-Visual-Inertial Dataset for 3D Indoor Reconstruction - HD Mapping ground truths]](https://zenodo.org/records/23069933)
 - [[OmniWarsawDataset]](https://github.com/MapsHD/OmniWarsawDataset)
+- [[HDMAPPING-CAVE-DATASET-1]](https://zenodo.org/records/24254676)
 
 # Sponsors
 

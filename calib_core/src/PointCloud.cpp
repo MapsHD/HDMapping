@@ -2,6 +2,7 @@
 #include <laszip/laszip_api.h>
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <limits>
 #include <cstdio>
 #include <regex>
@@ -67,7 +68,9 @@ bool PointCloud::load(const std::string& path) {
         p.y = static_cast<float>(coords[1]);
         p.z = static_cast<float>(coords[2]);
         p.intensity = static_cast<float>(point->intensity);
-        p.ts_ns     = static_cast<int64_t>(point->gps_time);
+        // Mandeye writes gps_time in seconds, core's export_laz.h in
+        // nanoseconds; epoch seconds stay below 1e14, epoch nanoseconds don't.
+        p.ts_ns = point->gps_time < 1e14 ? std::llround(point->gps_time * 1e9) : std::llround(point->gps_time);
         if (formatHasRgb) {
             rgb16.push_back({ point->rgb[0], point->rgb[1], point->rgb[2] });
             maxRgb = std::max({ maxRgb, point->rgb[0], point->rgb[1], point->rgb[2] });

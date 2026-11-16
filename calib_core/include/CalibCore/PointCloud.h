@@ -9,7 +9,7 @@ namespace calib {
 struct Point3D {
     float   x, y, z;
     float   intensity; // normalized to [0,1]
-    int64_t ts_ns = 0; // GPS time cast from gps_time field (0 if unavailable)
+    int64_t ts_ns = 0; // gps_time in nanoseconds, read as seconds or ns (0 if unavailable)
     uint8_t r = 0, g = 0, b = 0; // LAS rgb (16-bit >> 8); 0 when the file has none
 };
 

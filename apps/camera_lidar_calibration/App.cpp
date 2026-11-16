@@ -432,6 +432,42 @@ void AppState::loadImage(const char* path)
         statusMsg += "; " + scaleNote;
 }
 
+// ── AppState::loadImageClosestToCloudTime ─────────────────────────────────────
+void AppState::loadImageClosestToCloudTime(const char* dir)
+{
+    int64_t t0 = std::numeric_limits<int64_t>::max(), t1 = std::numeric_limits<int64_t>::min();
+    for (const auto& p : cloud.points)
+        if (p.ts_ns != 0)
+        {
+            t0 = std::min(t0, p.ts_ns);
+            t1 = std::max(t1, p.ts_ns);
+        }
+    if (t0 > t1)
+    {
+        statusMsg = std::string("No point times in the loaded clouds, so no image picked from ") + dir;
+        return;
+    }
+    const int64_t mid = t0 + (t1 - t0) / 2;
+    const auto image = calib::closestImage(dir, mid);
+    if (!image)
+    {
+        statusMsg = std::string("No image with a capture time in ") + dir;
+        return;
+    }
+    loadImage(image->path.c_str());
+    if (imagePath != image->path)
+        return; // loadImage said why
+    char buf[256];
+    std::snprintf(
+        buf,
+        sizeof(buf),
+        "%s is %+.3f s from the middle of the clouds' %.1f s; ",
+        std::filesystem::path(image->path).filename().string().c_str(),
+        static_cast<double>(image->tsNs - mid) * 1e-9,
+        static_cast<double>(t1 - t0) * 1e-9);
+    statusMsg = buf + statusMsg;
+}
+
 // ── AppState::focusOnSensors ──────────────────────────────────────────────────
 void AppState::focusOnSensors()
 {
@@ -989,6 +1025,12 @@ void App::run()
         state.loadIntrinsics(pendingIntrinsics.c_str());
     if (!pendingCalibration.empty())
         state.loadCalibration(pendingCalibration.c_str());
+    // Last, so its message is the one left in the status line.
+    if (!pendingImageDirByTime.empty())
+    {
+        state.loadImageClosestToCloudTime(pendingImageDirByTime.c_str());
+        std::printf("%s\n", state.statusMsg.c_str());
+    }
 
     while (!WindowShouldClose())
     {

@@ -856,3 +856,76 @@ TEST_CASE("LoadTimestampFromSideCar: an unquoted numeric value is read too")
     REQUIRE(ts.has_value());
     CHECK(*ts == doctest::Approx(1789125060554994432.0));
 }
+
+// ── imageTimestampNs / closestImage ──────────────────────────────────────────
+
+namespace
+{
+    //! Empty folder under the temp dir, removed with everything in it on scope exit.
+    struct TempDir
+    {
+        std::filesystem::path path;
+        explicit TempDir(const std::string& name)
+            : path(std::filesystem::temp_directory_path() / name)
+        {
+            std::filesystem::remove_all(path);
+            std::filesystem::create_directories(path);
+        }
+        ~TempDir()
+        {
+            std::filesystem::remove_all(path);
+        }
+        void touch(const std::string& file, const std::string& body = "") const
+        {
+            std::ofstream(path / file) << body;
+        }
+    };
+} // namespace
+
+TEST_CASE("imageTimestampNs: the sidecar wins, else the digits after the last '_'")
+{
+    TempDir dir("calib_core_test_image_ts");
+    dir.touch("cam0_1794577043530708168.jpg");
+    dir.touch("cam0_1794577043530708168.meta.json", R"({"FRAME_WALL_CLOCK": "1794577043412505088"})");
+    dir.touch("front_1794530692539566915.jpg");
+    dir.touch("1794530692706426915.png");
+    dir.touch("IMG_0042b.jpg");
+    dir.touch("photo.jpg");
+
+    CHECK(imageTimestampNs((dir.path / "cam0_1794577043530708168.jpg").string()) == 1794577043412505088LL);
+    CHECK(imageTimestampNs((dir.path / "front_1794530692539566915.jpg").string()) == 1794530692539566915LL);
+    CHECK(imageTimestampNs((dir.path / "1794530692706426915.png").string()) == 1794530692706426915LL);
+    CHECK_FALSE(imageTimestampNs((dir.path / "IMG_0042b.jpg").string()).has_value());
+    CHECK_FALSE(imageTimestampNs((dir.path / "photo.jpg").string()).has_value());
+}
+
+TEST_CASE("closestImage: picks the frame nearest in time, ignoring untimed and non-image files")
+{
+    TempDir dir("calib_core_test_closest_image");
+    dir.touch("front_1000.jpg");
+    dir.touch("front_2000.jpg");
+    dir.touch("front_3000.JPG");
+    dir.touch("front_2600.txt");
+    dir.touch("notes.jpg");
+
+    auto best = closestImage(dir.path.string(), 2600);
+    REQUIRE(best.has_value());
+    CHECK(best->tsNs == 3000);
+    CHECK(std::filesystem::path(best->path).filename() == "front_3000.JPG");
+
+    best = closestImage(dir.path.string(), 1500); // tie: the earlier frame
+    REQUIRE(best.has_value());
+    CHECK(best->tsNs == 1000);
+
+    best = closestImage(dir.path.string(), -5);
+    REQUIRE(best.has_value());
+    CHECK(best->tsNs == 1000);
+}
+
+TEST_CASE("closestImage: nullopt for a folder with no timed images, or no folder")
+{
+    TempDir dir("calib_core_test_closest_image_empty");
+    dir.touch("notes.jpg");
+    CHECK_FALSE(closestImage(dir.path.string(), 0).has_value());
+    CHECK_FALSE(closestImage("/nonexistent/calib_core_test_dir", 0).has_value());
+}

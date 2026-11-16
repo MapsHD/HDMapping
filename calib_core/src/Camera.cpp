@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
+#include <filesystem>
 #include <fstream>
 
 #include <nlohmann/json.hpp>
@@ -106,6 +108,49 @@ std::optional<double> LoadTimestampFromSideCar(const std::string& path)
     if (it->is_number())
         return it->get<double>();
     return std::nullopt;
+}
+
+std::optional<int64_t> imageTimestampNs(const std::string& path)
+{
+    if (const auto sidecarTs = LoadTimestampFromSideCar(path))
+        return std::llround(*sidecarTs);
+
+    std::string stem = std::filesystem::path(path).stem().string();
+    if (const auto us = stem.rfind('_'); us != std::string::npos)
+        stem = stem.substr(us + 1);
+    // The all-digits check rejects unrelated names before std::stoll.
+    if (stem.empty() || stem.find_first_not_of("0123456789") != std::string::npos)
+        return std::nullopt;
+    try
+    {
+        return std::stoll(stem);
+    } catch (const std::exception&)
+    {
+        return std::nullopt;
+    }
+}
+
+std::optional<TimedImage> closestImage(const std::string& dir, int64_t tsNs)
+{
+    std::error_code ec;
+    std::optional<TimedImage> best;
+    for (const auto& entry : std::filesystem::directory_iterator(dir, ec))
+    {
+        std::string ext = entry.path().extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+        if (!entry.is_regular_file() || (ext != ".jpg" && ext != ".jpeg" && ext != ".png" && ext != ".bmp"))
+            continue;
+        const auto ts = imageTimestampNs(entry.path().string());
+        if (!ts)
+            continue;
+        const auto gap = [tsNs](int64_t t)
+        {
+            return t > tsNs ? t - tsNs : tsNs - t;
+        };
+        if (!best || gap(*ts) < gap(best->tsNs) || (gap(*ts) == gap(best->tsNs) && *ts < best->tsNs))
+            best = TimedImage{ entry.path().string(), *ts };
+    }
+    return best;
 }
 
 Eigen::Matrix3f omFiKaToMat3(float om_deg, float fi_deg, float ka_deg) {

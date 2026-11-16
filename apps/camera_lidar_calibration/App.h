@@ -146,6 +146,10 @@ struct AppState
     //! to see the sensor models, keeping the current viewing angle.
     void focusOnSensors();
     void loadImage(const char* path);
+    //! Loads the image in `dir` taken closest to the middle of the loaded
+    //! clouds' point times (calib::closestImage); leaves the image as it is,
+    //! saying why in statusMsg, when the clouds or images carry no times.
+    void loadImageClosestToCloudTime(const char* dir);
     void loadCloud(const char* path); // clear + load
     void addCloud(const char* path); // merge into existing cloud
     void loadIntrinsics(const char* path);
@@ -182,6 +186,12 @@ public:
     {
         pendingCalibration = path;
     }
+    //! After the clouds load, replace the image with the one in `dir` taken
+    //! closest to their time (AppState::loadImageClosestToCloudTime).
+    void preloadImageClosestToClouds(const char* dir)
+    {
+        pendingImageDirByTime = dir;
+    }
 
     void run();
 
@@ -191,6 +201,7 @@ private:
     std::vector<std::string> pendingClouds;
     std::string pendingIntrinsics;
     std::string pendingCalibration;
+    std::string pendingImageDirByTime;
 
     void update();
     void draw();

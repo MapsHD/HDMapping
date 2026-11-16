@@ -423,6 +423,8 @@ void UI::handleShortcuts(AppState& state)
 
     if (ImGui::IsKeyPressed(ImGuiKey_C, false))
         state.showCompassRuler = !state.showCompassRuler;
+    if (ImGui::IsKeyPressed(ImGuiKey_F, false))
+        state.focusOnSensors();
 }
 
 void UI::panelMenuBar(AppState& state)
@@ -458,6 +460,8 @@ void UI::panelMenuBar(AppState& state)
         ImGui::SliderInt("Draw decimation", &state.vizParams.drawDecim, 1, 64);
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Renders only every Nth point -- raise this if the 3D view is slow with a large cloud.");
+        if (ImGui::MenuItem("Focus on sensors", "F"))
+            state.focusOnSensors();
         ImGui::EndMenu();
     }
 
@@ -744,7 +748,7 @@ void UI::panelVisualization(AppState& state)
     helpMarker(
         "Simplified, real-size Livox Mid-360 at the LiDAR origin (connector at the back, -x) and\n"
         "the camera body below at the camera pose. The yellow ring marks the lens these extrinsics describe.\n"
-        "Zoom in on the LiDAR origin to see them.");
+        "Focus on sensors (F) zooms in on them.");
 
     // Order matches CameraBody's enumerators.
     const char* bodies[] = { "Insta360 X5", "PCB camera" };
@@ -758,6 +762,9 @@ void UI::panelVisualization(AppState& state)
     helpMarker(
         "PCB camera: a bare board in the Raspberry Pi camera format (25 x 24 mm, e.g. an IMX519\n"
         "module), ribbon connector at the bottom of the image.");
+
+    if (ImGui::Button("Focus on sensors (F)"))
+        state.focusOnSensors();
 }
 
 // ── Correspondences ──────────────────────────────────────────────────────────

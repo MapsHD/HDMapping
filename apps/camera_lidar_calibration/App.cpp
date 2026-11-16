@@ -301,6 +301,19 @@ void AppState::loadImage(const char* path)
         statusMsg += "; " + scaleNote;
 }
 
+// ── AppState::focusOnSensors ──────────────────────────────────────────────────
+void AppState::focusOnSensors()
+{
+    // LiDAR origin and optical centre in raylib coords (x, z, -y).
+    const Vector3 lidar = { 0.f, 0.f, 0.f };
+    const Vector3 camera = { extrinsics.tx, extrinsics.tz, -extrinsics.ty };
+    // Holds both bodies: the X5 reaches ~0.1 m from its optical centre.
+    const float radius = 0.5f * Vector3Distance(lidar, camera) + 0.1f;
+    orbit.target = Vector3Scale(Vector3Add(lidar, camera), 0.5f);
+    // Fits that sphere in OrbitCamera's 45 deg vertical FOV, no closer than its 0.5 m wheel-zoom limit.
+    orbit.distance = std::max(0.5f, radius / std::sin(22.5f * DEG2RAD));
+}
+
 // ── AppState::loadCloud ───────────────────────────────────────────────────────
 static void centerOrbitOnCloud(AppState& s)
 {
@@ -1103,7 +1116,7 @@ void App::draw()
     if (shiftHeld())
         DrawText("Shift+click to pick a 3D point (green = candidate)", 8, (int)menuBarH + 4, 14, YELLOW);
     else
-        DrawText("3D View  [LMB: orbit | RMB: pan | Scroll: zoom | Shift: pick]", 8, (int)menuBarH + 4, 14, LIGHTGRAY);
+        DrawText("3D View  [LMB: orbit | RMB: pan | Scroll: zoom | Shift: pick | F: focus sensors]", 8, (int)menuBarH + 4, 14, LIGHTGRAY);
 
     DrawFPS((int)viewW - 90, (int)menuBarH + 4);
 

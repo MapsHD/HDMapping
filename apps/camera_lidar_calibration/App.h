@@ -126,6 +126,9 @@ struct AppState
     bool solvePairs(); // solves extrinsics from `pairs`, updates statusMsg
 
     // ── operations ────────────────────────────────────────────────────────────
+    //! Points the 3D view at the LiDAR origin and the camera pose, close enough
+    //! to see the sensor models, keeping the current viewing angle.
+    void focusOnSensors();
     void loadImage(const char* path);
     void loadCloud(const char* path); // clear + load
     void addCloud(const char* path); // merge into existing cloud

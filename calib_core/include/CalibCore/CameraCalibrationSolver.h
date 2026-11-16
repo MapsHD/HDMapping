@@ -1,6 +1,7 @@
 #pragma once
 #include "Camera.h"
 #include <Eigen/Core>
+#include <array>
 #include <string>
 #include <vector>
 
@@ -22,6 +23,43 @@ namespace calib
         double u = 0.0, v = 0.0;
     };
 
+    /**
+     * @brief Soft constraint (prior) on one extrinsic parameter: an extra
+     *        observation equation (value - target) / sigma alongside the
+     *        reprojection residuals, which are in pixels. A parameter sigma
+     *        away from its target costs as much as one pixel of reprojection
+     *        error, so it can still move when the pairs demand it, unlike a
+     *        lock. Meant for directions the picked pairs constrain poorly,
+     *        such as the camera's height (tz) when every point lies near the
+     *        horizon.
+     */
+    struct ParameterPrior
+    {
+        //! Add the observation equation for this parameter.
+        bool enabled = false;
+        //! Value the parameter is pulled towards: metres for tx/ty/tz,
+        //! degrees for om/fi/ka, in the same frame as Extrinsics.
+        double target = 0.0;
+        //! Allowed deviation, metres for tx/ty/tz, degrees for om/fi/ka.
+        //! Must be > 0 when enabled.
+        double sigma = 0.01;
+    };
+
+    /**
+     * @brief One ParameterPrior per Extrinsics parameter, indexed as
+     *        kPriorTx..kPriorKa. All disabled by default.
+     */
+    using ExtrinsicsPriors = std::array<ParameterPrior, 6>;
+    enum ExtrinsicsPriorIndex
+    {
+        kPriorTx = 0,
+        kPriorTy,
+        kPriorTz,
+        kPriorOm,
+        kPriorFi,
+        kPriorKa
+    };
+
     //! Solve for the extrinsics (camera position + orientation) that best
     //! explain the given LiDAR-point <-> image-pixel correspondences, via
     //! damped Gauss-Newton (Levenberg-Marquardt) on the reused observation
@@ -38,10 +76,14 @@ namespace calib
     //! @param fixRotation pin om/fi/ka at their initial values and optimize
     //!        position only (3-DOF) -- useful when the camera orientation is
     //!        already known precisely
+    //! @param priors soft constraints pulling individual parameters towards
+    //!        a target (see ParameterPrior); ignored for a locked parameter.
+    //!        outRmsPixels reports the reprojection error only, without them
     //! @return false, leaving extrinsicsInOut unchanged, for fewer than 3
     //!         correspondences, fewer correspondences than free parameters
     //!         (3 with fixTranslation or fixRotation, else 6), both fix flags
-    //!         set (nothing left to solve), or a singular system
+    //!         set (nothing left to solve), an enabled prior with sigma <= 0,
+    //!         or a singular system
     //! @note Pinhole only: the reused observation equations are a pure
     //!       rectilinear perspective projection, with no distortion and no
     //!       unified-sphere term. @see solveExtrinsicsCeres
@@ -51,7 +93,8 @@ namespace calib
         Extrinsics& extrinsicsInOut,
         double* outRmsPixels = nullptr,
         bool fixTranslation = false,
-        bool fixRotation = false);
+        bool fixRotation = false,
+        const ExtrinsicsPriors& priors = {});
 
     //! CameraModel::Mei and CameraModel::Fisheye counterpart to
     //! @ref solveExtrinsicsFromCorrespondences. No vendored analytic Jacobian
@@ -69,8 +112,10 @@ namespace calib
     //! @param outRmsPixels optionally receives the RMS reprojection error
     //! @param fixTranslation as in @ref solveExtrinsicsFromCorrespondences
     //! @param fixRotation as in @ref solveExtrinsicsFromCorrespondences
+    //! @param priors as in @ref solveExtrinsicsFromCorrespondences
     //! @return false on failure, with the reason in errorMessage -- including
-    //!         any other K.model, or both fix flags set
+    //!         any other K.model, both fix flags set, or an enabled prior with
+    //!         sigma <= 0
     //! @note Needs -DCALIB_ENABLE_CERES=ON (OFF by default). Built without it
     //!       this always returns false and says so, so callers never need an
     //!       \#ifdef of their own.
@@ -81,6 +126,14 @@ namespace calib
         std::string& errorMessage,
         double* outRmsPixels = nullptr,
         bool fixTranslation = false,
-        bool fixRotation = false);
+        bool fixRotation = false,
+        const ExtrinsicsPriors& priors = {});
+
+    /**
+     * @brief Checks that every enabled prior has a positive sigma.
+     * @param priors priors to check
+     * @return true when the priors can be passed to a solver
+     */
+    bool extrinsicsPriorsValid(const ExtrinsicsPriors& priors);
 
 } // namespace calib

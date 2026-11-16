@@ -649,6 +649,64 @@ void UI::panelExtrinsics(AppState& state)
     ImGui::EndDisabled();
     ImGui::PopItemWidth();
 
+    if (ImGui::TreeNode("Priors (soft constraints)"))
+    {
+        helpMarker(
+            "Each enabled prior adds an observation equation\n(value - target) / sigma to \"Solve Extrinsics from Pairs\".\n"
+            "A parameter sigma away from its target costs as much\nas 1 px of reprojection error, so it stays near the\n"
+            "target unless the pairs clearly say otherwise.\nUse it for directions the pairs barely constrain,\n"
+            "e.g. the camera height tz. Ignored while locked.");
+        static const char* const kNames[6] = { "tx", "ty", "tz", "om", "fi", "ka" };
+        float* const current[6] = { &E.tx, &E.ty, &E.tz, &E.om, &E.fi, &E.ka };
+        if (ImGui::BeginTable("priors", 4, ImGuiTableFlags_SizingStretchProp))
+        {
+            ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed);
+            ImGui::TableSetupColumn("target");
+            ImGui::TableSetupColumn("sigma");
+            ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed);
+            ImGui::TableHeadersRow();
+            for (int i = 0; i < 6; ++i)
+            {
+                const bool isTranslation = i < 3;
+                calib::ParameterPrior& prior = state.priors[i];
+                ImGui::PushID(i);
+                ImGui::BeginDisabled(isTranslation ? state.lockTranslation : state.lockRotation);
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                // Enabling a prior holds the parameter where it is now.
+                if (ImGui::Checkbox(kNames[i], &prior.enabled) && prior.enabled)
+                    prior.target = *current[i];
+                ImGui::BeginDisabled(!prior.enabled);
+                ImGui::TableNextColumn();
+                ImGui::SetNextItemWidth(-FLT_MIN);
+                float target = static_cast<float>(prior.target);
+                if (dragFloat("##target", &target, isTranslation ? 0.01f : 0.1f, -180.f, 180.f, isTranslation ? "%.3f m" : "%.2f deg"))
+                    prior.target = target;
+                ImGui::TableNextColumn();
+                ImGui::SetNextItemWidth(-FLT_MIN);
+                float sigma = static_cast<float>(prior.sigma);
+                if (dragFloat(
+                        "##sigma",
+                        &sigma,
+                        isTranslation ? 0.001f : 0.01f,
+                        isTranslation ? 0.0001f : 0.001f,
+                        isTranslation ? 10.f : 90.f,
+                        isTranslation ? "%.4f m" : "%.3f deg"))
+                    prior.sigma = std::max(sigma, isTranslation ? 0.0001f : 0.001f);
+                ImGui::TableNextColumn();
+                if (ImGui::SmallButton("= current"))
+                    prior.target = *current[i];
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Set the target to the current %s", kNames[i]);
+                ImGui::EndDisabled();
+                ImGui::EndDisabled();
+                ImGui::PopID();
+            }
+            ImGui::EndTable();
+        }
+        ImGui::TreePop();
+    }
+
     // Show current rotation matrix
     if (ImGui::TreeNode("Rotation matrix"))
     {

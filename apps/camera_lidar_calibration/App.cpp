@@ -210,6 +210,14 @@ void AppState::removePair(int index)
         selectedPairIndex--;
 }
 
+calib::ExtrinsicsPriors AppState::defaultPriors()
+{
+    calib::ExtrinsicsPriors priors;
+    for (int i = 0; i < 6; ++i)
+        priors[i].sigma = i < 3 ? 0.01 : 0.5;
+    return priors;
+}
+
 bool AppState::solvePairs()
 {
     if (pairs.size() < 3)
@@ -240,8 +248,8 @@ bool AppState::solvePairs()
     // Mei and Fisheye use solveExtrinsicsCeres instead. See
     // CameraCalibrationSolver.h.
     bool ok = (intrinsics.model == CameraModel::Mei || intrinsics.model == CameraModel::Fisheye)
-        ? calib::solveExtrinsicsCeres(corr, intrinsics, extrinsics, solveErr, &rms, lockTranslation, lockRotation)
-        : calib::solveExtrinsicsFromCorrespondences(corr, intrinsics, extrinsics, &rms, lockTranslation, lockRotation);
+        ? calib::solveExtrinsicsCeres(corr, intrinsics, extrinsics, solveErr, &rms, lockTranslation, lockRotation, priors)
+        : calib::solveExtrinsicsFromCorrespondences(corr, intrinsics, extrinsics, &rms, lockTranslation, lockRotation, priors);
     if (!ok)
     {
         statusMsg = !solveErr.empty() ? ("Solve failed: " + solveErr) : "Solve failed (degenerate correspondences)";
@@ -256,6 +264,15 @@ bool AppState::solvePairs()
     else
         statusMsg = "Solved extrinsics: RMS reprojection error ";
     statusMsg += std::to_string(rms) + " px";
+    const int nPriors = static_cast<int>(std::count_if(
+        priors.begin(),
+        priors.end(),
+        [](const auto& p)
+        {
+            return p.enabled;
+        }));
+    if (nPriors > 0)
+        statusMsg += " (" + std::to_string(nPriors) + (nPriors == 1 ? " prior)" : " priors)");
     if (!imageRectified && intrinsicsLoaded == false)
         statusMsg += " (no intrinsics loaded -- distortion assumed zero)";
     return true;

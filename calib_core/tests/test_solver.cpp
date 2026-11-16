@@ -162,6 +162,65 @@ TEST_CASE("solveExtrinsicsFromCorrespondences: locks keep their parameters and s
     }
 }
 
+TEST_CASE("solveExtrinsicsFromCorrespondences: priors pull a parameter towards its target")
+{
+    const Intrinsics K = pinholeIntrinsics();
+    const Extrinsics truth = groundTruthExtrinsics();
+    const auto corr = syntheticCorrespondences(K, truth, /*dropUnprojectable=*/true);
+    const float wrongTz = truth.tz + 0.5f;
+
+    SUBCASE("a tight prior holds tz at a wrong target; the reported RMS is reprojection only")
+    {
+        ExtrinsicsPriors priors;
+        priors[kPriorTz] = { true, wrongTz, 1e-5 };
+        Extrinsics E = perturbed(truth);
+        double rms = -1.0;
+        REQUIRE(solveExtrinsicsFromCorrespondences(corr, K, E, &rms, false, false, priors));
+        CHECK(E.tz == doctest::Approx(wrongTz).epsilon(1e-3));
+        CHECK(rms > 1.0);
+    }
+    SUBCASE("a loose prior barely moves the solution")
+    {
+        ExtrinsicsPriors priors;
+        priors[kPriorTz] = { true, wrongTz, 100.0 };
+        priors[kPriorKa] = { true, truth.ka + 5.0, 1000.0 };
+        Extrinsics E = perturbed(truth);
+        double rms = -1.0;
+        REQUIRE(solveExtrinsicsFromCorrespondences(corr, K, E, &rms, false, false, priors));
+        CHECK(rms < 0.5);
+        CHECK(E.tz == doctest::Approx(truth.tz).epsilon(1e-3));
+        CHECK(E.ka == doctest::Approx(truth.ka).epsilon(1e-2));
+    }
+    SUBCASE("a tight rotation prior holds ka")
+    {
+        ExtrinsicsPriors priors;
+        priors[kPriorKa] = { true, truth.ka + 3.0, 1e-5 };
+        Extrinsics E = perturbed(truth);
+        REQUIRE(solveExtrinsicsFromCorrespondences(corr, K, E, nullptr, false, false, priors));
+        CHECK(E.ka == doctest::Approx(truth.ka + 3.0).epsilon(1e-3));
+    }
+    SUBCASE("a prior on a locked parameter is ignored")
+    {
+        ExtrinsicsPriors priors;
+        priors[kPriorTz] = { true, wrongTz, 1e-5 };
+        Extrinsics withPrior = perturbed(truth);
+        Extrinsics without = withPrior;
+        REQUIRE(solveExtrinsicsFromCorrespondences(corr, K, withPrior, nullptr, true, false, priors));
+        REQUIRE(solveExtrinsicsFromCorrespondences(corr, K, without, nullptr, true, false));
+        CHECK(withPrior.tz == without.tz);
+        CHECK(withPrior.om == doctest::Approx(without.om));
+    }
+    SUBCASE("an enabled prior with sigma <= 0 fails and leaves the extrinsics alone")
+    {
+        ExtrinsicsPriors priors;
+        priors[kPriorTz] = { true, wrongTz, 0.0 };
+        Extrinsics E = perturbed(truth);
+        const Extrinsics before = E;
+        CHECK_FALSE(solveExtrinsicsFromCorrespondences(corr, K, E, nullptr, false, false, priors));
+        CHECK(E.tz == before.tz);
+    }
+}
+
 #ifndef CALIB_ENABLE_CERES
 
 TEST_CASE("solveExtrinsicsCeres: stub explains the build flag when Ceres is disabled")
@@ -273,6 +332,41 @@ TEST_CASE("solveExtrinsicsCeres: fixRotation leaves om/fi/ka untouched")
         CHECK(wrong.om == doctest::Approx(locked.om));
         CHECK(wrong.fi == doctest::Approx(locked.fi));
         CHECK(wrong.ka == doctest::Approx(locked.ka));
+    }
+}
+
+TEST_CASE("solveExtrinsicsCeres: priors pull a parameter towards its target")
+{
+    for (const Intrinsics& K : { meiIntrinsics(), fisheyeIntrinsics() })
+    {
+        CAPTURE(modelToString(K.model));
+        const Extrinsics truth = groundTruthExtrinsics();
+        const auto corr = syntheticCorrespondences(K, truth);
+        std::string err;
+
+        ExtrinsicsPriors tight;
+        tight[kPriorTz] = { true, truth.tz + 0.5, 1e-5 };
+        tight[kPriorKa] = { true, truth.ka + 3.0, 1e-5 };
+        Extrinsics E = perturbed(truth);
+        double rms = -1.0;
+        REQUIRE(solveExtrinsicsCeres(corr, K, E, err, &rms, false, false, tight));
+        CHECK(E.tz == doctest::Approx(truth.tz + 0.5).epsilon(1e-3));
+        CHECK(E.ka == doctest::Approx(truth.ka + 3.0).epsilon(1e-3));
+        CHECK(rms > 1.0);
+
+        ExtrinsicsPriors loose;
+        loose[kPriorTz] = { true, truth.tz + 0.5, 100.0 };
+        Extrinsics F = perturbed(truth);
+        REQUIRE(solveExtrinsicsCeres(corr, K, F, err, &rms, false, false, loose));
+        CHECK(rms < 0.5);
+        CHECK(F.tz == doctest::Approx(truth.tz).epsilon(1e-3));
+
+        ExtrinsicsPriors invalid;
+        invalid[kPriorOm].enabled = true;
+        invalid[kPriorOm].sigma = -1.0;
+        Extrinsics G = perturbed(truth);
+        CHECK_FALSE(solveExtrinsicsCeres(corr, K, G, err, nullptr, false, false, invalid));
+        CHECK(err.find("sigma") != std::string::npos);
     }
 }
 

@@ -22,7 +22,7 @@ namespace calib
         // rows rather than a general 3x3 product: offset =
         // [[0,0,1],[-1,0,0],[0,-1,0]], so row 0 of R is row 2 of Rdelta,
         // row 1 is -(row 0), row 2 is -(row 1).
-        template <typename T>
+        template<typename T>
         void rotationMatrix(const T& om, const T& fi, const T& ka, T R[3][3])
         {
             const T sx = sin(om), cx = cos(om);
@@ -52,7 +52,7 @@ namespace calib
         // Ceres autodiff --
         // same formula. Intrinsics stay plain doubles (fixed, not solved
         // for); only pc is the Jet-typed variable.
-        template <typename T>
+        template<typename T>
         void projectMei(
             const T pc[3],
             double fx,
@@ -82,8 +82,9 @@ namespace calib
 
         // Templated equivalent of calib::projectPoint's Fisheye branch, for
         // Ceres autodiff.
-        template <typename T>
-        void projectFisheye(const T pc[3], double fx, double fy, double cx, double cy, double k1, double k2, double k3, double k4, T& u, T& v)
+        template<typename T>
+        void projectFisheye(
+            const T pc[3], double fx, double fy, double cx, double cy, double k1, double k2, double k3, double k4, T& u, T& v)
         {
             const T r2 = pc[0] * pc[0] + pc[1] * pc[1];
             // theta_d / r, the factor that scales (x, y) onto the image plane.
@@ -112,11 +113,14 @@ namespace calib
         struct ReprojectionResidual
         {
             ReprojectionResidual(const Eigen::Vector3d& p, double u_kp, double v_kp, const Intrinsics& K)
-                : p_(p), u_kp_(u_kp), v_kp_(v_kp), K_(K)
+                : p_(p)
+                , u_kp_(u_kp)
+                , v_kp_(v_kp)
+                , K_(K)
             {
             }
 
-            template <typename T>
+            template<typename T>
             bool operator()(const T* const tx_ty_tz, const T* const om_fi_ka, T* residual) const
             {
                 T R[3][3];
@@ -144,6 +148,29 @@ namespace calib
             const double u_kp_, v_kp_;
             const Intrinsics K_;
         };
+
+        // Prior observation equation on one component of a 3-parameter block:
+        // (value - target) / sigma, in the block's own units (metres, or
+        // radians for om/fi/ka).
+        struct PriorResidual
+        {
+            PriorResidual(int index, double target, double invSigma)
+                : index_(index)
+                , target_(target)
+                , invSigma_(invSigma)
+            {
+            }
+
+            template<typename T>
+            bool operator()(const T* const block, T* residual) const
+            {
+                residual[0] = (block[index_] - T(target_)) * T(invSigma_);
+                return true;
+            }
+
+            const int index_;
+            const double target_, invSigma_;
+        };
     } // namespace
 
     bool solveExtrinsicsCeres(
@@ -153,7 +180,8 @@ namespace calib
         std::string& errorMessage,
         double* outRmsPixels,
         bool fixTranslation,
-        bool fixRotation)
+        bool fixRotation,
+        const ExtrinsicsPriors& priors)
     {
         if (K.model != CameraModel::Mei && K.model != CameraModel::Fisheye)
         {
@@ -163,6 +191,11 @@ namespace calib
         if (fixTranslation && fixRotation)
         {
             errorMessage = "Translation and rotation are both locked -- nothing to solve";
+            return false;
+        }
+        if (!extrinsicsPriorsValid(priors))
+        {
+            errorMessage = "Every enabled prior needs a sigma > 0";
             return false;
         }
 
@@ -178,10 +211,23 @@ namespace calib
         double omfika[3] = { extrinsicsInOut.om * d2r, extrinsicsInOut.fi * d2r, extrinsicsInOut.ka * d2r };
 
         ceres::Problem problem;
+        std::vector<ceres::ResidualBlockId> reprojectionBlocks;
         for (const auto& c : correspondences)
         {
             auto* cost = new ceres::AutoDiffCostFunction<ReprojectionResidual, 2, 3, 3>(new ReprojectionResidual(c.p, c.u, c.v, K));
-            problem.AddResidualBlock(cost, nullptr, txyz, omfika);
+            reprojectionBlocks.push_back(problem.AddResidualBlock(cost, nullptr, txyz, omfika));
+        }
+        // A locked parameter's prior is dropped: it cannot move anyway.
+        for (int i = 0; i < 6; ++i)
+        {
+            const ParameterPrior& prior = priors[i];
+            const bool isTranslation = i < 3;
+            if (!prior.enabled || (isTranslation && fixTranslation) || (!isTranslation && fixRotation))
+                continue;
+            const double scale = isTranslation ? 1.0 : d2r;
+            auto* cost = new ceres::AutoDiffCostFunction<PriorResidual, 1, 3>(
+                new PriorResidual(i % 3, prior.target * scale, 1.0 / (prior.sigma * scale)));
+            problem.AddResidualBlock(cost, nullptr, isTranslation ? txyz : omfika);
         }
         if (fixTranslation)
             problem.SetParameterBlockConstant(txyz);
@@ -209,11 +255,19 @@ namespace calib
         extrinsicsInOut.fi = static_cast<float>(omfika[1] / d2r);
         extrinsicsInOut.ka = static_cast<float>(omfika[2] / d2r);
 
-        // final_cost is 0.5*sum(residual^2) over every SCALAR residual (2 per
+        // Reprojection error only, without the priors' share of the cost:
+        // evaluate just the reprojection blocks. Their cost is
+        // 0.5*sum(residual^2) over every SCALAR residual (2 per
         // correspondence), so the Pinhole solver's rms formula
-        // sqrt(sum(du^2+dv^2) / (2*N)) simplifies to sqrt(final_cost/N).
+        // sqrt(sum(du^2+dv^2) / (2*N)) simplifies to sqrt(cost/N).
         if (outRmsPixels)
-            *outRmsPixels = std::sqrt(summary.final_cost / static_cast<double>(correspondences.size()));
+        {
+            ceres::Problem::EvaluateOptions evalOptions;
+            evalOptions.residual_blocks = reprojectionBlocks;
+            double reprojectionCost = 0.0;
+            problem.Evaluate(evalOptions, &reprojectionCost, nullptr, nullptr, nullptr);
+            *outRmsPixels = std::sqrt(reprojectionCost / static_cast<double>(correspondences.size()));
+        }
 
         return true;
     }
@@ -226,10 +280,16 @@ namespace calib
 namespace calib
 {
     bool solveExtrinsicsCeres(
-        const std::vector<PointPixelCorrespondence>&, const Intrinsics&, Extrinsics&, std::string& errorMessage, double*, bool, bool)
+        const std::vector<PointPixelCorrespondence>&,
+        const Intrinsics&,
+        Extrinsics&,
+        std::string& errorMessage,
+        double*,
+        bool,
+        bool,
+        const ExtrinsicsPriors&)
     {
-        errorMessage =
-            "Mei/fisheye extrinsics solving needs calib_core built with -DCALIB_ENABLE_CERES=ON (see calib_core/CMakeLists.txt)";
+        errorMessage = "Mei/fisheye extrinsics solving needs calib_core built with -DCALIB_ENABLE_CERES=ON (see calib_core/CMakeLists.txt)";
         std::cerr << errorMessage << std::endl;
         return false;
     }

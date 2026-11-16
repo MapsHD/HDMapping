@@ -3,6 +3,7 @@
 #include "UI.h"
 #include "raylib.h"
 #include <CalibCore/Camera.h>
+#include <CalibCore/CameraCalibrationSolver.h>
 #include <CalibCore/PointCloud.h>
 #include <opencv2/core.hpp>
 #include <string>
@@ -97,6 +98,18 @@ struct AppState
     //! Rotation counterpart of lockTranslation: the solve refines tx/ty/tz
     //! only and the om/fi/ka sliders are disabled.
     bool lockRotation = false;
+    //! Soft constraints for "Solve Extrinsics from Pairs": each enabled one
+    //! adds an observation equation pulling that parameter towards its
+    //! target, e.g. to keep the camera height (tz) from drifting when the
+    //! pairs barely constrain it. Indexed as calib::kPriorTx..kPriorKa.
+    calib::ExtrinsicsPriors priors = defaultPriors();
+
+    /**
+     * @brief Priors all disabled, with a sigma of 1 cm for tx/ty/tz and
+     *        0.5 deg for om/fi/ka.
+     * @return the default priors
+     */
+    static calib::ExtrinsicsPriors defaultPriors();
 
     void setPendingImagePoint(float u, float v); // completes the pair if a cloud point is already pending
     void setPendingCloudPoint(float px, float py, float pz); // completes the pair if an image point is already pending

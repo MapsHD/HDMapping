@@ -33,6 +33,12 @@ add_library(calib_core STATIC
 #   cmake -DCALIB_ENABLE_CERES=ON   (needs libceres-dev or equivalent).
 option(CALIB_ENABLE_CERES "Enable the Ceres-based extrinsics solver for the Mei and fisheye camera models" OFF)
 if(CALIB_ENABLE_CERES)
+    # Ceres' FindSuiteSparse runs find_package(TBB QUIET). With the bundled oneTBB
+    # already defining TBB::tbb, a system TBBConfig.cmake aborts on the partial
+    # target set, so keep that lookup from running in this directory.
+    if(TARGET TBB::tbb)
+        set(CMAKE_DISABLE_FIND_PACKAGE_TBB ON)
+    endif()
     find_package(Ceres REQUIRED)
     # PUBLIC so calib_core_tests can #ifdef on it to build the real-solve
     # test only when it can actually run.

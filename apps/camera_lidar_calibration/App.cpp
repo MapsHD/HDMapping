@@ -12,6 +12,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <limits>
 #include <nlohmann/json.hpp>
@@ -208,6 +209,101 @@ void AppState::removePair(int index)
         selectedPairIndex = -1;
     else if (selectedPairIndex > index)
         selectedPairIndex--;
+}
+
+// ── AppState pairs file ───────────────────────────────────────────────────────
+void AppState::savePairs(const char* path)
+{
+    nlohmann::json j;
+    // u/v are pixels of the displayed image: rectified or raw, at this size.
+    // The paths are a note of what the pairs were picked on; loading ignores them.
+    j["image"] = { { "path", imagePath }, { "width", imageW }, { "height", imageH }, { "rectified", imageRectified } };
+    j["clouds"] = cloudPaths;
+    j["pairs"] = nlohmann::json::array();
+    for (const auto& p : pairs)
+        j["pairs"].push_back({ { "u", p.u }, { "v", p.v }, { "point", { p.px, p.py, p.pz } } });
+
+    std::ofstream f(path);
+    if (!f)
+    {
+        statusMsg = std::string("Cannot write: ") + path;
+        return;
+    }
+    f << j.dump(2);
+    statusMsg = "Saved " + std::to_string(pairs.size()) + " pairs to " + path;
+}
+
+bool AppState::isPairsFile(const char* path)
+{
+    std::string ext = std::filesystem::path(path).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    if (ext != ".json")
+        return false;
+    std::ifstream f(path);
+    const nlohmann::json j = nlohmann::json::parse(f, nullptr, false);
+    return j.is_object() && j.contains("pairs") && j["pairs"].is_array();
+}
+
+void AppState::loadPairs(const char* path)
+{
+    std::ifstream f(path);
+    if (!f)
+    {
+        statusMsg = std::string("Cannot open: ") + path;
+        return;
+    }
+    std::vector<CorrespondencePair> loaded;
+    int fileW = 0, fileH = 0;
+    bool fileRectified = false;
+    try
+    {
+        nlohmann::json j;
+        f >> j;
+        if (!j.contains("pairs") || !j["pairs"].is_array())
+        {
+            statusMsg = std::string("No pairs found in: ") + path;
+            return;
+        }
+        const nlohmann::json ji = j.value("image", nlohmann::json::object());
+        fileW = ji.value("width", 0);
+        fileH = ji.value("height", 0);
+        fileRectified = ji.value("rectified", false);
+        for (const auto& jp : j["pairs"])
+        {
+            const auto& pt = jp.at("point");
+            CorrespondencePair p;
+            p.u = jp.at("u").get<float>();
+            p.v = jp.at("v").get<float>();
+            p.px = pt.at(0).get<float>();
+            p.py = pt.at(1).get<float>();
+            p.pz = pt.at(2).get<float>();
+            loaded.push_back(p);
+        }
+    } catch (const nlohmann::json::exception& e)
+    {
+        statusMsg = std::string("Bad pairs file ") + path + ": " + e.what();
+        return;
+    }
+
+    std::string notes;
+    if (imageLoaded && fileW > 0 && fileH > 0 && (fileW != imageW || fileH != imageH))
+    {
+        const float sx = static_cast<float>(imageW) / fileW, sy = static_cast<float>(imageH) / fileH;
+        for (auto& p : loaded)
+        {
+            p.u *= sx;
+            p.v *= sy;
+        }
+        notes += "; pixels scaled from " + std::to_string(fileW) + "x" + std::to_string(fileH) + " to the loaded image";
+    }
+    if (imageLoaded && fileRectified != imageRectified)
+        notes += std::string("; WARNING: picked in the ") + (fileRectified ? "rectified" : "raw") + " image, the shown one is " +
+            (imageRectified ? "rectified" : "raw");
+
+    pairs = std::move(loaded);
+    selectedPairIndex = -1;
+    lastSolveRmsPixels = -1.0;
+    statusMsg = "Loaded " + std::to_string(pairs.size()) + " pairs from " + path + notes;
 }
 
 calib::ExtrinsicsPriors AppState::defaultPriors()
@@ -931,15 +1027,25 @@ void App::update()
     state.orbit.update(allowOrbit);
 
     // Drag & drop images (*.jpg/*.jpeg/*.png/*.bmp), point clouds (*.laz/*.las), intrinsics
-    // (*.yml/*.yaml) or a calibration (*.json) onto the window to load them -- raylib's GLFW
-    // backend surfaces OS drag & drop the same way on Windows, Linux and macOS, so no
-    // platform-specific code is needed here.
+    // (*.yml/*.yaml), a calibration or saved pairs (*.json) onto the window to load them --
+    // raylib's GLFW backend surfaces OS drag & drop the same way on Windows, Linux and macOS,
+    // so no platform-specific code is needed here.
     if (IsFileDropped())
     {
         FilePathList dropped = LoadDroppedFiles();
         bool sawCloud = false;
+        // Pairs go last, so the image and calibration dropped with them are what
+        // loadPairs() rescales to and checks rectification against.
+        std::vector<std::string> pairFiles;
         for (unsigned int i = 0; i < dropped.count; i++)
-            handleDroppedFile(state, dropped.paths[i], sawCloud);
+        {
+            if (AppState::isPairsFile(dropped.paths[i]))
+                pairFiles.push_back(dropped.paths[i]);
+            else
+                handleDroppedFile(state, dropped.paths[i], sawCloud);
+        }
+        for (const std::string& path : pairFiles)
+            state.loadPairs(path.c_str());
         UnloadDroppedFiles(dropped);
     }
 }

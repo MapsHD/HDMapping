@@ -47,5 +47,7 @@ private:
     void actionOpenIntrinsics(AppState& state);
     void actionOpenCalibration(AppState& state);
     void actionSaveCalibration(AppState& state);
+    void actionLoadPairs(AppState& state);
+    void actionSavePairs(AppState& state);
     void handleShortcuts(AppState& state);
 };

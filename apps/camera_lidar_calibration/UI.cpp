@@ -386,6 +386,22 @@ void UI::actionSaveCalibration(AppState& state)
     }
 }
 
+static const std::vector<std::string> kPairsFilter = { "Picked pairs (*.json)", "*.json", "All files", "*" };
+
+void UI::actionLoadPairs(AppState& state)
+{
+    std::string path = mandeye::fd::OpenFileDialogOneFile("Load picked pairs", kPairsFilter);
+    if (!path.empty())
+        state.loadPairs(path.c_str());
+}
+
+void UI::actionSavePairs(AppState& state)
+{
+    std::string path = mandeye::fd::SaveFileDialog("Save picked pairs", kPairsFilter, ".json", "pairs.json");
+    if (!path.empty())
+        state.savePairs(path.c_str());
+}
+
 // ── Keyboard shortcuts ───────────────────────────────────────────────────────
 // Ctrl-combos follow the io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_X, false)
 // + io.AddKeyEvent(...) reset convention used by mandeye_single_session_viewer
@@ -448,6 +464,11 @@ void UI::panelMenuBar(AppState& state)
             actionOpenCalibration(state);
         if (ImGui::MenuItem("Save Calibration...", "Ctrl+S"))
             actionSaveCalibration(state);
+        ImGui::Separator();
+        if (ImGui::MenuItem("Load Pairs..."))
+            actionLoadPairs(state);
+        if (ImGui::MenuItem("Save Pairs...", nullptr, false, !state.pairs.empty()))
+            actionSavePairs(state);
         ImGui::EndMenu();
     }
 
@@ -829,6 +850,17 @@ void UI::panelCorrespondences(AppState& state)
     }
     if (removeIndex >= 0)
         state.removePair(removeIndex);
+
+    ImGui::BeginDisabled(state.pairs.empty());
+    if (ImGui::Button("Save pairs..."))
+        actionSavePairs(state);
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    if (ImGui::Button("Load pairs..."))
+        actionLoadPairs(state);
+    helpMarker(
+        "Or drop a saved pairs .json on the window. Loading replaces the current pairs.\n"
+        "Pixels are of the shown image (rectified or raw) -- load the same image and calibration first.");
 
     ImGui::Spacing();
     const bool allLocked = state.lockTranslation && state.lockRotation;

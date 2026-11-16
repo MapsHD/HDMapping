@@ -124,6 +124,14 @@ struct AppState
     Intrinsics displayIntrinsics() const;
     void removePair(int index);
     bool solvePairs(); // solves extrinsics from `pairs`, updates statusMsg
+    //! Writes `pairs` to a JSON file, with the size and rectification of the
+    //! image their u/v were picked in.
+    void savePairs(const char* path);
+    //! Replaces `pairs` with those in a savePairs() file, rescaling u/v when the
+    //! loaded image's size differs from the file's.
+    void loadPairs(const char* path);
+    //! @return whether `path` is a savePairs() file, i.e. a .json with a "pairs" array
+    static bool isPairsFile(const char* path);
 
     // ── operations ────────────────────────────────────────────────────────────
     //! Points the 3D view at the LiDAR origin and the camera pose, close enough

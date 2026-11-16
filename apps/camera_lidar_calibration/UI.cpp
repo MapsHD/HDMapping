@@ -584,6 +584,19 @@ void UI::panelIntrinsics(AppState& state)
         helpMarker(
             "Drag to adjust. Hold Ctrl+click to type a value.\nUnlike Pinhole, the displayed image is never undistorted for "
             "Mei -- the projection overlay and Camera RGB coloring apply this distortion to the raw image directly.");
+
+        ImGui::Text("Refine with \"Solve Extrinsics from Pairs\":");
+        ImGui::Checkbox("fx, fy", &state.refineIntrinsics.focal);
+        ImGui::SameLine();
+        ImGui::Checkbox("cx, cy", &state.refineIntrinsics.principalPoint);
+        ImGui::SameLine();
+        ImGui::Checkbox("xi", &state.refineIntrinsics.xi);
+        ImGui::Checkbox("k1-k3, p1, p2", &state.refineIntrinsics.distortion);
+        helpMarker(
+            "Solved together with the extrinsics; the values above are replaced.\n"
+            "Each pair gives 2 equations. xi trades off against fx/fy, and a few\n"
+            "pairs barely pin the distortion -- refine only what the pairs support.\n"
+            "Reload the calibration to undo.");
     }
     else if (K.model == CameraModel::Fisheye)
     {
@@ -866,15 +879,18 @@ void UI::panelCorrespondences(AppState& state)
         "Pixels are of the shown image (rectified or raw) -- load the same image and calibration first.");
 
     ImGui::Spacing();
-    const bool allLocked = state.lockTranslation && state.lockRotation;
-    ImGui::BeginDisabled(state.pairs.size() < 3 || allLocked);
+    const std::string refined = state.refinedIntrinsicsLabel();
+    const bool nothingFree = state.lockTranslation && state.lockRotation && refined.empty();
+    ImGui::BeginDisabled(state.pairs.size() < 3 || nothingFree);
     if (ImGui::Button("Solve Extrinsics from Pairs", ImVec2(-1, 0)))
         state.solvePairs();
     ImGui::EndDisabled();
     if (state.pairs.size() < 3)
         ImGui::TextDisabled("At least 3 pairs needed");
-    else if (allLocked)
+    else if (nothingFree)
         ImGui::TextDisabled("Translation and rotation are both locked");
+    if (!refined.empty())
+        ImGui::TextDisabled("Also refines %s", refined.c_str());
     if (state.lastSolveRmsPixels >= 0.0)
         ImGui::Text("Last solve RMS reprojection error: %.2f px", state.lastSolveRmsPixels);
 }

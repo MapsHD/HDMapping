@@ -2,12 +2,14 @@
 
 // Always compiled; the #ifdef below picks between the real Ceres
 // implementation and a stub that explains why it isn't available, so callers
-// check solveExtrinsicsCeres's return value rather than an #ifdef.
+// check solveExtrinsicsAndIntrinsicsCeres's return value rather than an #ifdef.
 #ifdef CALIB_ENABLE_CERES
 
 #include <ceres/ceres.h>
 
+#include <algorithm>
 #include <cmath>
+#include <string>
 
 namespace calib
 {
@@ -48,36 +50,46 @@ namespace calib
             }
         }
 
-        // Templated equivalent of calib::projectPoint's Mei branch, for
-        // Ceres autodiff --
-        // same formula. Intrinsics stay plain doubles (fixed, not solved
-        // for); only pc is the Jet-typed variable.
+        //! p_cam = R_wc^T * (p_world - C), from the two extrinsic parameter blocks.
+        template<typename T>
+        void lidarToCamera(const Eigen::Vector3d& p, const T* tx_ty_tz, const T* om_fi_ka, T pc[3])
+        {
+            T R[3][3];
+            rotationMatrix(om_fi_ka[0], om_fi_ka[1], om_fi_ka[2], R);
+            const T d[3] = { T(p.x()) - tx_ty_tz[0], T(p.y()) - tx_ty_tz[1], T(p.z()) - tx_ty_tz[2] };
+            pc[0] = R[0][0] * d[0] + R[1][0] * d[1] + R[2][0] * d[2];
+            pc[1] = R[0][1] * d[0] + R[1][1] * d[1] + R[2][1] * d[2];
+            pc[2] = R[0][2] * d[0] + R[1][2] * d[1] + R[2][2] * d[2];
+        }
+
+        //! Templated calib::projectPoint Mei branch, for Ceres autodiff; the
+        //! intrinsics are Jets too, so they can be refined.
         template<typename T>
         void projectMei(
             const T pc[3],
-            double fx,
-            double fy,
-            double cx,
-            double cy,
-            double xi,
-            double k1,
-            double k2,
-            double k3,
-            double p1,
-            double p2,
+            const T& fx,
+            const T& fy,
+            const T& cx,
+            const T& cy,
+            const T& xi,
+            const T& k1,
+            const T& k2,
+            const T& k3,
+            const T& p1,
+            const T& p2,
             T& u,
             T& v)
         {
             const T n = sqrt(pc[0] * pc[0] + pc[1] * pc[1] + pc[2] * pc[2]);
             const T Xx = pc[0] / n, Xy = pc[1] / n, Xz = pc[2] / n;
-            const T denom = Xz + T(xi);
+            const T denom = Xz + xi;
             const T x = Xx / denom, y = Xy / denom;
             const T r2 = x * x + y * y;
-            const T radial = T(1.0) + T(k1) * r2 + T(k2) * r2 * r2 + T(k3) * r2 * r2 * r2;
-            const T xd = x * radial + T(2.0 * p1) * x * y + T(p2) * (r2 + T(2.0) * x * x);
-            const T yd = y * radial + T(p1) * (r2 + T(2.0) * y * y) + T(2.0 * p2) * x * y;
-            u = T(fx) * xd + T(cx);
-            v = T(fy) * yd + T(cy);
+            const T radial = T(1.0) + k1 * r2 + k2 * r2 * r2 + k3 * r2 * r2 * r2;
+            const T xd = x * radial + T(2.0) * p1 * x * y + p2 * (r2 + T(2.0) * x * x);
+            const T yd = y * radial + p1 * (r2 + T(2.0) * y * y) + T(2.0) * p2 * x * y;
+            u = fx * xd + cx;
+            v = fy * yd + cy;
         }
 
         // Templated equivalent of calib::projectPoint's Fisheye branch, for
@@ -106,13 +118,49 @@ namespace calib
             v = T(fy) * pc[1] * s + T(cy);
         }
 
-        // Reprojection residual for one correspondence: predicted (u, v)
+        // Reprojection residuals for one correspondence: predicted (u, v)
         // minus the picked pixel, like the Pinhole solver's observation
         // equation but autodiff'd, no vendored Mei or fisheye Jacobian
-        // existing. K.model must be Mei or Fisheye.
-        struct ReprojectionResidual
+        // existing.
+
+        //! Mei, with the intrinsics as parameter blocks (fx fy | cx cy | xi |
+        //! k1 k2 k3 p1 p2), held constant unless refined.
+        struct MeiReprojectionResidual
         {
-            ReprojectionResidual(const Eigen::Vector3d& p, double u_kp, double v_kp, const Intrinsics& K)
+            MeiReprojectionResidual(const Eigen::Vector3d& p, double u_kp, double v_kp)
+                : p_(p)
+                , u_kp_(u_kp)
+                , v_kp_(v_kp)
+            {
+            }
+
+            template<typename T>
+            bool operator()(
+                const T* const tx_ty_tz,
+                const T* const om_fi_ka,
+                const T* const focal,
+                const T* const centre,
+                const T* const xi,
+                const T* const dist,
+                T* residual) const
+            {
+                T pc[3];
+                lidarToCamera(p_, tx_ty_tz, om_fi_ka, pc);
+                T u, v;
+                projectMei(pc, focal[0], focal[1], centre[0], centre[1], xi[0], dist[0], dist[1], dist[2], dist[3], dist[4], u, v);
+                residual[0] = u - T(u_kp_);
+                residual[1] = v - T(v_kp_);
+                return true;
+            }
+
+            const Eigen::Vector3d p_;
+            const double u_kp_, v_kp_;
+        };
+
+        //! Fisheye, intrinsics fixed.
+        struct FisheyeReprojectionResidual
+        {
+            FisheyeReprojectionResidual(const Eigen::Vector3d& p, double u_kp, double v_kp, const Intrinsics& K)
                 : p_(p)
                 , u_kp_(u_kp)
                 , v_kp_(v_kp)
@@ -123,22 +171,10 @@ namespace calib
             template<typename T>
             bool operator()(const T* const tx_ty_tz, const T* const om_fi_ka, T* residual) const
             {
-                T R[3][3];
-                rotationMatrix(om_fi_ka[0], om_fi_ka[1], om_fi_ka[2], R);
-
-                const T d[3] = { T(p_.x()) - tx_ty_tz[0], T(p_.y()) - tx_ty_tz[1], T(p_.z()) - tx_ty_tz[2] };
-                // p_cam = R_wc^T * (p_world - C)
-                const T pc[3] = {
-                    R[0][0] * d[0] + R[1][0] * d[1] + R[2][0] * d[2],
-                    R[0][1] * d[0] + R[1][1] * d[1] + R[2][1] * d[2],
-                    R[0][2] * d[0] + R[1][2] * d[1] + R[2][2] * d[2],
-                };
-
+                T pc[3];
+                lidarToCamera(p_, tx_ty_tz, om_fi_ka, pc);
                 T u, v;
-                if (K_.model == CameraModel::Fisheye)
-                    projectFisheye(pc, K_.fx, K_.fy, K_.cx, K_.cy, K_.k1, K_.k2, K_.k3, K_.k4, u, v);
-                else
-                    projectMei(pc, K_.fx, K_.fy, K_.cx, K_.cy, K_.xi, K_.k1, K_.k2, K_.k3, K_.p1, K_.p2, u, v);
+                projectFisheye(pc, K_.fx, K_.fy, K_.cx, K_.cy, K_.k1, K_.k2, K_.k3, K_.k4, u, v);
                 residual[0] = u - T(u_kp_);
                 residual[1] = v - T(v_kp_);
                 return true;
@@ -173,22 +209,29 @@ namespace calib
         };
     } // namespace
 
-    bool solveExtrinsicsCeres(
+    bool solveExtrinsicsAndIntrinsicsCeres(
         const std::vector<PointPixelCorrespondence>& correspondences,
-        const Intrinsics& K,
+        Intrinsics& intrinsicsInOut,
         Extrinsics& extrinsicsInOut,
+        const MeiIntrinsicsRefinement& refine,
         std::string& errorMessage,
         double* outRmsPixels,
         bool fixTranslation,
         bool fixRotation,
         const ExtrinsicsPriors& priors)
     {
+        const Intrinsics& K = intrinsicsInOut;
         if (K.model != CameraModel::Mei && K.model != CameraModel::Fisheye)
         {
             errorMessage = std::string("The Ceres solver handles the mei and fisheye models only, not ") + modelToString(K.model);
             return false;
         }
-        if (fixTranslation && fixRotation)
+        if (refine.count() > 0 && K.model != CameraModel::Mei)
+        {
+            errorMessage = std::string("Refining intrinsics is supported for the mei model only, not ") + modelToString(K.model);
+            return false;
+        }
+        if (fixTranslation && fixRotation && refine.count() == 0)
         {
             errorMessage = "Translation and rotation are both locked -- nothing to solve";
             return false;
@@ -199,23 +242,53 @@ namespace calib
             return false;
         }
 
-        const int nParams = (fixTranslation || fixRotation) ? 3 : 6;
-        if (static_cast<int>(correspondences.size()) < 3 || static_cast<int>(correspondences.size()) * 2 < nParams)
+        // Each correspondence gives 2 equations.
+        const int nParams = (fixTranslation ? 0 : 3) + (fixRotation ? 0 : 3) + refine.count();
+        const int nNeeded = std::max(3, (nParams + 1) / 2);
+        if (static_cast<int>(correspondences.size()) < nNeeded)
         {
-            errorMessage = "Need at least 3 correspondences";
+            errorMessage =
+                "Need at least " + std::to_string(nNeeded) + " correspondences for " + std::to_string(nParams) + " free parameters";
             return false;
         }
 
         const double d2r = M_PI / 180.0;
         double txyz[3] = { extrinsicsInOut.tx, extrinsicsInOut.ty, extrinsicsInOut.tz };
         double omfika[3] = { extrinsicsInOut.om * d2r, extrinsicsInOut.fi * d2r, extrinsicsInOut.ka * d2r };
+        double focal[2] = { K.fx, K.fy };
+        double centre[2] = { K.cx, K.cy };
+        double xi[1] = { K.xi };
+        double dist[5] = { K.k1, K.k2, K.k3, K.p1, K.p2 };
 
         ceres::Problem problem;
         std::vector<ceres::ResidualBlockId> reprojectionBlocks;
         for (const auto& c : correspondences)
         {
-            auto* cost = new ceres::AutoDiffCostFunction<ReprojectionResidual, 2, 3, 3>(new ReprojectionResidual(c.p, c.u, c.v, K));
-            reprojectionBlocks.push_back(problem.AddResidualBlock(cost, nullptr, txyz, omfika));
+            if (K.model == CameraModel::Mei)
+            {
+                auto* cost = new ceres::AutoDiffCostFunction<MeiReprojectionResidual, 2, 3, 3, 2, 2, 1, 5>(
+                    new MeiReprojectionResidual(c.p, c.u, c.v));
+                reprojectionBlocks.push_back(problem.AddResidualBlock(cost, nullptr, txyz, omfika, focal, centre, xi, dist));
+            }
+            else
+            {
+                auto* cost = new ceres::AutoDiffCostFunction<FisheyeReprojectionResidual, 2, 3, 3>(
+                    new FisheyeReprojectionResidual(c.p, c.u, c.v, K));
+                reprojectionBlocks.push_back(problem.AddResidualBlock(cost, nullptr, txyz, omfika));
+            }
+        }
+        if (K.model == CameraModel::Mei)
+        {
+            if (!refine.focal)
+                problem.SetParameterBlockConstant(focal);
+            if (!refine.principalPoint)
+                problem.SetParameterBlockConstant(centre);
+            if (refine.xi)
+                problem.SetParameterLowerBound(xi, 0, 0.0);
+            else
+                problem.SetParameterBlockConstant(xi);
+            if (!refine.distortion)
+                problem.SetParameterBlockConstant(dist);
         }
         // A locked parameter's prior is dropped: it cannot move anyway.
         for (int i = 0; i < 6; ++i)
@@ -254,6 +327,19 @@ namespace calib
         extrinsicsInOut.om = static_cast<float>(omfika[0] / d2r);
         extrinsicsInOut.fi = static_cast<float>(omfika[1] / d2r);
         extrinsicsInOut.ka = static_cast<float>(omfika[2] / d2r);
+        if (refine.count() > 0)
+        {
+            intrinsicsInOut.fx = static_cast<float>(focal[0]);
+            intrinsicsInOut.fy = static_cast<float>(focal[1]);
+            intrinsicsInOut.cx = static_cast<float>(centre[0]);
+            intrinsicsInOut.cy = static_cast<float>(centre[1]);
+            intrinsicsInOut.xi = static_cast<float>(xi[0]);
+            intrinsicsInOut.k1 = static_cast<float>(dist[0]);
+            intrinsicsInOut.k2 = static_cast<float>(dist[1]);
+            intrinsicsInOut.k3 = static_cast<float>(dist[2]);
+            intrinsicsInOut.p1 = static_cast<float>(dist[3]);
+            intrinsicsInOut.p2 = static_cast<float>(dist[4]);
+        }
 
         // Reprojection error only, without the priors' share of the cost:
         // evaluate just the reprojection blocks. Their cost is
@@ -279,10 +365,11 @@ namespace calib
 
 namespace calib
 {
-    bool solveExtrinsicsCeres(
+    bool solveExtrinsicsAndIntrinsicsCeres(
         const std::vector<PointPixelCorrespondence>&,
-        const Intrinsics&,
+        Intrinsics&,
         Extrinsics&,
+        const MeiIntrinsicsRefinement&,
         std::string& errorMessage,
         double*,
         bool,
@@ -296,3 +383,21 @@ namespace calib
 } // namespace calib
 
 #endif
+
+namespace calib
+{
+    bool solveExtrinsicsCeres(
+        const std::vector<PointPixelCorrespondence>& correspondences,
+        const Intrinsics& K,
+        Extrinsics& extrinsicsInOut,
+        std::string& errorMessage,
+        double* outRmsPixels,
+        bool fixTranslation,
+        bool fixRotation,
+        const ExtrinsicsPriors& priors)
+    {
+        Intrinsics fixedK = K;
+        return solveExtrinsicsAndIntrinsicsCeres(
+            correspondences, fixedK, extrinsicsInOut, {}, errorMessage, outRmsPixels, fixTranslation, fixRotation, priors);
+    }
+} // namespace calib

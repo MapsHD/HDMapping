@@ -106,6 +106,11 @@ struct AppState
     //! target, e.g. to keep the camera height (tz) from drifting when the
     //! pairs barely constrain it. Indexed as calib::kPriorTx..kPriorKa.
     calib::ExtrinsicsPriors priors = defaultPriors();
+    //! Mei intrinsics "Solve Extrinsics from Pairs" refines too; ignored for
+    //! other models.
+    calib::MeiIntrinsicsRefinement refineIntrinsics;
+    //! @return the intrinsics the solve refines, e.g. "fx, fy, xi"; empty when none
+    std::string refinedIntrinsicsLabel() const;
 
     /**
      * @brief Priors all disabled, with a sigma of 1 cm for tx/ty/tz and

@@ -130,6 +130,55 @@ namespace calib
         const ExtrinsicsPriors& priors = {});
 
     /**
+     * @brief Which CameraModel::Mei intrinsics @ref solveExtrinsicsAndIntrinsicsCeres
+     *        refines along with the extrinsics; the rest stay as given.
+     */
+    struct MeiIntrinsicsRefinement
+    {
+        bool focal = false; //!< fx, fy
+        bool principalPoint = false; //!< cx, cy
+        bool xi = false; //!< unified-sphere parameter, kept >= 0
+        bool distortion = false; //!< k1, k2, k3, p1, p2
+
+        //! @return how many intrinsics are refined
+        int count() const
+        {
+            return (focal ? 2 : 0) + (principalPoint ? 2 : 0) + (xi ? 1 : 0) + (distortion ? 5 : 0);
+        }
+    };
+
+    /**
+     * @brief @ref solveExtrinsicsCeres that also refines the CameraModel::Mei
+     *        intrinsics `refine` selects.
+     * @param correspondences picked pairs, as in solveExtrinsicsCeres; each gives
+     *        2 equations, so at least half as many as there are free parameters
+     * @param intrinsicsInOut intrinsics in, refined ones replaced on success;
+     *        model Mei or Fisheye, and Mei when refining any
+     * @param extrinsicsInOut initial guess in, solved result out
+     * @param refine intrinsics to refine; none behaves as solveExtrinsicsCeres
+     * @param errorMessage set on failure, as in solveExtrinsicsCeres
+     * @param outRmsPixels optionally receives the RMS reprojection error
+     * @param fixTranslation as in @ref solveExtrinsicsFromCorrespondences
+     * @param fixRotation as in @ref solveExtrinsicsFromCorrespondences; with
+     *        fixTranslation too, only the intrinsics are solved
+     * @param priors as in @ref solveExtrinsicsFromCorrespondences
+     * @return false, leaving both in/out parameters unchanged, on the failures
+     *         solveExtrinsicsCeres has, or when refining a model other than Mei
+     * @note xi trades off against fx/fy, and a few pairs barely pin the
+     *       distortion: refine only what the pairs support.
+     */
+    bool solveExtrinsicsAndIntrinsicsCeres(
+        const std::vector<PointPixelCorrespondence>& correspondences,
+        Intrinsics& intrinsicsInOut,
+        Extrinsics& extrinsicsInOut,
+        const MeiIntrinsicsRefinement& refine,
+        std::string& errorMessage,
+        double* outRmsPixels = nullptr,
+        bool fixTranslation = false,
+        bool fixRotation = false,
+        const ExtrinsicsPriors& priors = {});
+
+    /**
      * @brief Checks that every enabled prior has a positive sigma.
      * @param priors priors to check
      * @return true when the priors can be passed to a solver

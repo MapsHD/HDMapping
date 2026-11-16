@@ -314,14 +314,32 @@ calib::ExtrinsicsPriors AppState::defaultPriors()
     return priors;
 }
 
+std::string AppState::refinedIntrinsicsLabel() const
+{
+    if (intrinsics.model != CameraModel::Mei)
+        return "";
+    std::string label;
+    auto add = [&label](bool on, const char* names)
+    {
+        if (on)
+            label += (label.empty() ? "" : ", ") + std::string(names);
+    };
+    add(refineIntrinsics.focal, "fx, fy");
+    add(refineIntrinsics.principalPoint, "cx, cy");
+    add(refineIntrinsics.xi, "xi");
+    add(refineIntrinsics.distortion, "k1-k3, p1, p2");
+    return label;
+}
+
 bool AppState::solvePairs()
 {
+    const std::string refined = refinedIntrinsicsLabel();
     if (pairs.size() < 3)
     {
         statusMsg = "Need at least 3 pairs to solve";
         return false;
     }
-    if (lockTranslation && lockRotation)
+    if (lockTranslation && lockRotation && refined.empty())
     {
         statusMsg = "Translation and rotation are both locked -- nothing to solve";
         return false;
@@ -341,10 +359,19 @@ bool AppState::solvePairs()
     double rms = -1.0;
     std::string solveErr;
     // Pinhole's observation equations are a plain rectilinear projection, so
-    // Mei and Fisheye use solveExtrinsicsCeres instead. See
-    // CameraCalibrationSolver.h.
+    // Mei and Fisheye use the Ceres solver instead, which can also refine Mei
+    // intrinsics. See CameraCalibrationSolver.h.
     bool ok = (intrinsics.model == CameraModel::Mei || intrinsics.model == CameraModel::Fisheye)
-        ? calib::solveExtrinsicsCeres(corr, intrinsics, extrinsics, solveErr, &rms, lockTranslation, lockRotation, priors)
+        ? calib::solveExtrinsicsAndIntrinsicsCeres(
+              corr,
+              intrinsics,
+              extrinsics,
+              refined.empty() ? calib::MeiIntrinsicsRefinement{} : refineIntrinsics,
+              solveErr,
+              &rms,
+              lockTranslation,
+              lockRotation,
+              priors)
         : calib::solveExtrinsicsFromCorrespondences(corr, intrinsics, extrinsics, &rms, lockTranslation, lockRotation, priors);
     if (!ok)
     {
@@ -353,13 +380,21 @@ bool AppState::solvePairs()
     }
 
     lastSolveRmsPixels = rms;
-    if (lockTranslation)
-        statusMsg = "Solved rotation (translation locked): RMS reprojection error ";
-    else if (lockRotation)
-        statusMsg = "Solved translation (rotation locked): RMS reprojection error ";
+    std::string solved;
+    if (lockTranslation && lockRotation)
+        solved = refined + " (extrinsics locked)";
     else
-        statusMsg = "Solved extrinsics: RMS reprojection error ";
-    statusMsg += std::to_string(rms) + " px";
+    {
+        if (lockTranslation)
+            solved = "rotation (translation locked)";
+        else if (lockRotation)
+            solved = "translation (rotation locked)";
+        else
+            solved = "extrinsics";
+        if (!refined.empty())
+            solved += " + " + refined;
+    }
+    statusMsg = "Solved " + solved + ": RMS reprojection error " + std::to_string(rms) + " px";
     const int nPriors = static_cast<int>(std::count_if(
         priors.begin(),
         priors.end(),

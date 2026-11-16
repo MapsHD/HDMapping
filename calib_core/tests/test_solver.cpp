@@ -395,4 +395,84 @@ TEST_CASE("solveExtrinsicsCeres: a model it has no residual for fails and says w
     CHECK(E.tx == groundTruthExtrinsics().tx);
 }
 
+TEST_CASE("solveExtrinsicsAndIntrinsicsCeres: refines the selected Mei intrinsics, keeps the rest")
+{
+    const Intrinsics truthK = meiIntrinsics();
+    const Extrinsics truthE = groundTruthExtrinsics();
+    const auto corr = syntheticCorrespondences(truthK, truthE);
+
+    Intrinsics K = truthK;
+    K.fx *= 1.04f;
+    K.fy *= 0.97f;
+    K.cx += 8.f;
+    K.cy -= 5.f;
+    Extrinsics E = perturbed(truthE);
+
+    MeiIntrinsicsRefinement refine;
+    refine.focal = true;
+    refine.principalPoint = true;
+    double rms = -1.0;
+    std::string err;
+    REQUIRE(solveExtrinsicsAndIntrinsicsCeres(corr, K, E, refine, err, &rms));
+
+    CHECK(rms < 0.5);
+    CHECK(K.fx == doctest::Approx(truthK.fx).epsilon(1e-3));
+    CHECK(K.fy == doctest::Approx(truthK.fy).epsilon(1e-3));
+    CHECK(K.cx == doctest::Approx(truthK.cx).epsilon(1e-3));
+    CHECK(K.cy == doctest::Approx(truthK.cy).epsilon(1e-3));
+    CHECK(E.tx == doctest::Approx(truthE.tx).epsilon(1e-3));
+    CHECK(E.ka == doctest::Approx(truthE.ka).epsilon(1e-2));
+    // Not selected: bit-for-bit what went in.
+    CHECK(K.xi == truthK.xi);
+    CHECK(K.k1 == truthK.k1);
+    CHECK(K.p2 == truthK.p2);
+}
+
+TEST_CASE("solveExtrinsicsAndIntrinsicsCeres: intrinsics alone, with both extrinsics locked")
+{
+    const Intrinsics truthK = meiIntrinsics();
+    const Extrinsics truthE = groundTruthExtrinsics();
+    const auto corr = syntheticCorrespondences(truthK, truthE);
+
+    Intrinsics K = truthK;
+    K.cx += 6.f;
+    Extrinsics E = truthE;
+    MeiIntrinsicsRefinement refine;
+    refine.principalPoint = true;
+    std::string err;
+    REQUIRE(solveExtrinsicsAndIntrinsicsCeres(corr, K, E, refine, err, nullptr, true, true));
+    CHECK(K.cx == doctest::Approx(truthK.cx).epsilon(1e-3));
+    CHECK(E.tx == truthE.tx);
+    CHECK(E.om == truthE.om);
+}
+
+TEST_CASE("solveExtrinsicsAndIntrinsicsCeres: refusals leave both inputs unchanged")
+{
+    MeiIntrinsicsRefinement all;
+    all.focal = all.principalPoint = all.xi = all.distortion = true;
+    std::string err;
+
+    SUBCASE("refining a fisheye")
+    {
+        Intrinsics K = fisheyeIntrinsics();
+        const auto corr = syntheticCorrespondences(K, groundTruthExtrinsics());
+        Extrinsics E = perturbed(groundTruthExtrinsics());
+        const Extrinsics before = E;
+        CHECK_FALSE(solveExtrinsicsAndIntrinsicsCeres(corr, K, E, all, err));
+        CHECK(err.find("mei model only") != std::string::npos);
+        CHECK(E.tx == before.tx);
+        CHECK(K.fx == fisheyeIntrinsics().fx);
+    }
+    SUBCASE("fewer pairs than half the free parameters")
+    {
+        Intrinsics K = meiIntrinsics();
+        auto corr = syntheticCorrespondences(K, groundTruthExtrinsics());
+        corr.pop_back(); // 7 pairs, 16 free parameters
+        Extrinsics E = perturbed(groundTruthExtrinsics());
+        CHECK_FALSE(solveExtrinsicsAndIntrinsicsCeres(corr, K, E, all, err));
+        CHECK(err.find("at least 8") != std::string::npos);
+        CHECK(K.k1 == meiIntrinsics().k1);
+    }
+}
+
 #endif // CALIB_ENABLE_CERES

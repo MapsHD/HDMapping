@@ -65,6 +65,9 @@ struct AppState
     bool showCameraModel = true;
     CameraBody cameraBody = CameraBody::Insta360X5;
 
+    //! Width of the Controls panel on the right, px; dragging its left edge changes it.
+    float panelW = 340.f;
+
     // ── 3D camera ─────────────────────────────────────────────────────────────
     OrbitCamera orbit;
 

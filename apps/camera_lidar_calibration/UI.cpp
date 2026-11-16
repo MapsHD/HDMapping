@@ -77,15 +77,18 @@ void UI::draw(AppState& state)
 
     ImGuiIO& io = ImGui::GetIO();
     float menuBarH = ImGui::GetFrameHeight();
-    float panelW = 340.f;
     float panelH = (float)GetScreenHeight() - menuBarH;
 
-    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x - panelW, menuBarH), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(panelW, panelH), ImGuiCond_Always);
-    ImGui::Begin(
-        "Controls",
-        nullptr,
-        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse);
+    // Pinned to the right edge at full height; dragging its left edge resizes
+    // it, between kMinPanelW and leaving the 3D view kMinViewW.
+    constexpr float kMinPanelW = 260.f, kMinViewW = 400.f;
+    const float maxPanelW = std::max(kMinPanelW, io.DisplaySize.x - kMinViewW);
+    state.panelW = std::clamp(state.panelW, kMinPanelW, maxPanelW);
+    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x - state.panelW, menuBarH), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(state.panelW, panelH), ImGuiCond_Always);
+    ImGui::SetNextWindowSizeConstraints(ImVec2(kMinPanelW, panelH), ImVec2(maxPanelW, panelH));
+    ImGui::Begin("Controls", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse);
+    state.panelW = ImGui::GetWindowWidth();
 
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.f, 1.f), "LiDAR-Camera Calibration");
     ImGui::Separator();
@@ -139,7 +142,7 @@ void UI::draw(AppState& state)
     // persists.
     if (state.renderer.imageTexValid)
     {
-        float viewW = io.DisplaySize.x - panelW;
+        float viewW = io.DisplaySize.x - state.panelW;
         float viewH = io.DisplaySize.y - menuBarH;
         ImGui::SetNextWindowPos(ImVec2(0, menuBarH), ImGuiCond_FirstUseEver);
         ImGui::SetNextWindowSize(ImVec2(viewW * 0.6f, viewH * 0.6f), ImGuiCond_FirstUseEver);

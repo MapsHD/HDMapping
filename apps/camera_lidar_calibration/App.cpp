@@ -936,8 +936,8 @@ void App::run()
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(W, H, ("LiDAR-Camera Calibration " HDMAPPING_CONFIGURE_PROJECT_VERSION));
     raylib_widgets::fitWindowToScreen();
-    // The 340px-wide side panel is fixed-width; below this the 3D/image
-    // views and the panel start overlapping instead of scrolling.
+    // Below this the 3D/image views and the side panel (340 px wide until
+    // resized) start overlapping instead of scrolling.
     SetWindowMinSize(900, 500);
     SetTargetFPS(60);
 
@@ -1147,8 +1147,7 @@ static void updateAndDrawPicking3D(
 void App::draw()
 {
     float menuBarH = ImGui::GetFrameHeight();
-    float panelW = 340.f;
-    float viewW = (float)GetScreenWidth() - panelW;
+    float viewW = (float)GetScreenWidth() - state.panelW;
     float viewH = (float)GetScreenHeight() - menuBarH;
 
     // ── Image + projection overlay (GPU, into render texture)

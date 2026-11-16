@@ -230,6 +230,7 @@ void AppState::savePairs(const char* path)
         return;
     }
     f << j.dump(2);
+    pairsPath = path;
     statusMsg = "Saved " + std::to_string(pairs.size()) + " pairs to " + path;
 }
 
@@ -301,6 +302,7 @@ void AppState::loadPairs(const char* path)
             (imageRectified ? "rectified" : "raw");
 
     pairs = std::move(loaded);
+    pairsPath = path;
     selectedPairIndex = -1;
     lastSolveRmsPixels = -1.0;
     statusMsg = "Loaded " + std::to_string(pairs.size()) + " pairs from " + path + notes;
@@ -1030,6 +1032,16 @@ void App::run()
     {
         state.loadImageClosestToCloudTime(pendingImageDirByTime.c_str());
         std::printf("%s\n", state.statusMsg.c_str());
+    }
+    if (!pendingPairs.empty())
+    {
+        if (std::filesystem::exists(pendingPairs))
+            state.loadPairs(pendingPairs.c_str());
+        else
+        {
+            state.pairsPath = pendingPairs;
+            state.statusMsg = "New pairs file " + pendingPairs + ": Ctrl+S saves the picked pairs there";
+        }
     }
 
     while (!WindowShouldClose())

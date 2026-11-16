@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <nlohmann/json.hpp>
 
@@ -410,6 +411,16 @@ void UI::actionLoadPairs(AppState& state)
 
 void UI::actionSavePairs(AppState& state)
 {
+    if (!state.pairsPath.empty())
+        state.savePairs(state.pairsPath.c_str());
+    else if (state.pairs.empty())
+        state.statusMsg = "No pairs to save";
+    else
+        actionSavePairsAs(state);
+}
+
+void UI::actionSavePairsAs(AppState& state)
+{
     std::string path = mandeye::fd::SaveFileDialog("Save picked pairs", kPairsFilter, ".json", "pairs.json");
     if (!path.empty())
         state.savePairs(path.c_str());
@@ -447,8 +458,10 @@ void UI::handleShortcuts(AppState& state)
         actionOpenIntrinsics(state);
     if (ctrlPressed(ImGuiKey_L))
         actionOpenCalibration(state);
-    if (ctrlPressed(ImGuiKey_S))
+    if (io.KeyShift && ctrlPressed(ImGuiKey_S))
         actionSaveCalibration(state);
+    else if (ctrlPressed(ImGuiKey_S))
+        actionSavePairs(state);
 
     if (ImGui::IsKeyPressed(ImGuiKey_C, false))
         state.showCompassRuler = !state.showCompassRuler;
@@ -475,13 +488,15 @@ void UI::panelMenuBar(AppState& state)
         ImGui::Separator();
         if (ImGui::MenuItem("Open Calibration...", "Ctrl+L"))
             actionOpenCalibration(state);
-        if (ImGui::MenuItem("Save Calibration...", "Ctrl+S"))
+        if (ImGui::MenuItem("Save Calibration...", "Ctrl+Shift+S"))
             actionSaveCalibration(state);
         ImGui::Separator();
         if (ImGui::MenuItem("Load Pairs..."))
             actionLoadPairs(state);
-        if (ImGui::MenuItem("Save Pairs...", nullptr, false, !state.pairs.empty()))
+        if (ImGui::MenuItem("Save Pairs", "Ctrl+S", false, !state.pairs.empty() || !state.pairsPath.empty()))
             actionSavePairs(state);
+        if (ImGui::MenuItem("Save Pairs As...", nullptr, false, !state.pairs.empty()))
+            actionSavePairsAs(state);
         ImGui::EndMenu();
     }
 
@@ -879,16 +894,27 @@ void UI::panelCorrespondences(AppState& state)
     if (removeIndex >= 0)
         state.removePair(removeIndex);
 
-    ImGui::BeginDisabled(state.pairs.empty());
-    if (ImGui::Button("Save pairs..."))
+    ImGui::BeginDisabled(state.pairs.empty() && state.pairsPath.empty());
+    if (ImGui::Button("Save pairs"))
         actionSavePairs(state);
     ImGui::EndDisabled();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+    {
+        if (state.pairsPath.empty())
+            ImGui::SetTooltip("Ctrl+S; asks for a file");
+        else
+            ImGui::SetTooltip("Ctrl+S, to %s", state.pairsPath.c_str());
+    }
     ImGui::SameLine();
     if (ImGui::Button("Load pairs..."))
         actionLoadPairs(state);
     helpMarker(
-        "Or drop a saved pairs .json on the window. Loading replaces the current pairs.\n"
+        "Or drop a saved pairs .json on the window, or pass --pairs <file.json>.\n"
+        "Loading replaces the current pairs. Ctrl+S saves to the last pairs file\n"
+        "loaded or saved, or the --pairs one (created if it does not exist yet).\n"
         "Pixels are of the shown image (rectified or raw) -- load the same image and calibration first.");
+    if (!state.pairsPath.empty())
+        ImGui::TextDisabled("Pairs file: %s", std::filesystem::path(state.pairsPath).filename().string().c_str());
 
     ImGui::Spacing();
     const std::string refined = state.refinedIntrinsicsLabel();

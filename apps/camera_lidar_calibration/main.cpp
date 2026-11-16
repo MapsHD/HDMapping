@@ -23,7 +23,7 @@ static bool isImage(const std::string& e)
     return e == "jpg" || e == "jpeg" || e == "png" || e == "bmp";
 }
 
-// Load each path by file type (clouds, images, intrinsics, calibration).
+// Load each path by file type (clouds, images, intrinsics, calibration, picked pairs).
 static void preloadByExt(App& app, const std::string& p)
 {
     std::string e = ext(p);
@@ -33,6 +33,8 @@ static void preloadByExt(App& app, const std::string& p)
         app.preloadCloud(p.c_str());
     else if (e == "yml" || e == "yaml")
         app.preloadIntrinsics(p.c_str());
+    else if (e == "json" && AppState::isPairsFile(p.c_str()))
+        app.preloadPairs(p.c_str());
     else if (e == "json")
         app.preloadCalibration(p.c_str());
 }
@@ -40,10 +42,13 @@ static void preloadByExt(App& app, const std::string& p)
 static constexpr const char* kClosestToLaz = "  --closest_to_laz             with --camera_dir <dir>: load the image taken closest\n"
                                              "                               to the middle of the --laz clouds' point times";
 
+static constexpr const char* kPairs = "  --pairs <file.json>          picked pairs: loaded when the file exists; Ctrl+S saves\n"
+                                      "                               the pairs to it";
+
 int main(int argc, char* argv[])
 {
     CliArgs args = parseArgs(argc, argv);
-    const std::vector<std::string> usage = { cliopt::CAMERA_DIR, kClosestToLaz, cliopt::LAZ, cliopt::CALIB };
+    const std::vector<std::string> usage = { cliopt::CAMERA_DIR, kClosestToLaz, cliopt::LAZ, cliopt::CALIB, kPairs };
     if (args.help)
     {
         printUsage("CalibrationApp", "Camera/LiDAR calibration tool", usage);
@@ -65,6 +70,10 @@ int main(int argc, char* argv[])
     // --calib: calibration json (intrinsic + extrinsic).
     if (args.has("calib"))
         app.preloadCalibration(args.get("calib").c_str());
+
+    // --pairs: picked pairs, loaded if the file exists; Ctrl+S saves to it.
+    if (args.has("pairs"))
+        app.preloadPairs(args.get("pairs").c_str());
 
     // --camera_dir: load the first image found in the directory; with
     // --closest_to_laz it is replaced, once the clouds are loaded, by the one

@@ -48,6 +48,7 @@ private:
     void actionOpenCalibration(AppState& state);
     void actionSaveCalibration(AppState& state);
     void actionLoadPairs(AppState& state);
-    void actionSavePairs(AppState& state);
+    void actionSavePairs(AppState& state); // to state.pairsPath, else asks
+    void actionSavePairsAs(AppState& state);
     void handleShortcuts(AppState& state);
 };

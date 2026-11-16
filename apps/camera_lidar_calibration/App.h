@@ -143,6 +143,9 @@ struct AppState
     void loadPairs(const char* path);
     //! @return whether `path` is a savePairs() file, i.e. a .json with a "pairs" array
     static bool isPairsFile(const char* path);
+    //! File Ctrl+S saves the pairs to: --pairs, else the last pairs file loaded or
+    //! saved; empty = ask for one.
+    std::string pairsPath;
 
     // ── operations ────────────────────────────────────────────────────────────
     //! Points the 3D view at the LiDAR origin and the camera pose, close enough
@@ -195,6 +198,12 @@ public:
     {
         pendingImageDirByTime = dir;
     }
+    //! Picked pairs file: loaded after everything else, as from a drop, when it
+    //! exists; Ctrl+S saves the pairs to it either way.
+    void preloadPairs(const char* path)
+    {
+        pendingPairs = path;
+    }
 
     void run();
 
@@ -205,6 +214,7 @@ private:
     std::string pendingIntrinsics;
     std::string pendingCalibration;
     std::string pendingImageDirByTime;
+    std::string pendingPairs;
 
     void update();
     void draw();

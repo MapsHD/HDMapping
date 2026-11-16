@@ -611,12 +611,15 @@ void UI::panelIntrinsics(AppState& state)
             "Mei -- the projection overlay and Camera RGB coloring apply this distortion to the raw image directly.");
 
         ImGui::Text("Refine with \"Solve Extrinsics from Pairs\":");
+        // Own ID scope: "xi" is also the drag field's label above.
+        ImGui::PushID("refine");
         ImGui::Checkbox("fx, fy", &state.refineIntrinsics.focal);
         ImGui::SameLine();
         ImGui::Checkbox("cx, cy", &state.refineIntrinsics.principalPoint);
         ImGui::SameLine();
         ImGui::Checkbox("xi", &state.refineIntrinsics.xi);
         ImGui::Checkbox("k1-k3, p1, p2", &state.refineIntrinsics.distortion);
+        ImGui::PopID();
         helpMarker(
             "Solved together with the extrinsics; the values above are replaced.\n"
             "Each pair gives 2 equations. xi trades off against fx/fy, and a few\n"

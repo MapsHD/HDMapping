@@ -72,6 +72,9 @@ static void drawSensorIds(const AppState& state)
 // ── Main draw ────────────────────────────────────────────────────────────────
 void UI::draw(AppState& state)
 {
+    // Set again below while a Remove button is hovered; the 3D view, drawn
+    // before the UI, shows the previous frame's.
+    state.hoveredRemoveIndex = -1;
     panelMenuBar(state);
     handleShortcuts(state);
 
@@ -285,13 +288,20 @@ void UI::drawImageView(AppState& state)
             dl->AddCircle(s, 6.f, IM_COL32(255, 140, 0, 255), 0, 2.f);
         }
         // Large cross for the pair selected in the Correspondences panel --
-        // matches the magenta cross drawn for it in the 3D view.
-        if (state.selectedPairIndex >= 0 && state.selectedPairIndex < (int)state.pairs.size())
+        // matches the magenta cross drawn for it in the 3D view -- and a red
+        // one, ringed, for the pair whose Remove button is hovered.
+        auto pairCross = [&](int index, ImU32 color)
         {
-            ImVec2 s = imgToScreen(ImVec2(state.pairs[state.selectedPairIndex].u, state.pairs[state.selectedPairIndex].v));
-            dl->AddLine(ImVec2(s.x - 18, s.y), ImVec2(s.x + 18, s.y), IM_COL32(255, 0, 255, 255), 2.f);
-            dl->AddLine(ImVec2(s.x, s.y - 18), ImVec2(s.x, s.y + 18), IM_COL32(255, 0, 255, 255), 2.f);
-        }
+            if (index < 0 || index >= (int)state.pairs.size())
+                return ImVec2(0, 0);
+            ImVec2 s = imgToScreen(ImVec2(state.pairs[index].u, state.pairs[index].v));
+            dl->AddLine(ImVec2(s.x - 18, s.y), ImVec2(s.x + 18, s.y), color, 2.f);
+            dl->AddLine(ImVec2(s.x, s.y - 18), ImVec2(s.x, s.y + 18), color, 2.f);
+            return s;
+        };
+        pairCross(state.selectedPairIndex, IM_COL32(255, 0, 255, 255));
+        if (state.hoveredRemoveIndex >= 0 && state.hoveredRemoveIndex < (int)state.pairs.size())
+            dl->AddCircle(pairCross(state.hoveredRemoveIndex, IM_COL32(255, 40, 40, 255)), 12.f, IM_COL32(255, 40, 40, 255), 0, 2.f);
 
         // In the intensity image, also the LiDAR side of each pair,
         // projected through the current calibration (cyan squares).
@@ -862,6 +872,8 @@ void UI::panelCorrespondences(AppState& state)
         ImGui::SameLine();
         if (ImGui::SmallButton("Remove"))
             removeIndex = i;
+        if (ImGui::IsItemHovered())
+            state.hoveredRemoveIndex = i;
         ImGui::PopID();
     }
     if (removeIndex >= 0)

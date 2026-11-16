@@ -1166,15 +1166,25 @@ static void updateAndDrawPicking3D(
     }
 
     // Large 3-axis cross for the pair selected in the Correspondences
-    // panel, so it's easy to spot in the (usually much busier) 3D view.
-    if (state.selectedPairIndex >= 0 && state.selectedPairIndex < (int)state.pairs.size())
+    // panel, so it's easy to spot in the (usually much busier) 3D view;
+    // a red one for the pair whose Remove button is hovered.
+    auto pairCross = [&state](int index, Color color)
     {
-        const auto& p = state.pairs[state.selectedPairIndex];
+        if (index < 0 || index >= (int)state.pairs.size())
+            return;
+        const auto& p = state.pairs[index];
         Vector3 wp = { p.px, p.pz, -p.py };
         const float armLen = 0.5f;
-        DrawLine3D(Vector3{ wp.x - armLen, wp.y, wp.z }, Vector3{ wp.x + armLen, wp.y, wp.z }, MAGENTA);
-        DrawLine3D(Vector3{ wp.x, wp.y - armLen, wp.z }, Vector3{ wp.x, wp.y + armLen, wp.z }, MAGENTA);
-        DrawLine3D(Vector3{ wp.x, wp.y, wp.z - armLen }, Vector3{ wp.x, wp.y, wp.z + armLen }, MAGENTA);
+        DrawLine3D(Vector3{ wp.x - armLen, wp.y, wp.z }, Vector3{ wp.x + armLen, wp.y, wp.z }, color);
+        DrawLine3D(Vector3{ wp.x, wp.y - armLen, wp.z }, Vector3{ wp.x, wp.y + armLen, wp.z }, color);
+        DrawLine3D(Vector3{ wp.x, wp.y, wp.z - armLen }, Vector3{ wp.x, wp.y, wp.z + armLen }, color);
+    };
+    pairCross(state.selectedPairIndex, MAGENTA);
+    pairCross(state.hoveredRemoveIndex, RED);
+    if (state.hoveredRemoveIndex >= 0 && state.hoveredRemoveIndex < (int)state.pairs.size())
+    {
+        const auto& p = state.pairs[state.hoveredRemoveIndex];
+        DrawSphereWires(Vector3{ p.px, p.pz, -p.py }, 0.12f, 6, 8, RED);
     }
 
     if (state.pendingHasCloud)

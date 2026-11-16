@@ -91,6 +91,9 @@ struct AppState
     // Row selected in the Correspondences panel list (-1 = none); drawn as
     // a large cross in both the 3D view and the image view.
     int selectedPairIndex = -1;
+    //! Pair whose Remove button is hovered (-1 = none), marked in red in both views
+    //! so it is clear which pair the click removes. Set by UI::draw each frame.
+    int hoveredRemoveIndex = -1;
     // When set, "Solve Extrinsics from Pairs" refines orientation only and
     // leaves tx/ty/tz exactly as they are -- for when the camera's position
     // relative to the LiDAR is already known (e.g. measured by hand) and

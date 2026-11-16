@@ -30,6 +30,7 @@
 #include <cmath>
 #include <ctime>
 #include <filesystem>
+#include <limits>
 
 #include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
 
@@ -89,6 +90,11 @@ struct ImuData
 ImuData imu_data_plot;
 
 std::vector<std::string> laz_files;
+//! Time span of every LAZ and IMU file load_data read, drawn as lanes under the playback timeline.
+InputFileSpans file_spans;
+//! [start, end] LiDAR-clock times [s] of the stretches VQF detected the IMU at rest.
+std::vector<std::pair<double, double>> motionless_segments;
+bool show_file_lanes = true;
 std::vector<std::string> photos_files;
 std::map<uint64_t, std::string> photo_files_ts;
 
@@ -1040,7 +1046,7 @@ void loadFiles(std::vector<std::string> input_file_names)
     if (input_file_names.empty())
         return;
 
-    if (load_data(input_file_names, params, pointsPerFile, imu_data, false))
+    if (load_data(input_file_names, params, pointsPerFile, imu_data, false, &file_spans))
     {
         // clear possible previous data
 
@@ -1145,6 +1151,12 @@ void loadFiles(std::vector<std::string> input_file_names)
 
         std::map<double, std::pair<Eigen::Matrix4d, double>> trajectory;
 
+        // Motionless segments: runs of samples VQF flags as rest. It flags rest once the
+        // IMU has been still for restMinT, so each run is moved that much earlier.
+        motionless_segments.clear();
+        bool resting = false;
+        double rest_start = 0.0, previous_t = 0.0;
+
         int counter = 1;
 
         for (const auto& [timestamp_pair, gyr, acc] : imu_data)
@@ -1156,6 +1168,18 @@ void loadFiles(std::vector<std::string> input_file_names)
                                       static_cast<double>(acc.z()) * g };
 
             vqf.update(gyr_vqf, acc_vqf);
+
+            const bool rest = vqf.getRestDetected();
+            if (rest && !resting)
+            {
+                rest_start = timestamp_pair.first - vqf_params.restMinT;
+                if (!motionless_segments.empty())
+                    rest_start = std::max(rest_start, motionless_segments.back().second);
+            }
+            else if (!rest && resting)
+                motionless_segments.emplace_back(rest_start, previous_t);
+            resting = rest;
+            previous_t = timestamp_pair.first;
 
             vqf_real_t quat[4];
             vqf.getQuat6D(quat);
@@ -1184,6 +1208,10 @@ void loadFiles(std::vector<std::string> input_file_names)
             imu_data_plot.pitch.push_back(euler.y());
             imu_data_plot.roll.push_back(euler.x());
         }
+
+        if (resting)
+            motionless_segments.emplace_back(rest_start, previous_t);
+        spdlog::info("{} motionless segment(s) detected", motionless_segments.size());
 
         // timeline x-axis is shown relative to the first IMU sample so it starts at 0 [s];
         // datasetStart keeps the absolute value for reference / annotations
@@ -1645,9 +1673,65 @@ static void updatePlayback()
 //! chunk timestamp and a scrubbable timeline.
 static void playbackBar()
 {
+    const double duration = playbackDurationSec();
+    // The timeline starts at the first chunk.
+    auto pos = [duration](double t)
+    {
+        return static_cast<float>((t - chunkStartSec(0)) / duration);
+    };
+
+    // Motionless segments as green bands on the track, and the LAZ and IMU files as
+    // Gantt-style lanes under it, alternating shades telling neighbours apart.
+    std::vector<raylib_widgets::TimelineSpan> spans;
+    std::vector<raylib_widgets::TimelineLane> lanes;
+    std::vector<std::string> labels; // filled before the bars point into it
+    if (duration > 0.0)
+    {
+        for (const auto& [from, to] : motionless_segments)
+            if (pos(to) >= 0.f && pos(from) <= 1.f)
+                spans.push_back({ pos(from), pos(to), IM_COL32(80, 200, 120, 110), "motionless" });
+
+        if (show_file_lanes)
+        {
+            const std::vector<InputFileSpan>* files[2] = { &file_spans.laz, &file_spans.imu };
+            static const char* const kLaneNames[2] = { "LAZ", "IMU" };
+            static const char* const kUnits[2] = { "points", "samples" };
+            static const ImU32 kShades[2][2] = { { IM_COL32(80, 140, 230, 255), IM_COL32(50, 100, 190, 255) },
+                                                 { IM_COL32(230, 150, 60, 255), IM_COL32(190, 110, 40, 255) } };
+            for (int l = 0; l < 2; ++l)
+                for (const auto& f : *files[l])
+                    if (f.count > 0)
+                    {
+                        char buf[256];
+                        std::snprintf(
+                            buf,
+                            sizeof(buf),
+                            "%s\n%.3f .. %.3f s (%.3f s), %zu %s",
+                            fs::path(f.file).filename().string().c_str(),
+                            f.first - chunkStartSec(0),
+                            f.last - chunkStartSec(0),
+                            f.last - f.first,
+                            f.count,
+                            kUnits[l]);
+                        labels.push_back(buf);
+                    }
+            size_t next = 0;
+            for (int l = 0; l < 2; ++l)
+            {
+                raylib_widgets::TimelineLane lane{ kLaneNames[l], {} };
+                for (const auto& f : *files[l])
+                    if (f.count > 0)
+                        lane.bars.push_back({ pos(f.first), pos(f.last), kShades[l][lane.bars.size() % 2], labels[next++].c_str() });
+                if (!lane.bars.empty())
+                    lanes.push_back(std::move(lane));
+            }
+        }
+    }
+
     const ImGuiStyle& style = ImGui::GetStyle();
     const float timelineH = 18.f + ImGui::GetTextLineHeight();
-    const float barH = style.WindowPadding.y * 2.f + ImGui::GetFrameHeight() + style.ItemSpacing.y + timelineH;
+    const float barH = style.WindowPadding.y * 2.f + ImGui::GetFrameHeight() + style.ItemSpacing.y + timelineH +
+        raylib_widgets::kTimelineLaneHeight * static_cast<float>(lanes.size());
     // NoNav: Space must not also press a focused bar button, and the arrows keep stepping chunks.
     if (ImGui::BeginViewportSideBar(
             "##playback",
@@ -1656,8 +1740,6 @@ static void playbackBar()
             barH,
             ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNav))
     {
-        const double duration = playbackDurationSec();
-
         if (ImGui::Button(playback_playing ? "Pause" : "Play", ImVec2(60.f, 0.f)))
             togglePlayback();
         if (ImGui::IsItemHovered())
@@ -1708,7 +1790,7 @@ static void playbackBar()
         }
 
         float progress = duration > 0.0 ? static_cast<float>(playhead_sec / duration) : 0.f;
-        if (raylib_widgets::timeline("##timeline", progress, duration, timelineH))
+        if (raylib_widgets::timeline("##timeline", progress, duration, timelineH, spans, lanes))
         {
             playhead_sec = progress * duration;
             index_rendered_points_local = chunkAtSec(playhead_sec);
@@ -2048,6 +2130,9 @@ void display()
                 ImGui::SetTooltip("Show the mean and covariance ellipsoid representation");
 
             ImGui::MenuItem("Show IMU data", nullptr, &show_imu_data);
+            ImGui::MenuItem("Show files on the timeline", nullptr, &show_file_lanes);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("LAZ and IMU csv files as lanes under the playback timeline, Gantt-style");
             ImGui::MenuItem("Show cameras data", nullptr, &show_cameras_data);
 
             ImGui::MenuItem("Intensity shading", nullptr, &intensity_shading);

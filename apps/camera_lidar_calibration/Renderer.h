@@ -15,7 +15,7 @@ struct VisualizationParams
     float depthMin = 0.f;
     float depthMax = 50.f;
     float opacity = 1.f;
-    int colorMode = 0; // 0=depth(jet), 1=intensity, 2=height(z), 3=Camera RGB
+    int colorMode = 1; // 0=depth(jet), 1=intensity (the default), 2=height(z), 3=Camera RGB
     // Draw only every Nth point (GPU-side, like camera_lidar_trajectory_viewer's
     // "Draw decimation") -- 1 = draw all points.
     int drawDecim = 1;

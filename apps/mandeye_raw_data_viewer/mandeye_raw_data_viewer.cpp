@@ -30,7 +30,10 @@
 #include <cmath>
 #include <ctime>
 #include <filesystem>
+#include <iomanip>
 #include <limits>
+#include <sstream>
+#include <string_view>
 
 #include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
 
@@ -1046,7 +1049,7 @@ void loadFiles(std::vector<std::string> input_file_names)
     if (input_file_names.empty())
         return;
 
-    if (load_data(input_file_names, params, pointsPerFile, imu_data, false, &file_spans))
+    if (load_data(input_file_names, params, pointsPerFile, imu_data, false, file_spans))
     {
         // clear possible previous data
 
@@ -1684,7 +1687,6 @@ static void playbackBar()
     // Gantt-style lanes under it, alternating shades telling neighbours apart.
     std::vector<raylib_widgets::TimelineSpan> spans;
     std::vector<raylib_widgets::TimelineLane> lanes;
-    std::vector<std::string> labels; // filled before the bars point into it
     if (duration > 0.0)
     {
         for (const auto& [from, to] : motionless_segments)
@@ -1693,38 +1695,25 @@ static void playbackBar()
 
         if (show_file_lanes)
         {
-            const std::vector<InputFileSpan>* files[2] = { &file_spans.laz, &file_spans.imu };
-            static const char* const kLaneNames[2] = { "LAZ", "IMU" };
-            static const char* const kUnits[2] = { "points", "samples" };
-            static const ImU32 kShades[2][2] = { { IM_COL32(80, 140, 230, 255), IM_COL32(50, 100, 190, 255) },
-                                                 { IM_COL32(230, 150, 60, 255), IM_COL32(190, 110, 40, 255) } };
-            for (int l = 0; l < 2; ++l)
-                for (const auto& f : *files[l])
-                    if (f.count > 0)
-                    {
-                        char buf[256];
-                        std::snprintf(
-                            buf,
-                            sizeof(buf),
-                            "%s\n%.3f .. %.3f s (%.3f s), %zu %s",
-                            fs::path(f.file).filename().string().c_str(),
-                            f.first - chunkStartSec(0),
-                            f.last - chunkStartSec(0),
-                            f.last - f.first,
-                            f.count,
-                            kUnits[l]);
-                        labels.push_back(buf);
-                    }
-            size_t next = 0;
-            for (int l = 0; l < 2; ++l)
+            const auto addLane =
+                [&](std::string name, std::string_view unit, const std::vector<InputFileSpan>& files, ImU32 shade, ImU32 altShade)
             {
-                raylib_widgets::TimelineLane lane{ kLaneNames[l], {} };
-                for (const auto& f : *files[l])
-                    if (f.count > 0)
-                        lane.bars.push_back({ pos(f.first), pos(f.last), kShades[l][lane.bars.size() % 2], labels[next++].c_str() });
+                raylib_widgets::TimelineLane lane{ std::move(name), {} };
+                for (const InputFileSpan& f : files)
+                {
+                    if (f.count == 0)
+                        continue;
+                    std::ostringstream label;
+                    label << fs::path(f.file).filename().string() << "\n"
+                          << std::fixed << std::setprecision(3) << f.first - chunkStartSec(0) << " .. " << f.last - chunkStartSec(0)
+                          << " s (" << f.last - f.first << " s), " << f.count << " " << unit;
+                    lane.bars.push_back({ pos(f.first), pos(f.last), lane.bars.size() % 2 == 0 ? shade : altShade, label.str() });
+                }
                 if (!lane.bars.empty())
                     lanes.push_back(std::move(lane));
-            }
+            };
+            addLane("LAZ", "points", file_spans.laz, IM_COL32(80, 140, 230, 255), IM_COL32(50, 100, 190, 255));
+            addLane("IMU", "samples", file_spans.imu, IM_COL32(230, 150, 60, 255), IM_COL32(190, 110, 40, 255));
         }
     }
 

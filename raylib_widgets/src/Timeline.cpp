@@ -79,8 +79,8 @@ namespace raylib_widgets
             if (mouse.y < p1.y)
             {
                 for (const TimelineSpan& span : spans)
-                    if (span.label && f >= span.from && f <= span.to)
-                        tip += std::string(", ") + span.label;
+                    if (!span.label.empty() && f >= span.from && f <= span.to)
+                        tip += ", " + span.label;
             }
             else if (mouse.y < lanesBottom)
             {
@@ -89,8 +89,8 @@ namespace raylib_widgets
                 {
                     if (f >= bars[k].from && f <= bars[k].to)
                     {
-                        if (bars[k].label)
-                            tip += std::string("\n") + bars[k].label;
+                        if (!bars[k].label.empty())
+                            tip += "\n" + bars[k].label;
                         break;
                     }
                     if (k + 1 < bars.size() && f > bars[k].to && f < bars[k + 1].from)
@@ -130,9 +130,13 @@ namespace raylib_widgets
                     x1 = std::max(x1, toX(bars[k + 1].from));
                 dl->AddRectFilled(ImVec2(x0, y0), ImVec2(x1, y1), bars[k].color);
             }
-            if (lanes[l].name)
+            if (!lanes[l].name.empty())
                 dl->AddText(
-                    ImGui::GetFont(), kTimelineLaneHeight - 1.f, ImVec2(p0.x + 3.f, y0), IM_COL32(255, 255, 255, 230), lanes[l].name);
+                    ImGui::GetFont(),
+                    kTimelineLaneHeight - 1.f,
+                    ImVec2(p0.x + 3.f, y0),
+                    IM_COL32(255, 255, 255, 230),
+                    lanes[l].name.c_str());
         }
 
         if (durationSec > 0.0)

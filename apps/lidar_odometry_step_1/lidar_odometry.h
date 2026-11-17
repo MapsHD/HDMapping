@@ -35,14 +35,21 @@ struct InputFileSpans
     std::vector<InputFileSpan> imu;
 };
 
-//! @param fileSpans optional; receives each input file's time span
+bool load_data(
+    std::vector<std::string>& input_file_names,
+    LidarOdometryParams& params,
+    std::vector<std::vector<Point3Di>>& pointsPerFile,
+    Imu& imu_data,
+    bool debugMsg);
+//! As above, and reports each input file's time span.
+//! @param fileSpans receives the spans; reset first
 bool load_data(
     std::vector<std::string>& input_file_names,
     LidarOdometryParams& params,
     std::vector<std::vector<Point3Di>>& pointsPerFile,
     Imu& imu_data,
     bool debugMsg,
-    InputFileSpans* fileSpans = nullptr);
+    InputFileSpans& fileSpans);
 void calculate_trajectory(Trajectory& trajectory, Imu& imu_data, LidarOdometryParams& params, bool debugMsg);
 // pointsPerFile is read, and with lazy_load_raw_clouds loaded and freed file by file
 bool compute_step_1(

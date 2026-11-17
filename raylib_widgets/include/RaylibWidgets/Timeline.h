@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <vector>
 
 // Scrubbable time ruler with ticks and a playhead, shared between
@@ -13,13 +14,13 @@ namespace raylib_widgets
     {
         float from = 0.f, to = 0.f; //!< 0-1 positions along the timeline
         unsigned int color = 0; //!< ImU32, drawn over the track; give it some transparency
-        const char* label = nullptr; //!< added to the hover tooltip over the band; may be null
+        std::string label; //!< added to the hover tooltip over the band; may be empty
     };
 
     //! A row of bars under the timeline's track, e.g. one bar per input file, Gantt-style.
     struct TimelineLane
     {
-        const char* name = nullptr; //!< drawn at the lane's left end; may be null
+        std::string name; //!< drawn at the lane's left end; may be empty
         std::vector<TimelineSpan> bars; //!< in time order; their labels name them in the tooltip
     };
 

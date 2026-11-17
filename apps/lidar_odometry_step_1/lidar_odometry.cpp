@@ -131,11 +131,21 @@ bool load_data(
     LidarOdometryParams& params,
     std::vector<std::vector<Point3Di>>& pointsPerFile,
     Imu& imu_data,
-    bool debugMsg,
-    InputFileSpans* fileSpans)
+    bool debugMsg)
 {
-    if (fileSpans)
-        *fileSpans = {};
+    InputFileSpans unused;
+    return load_data(input_file_names, params, pointsPerFile, imu_data, debugMsg, unused);
+}
+
+bool load_data(
+    std::vector<std::string>& input_file_names,
+    LidarOdometryParams& params,
+    std::vector<std::vector<Point3Di>>& pointsPerFile,
+    Imu& imu_data,
+    bool debugMsg,
+    InputFileSpans& fileSpans)
+{
+    fileSpans = {};
     if (!params.run_report || params.run_report->live().status != "running")
         params.run_report = std::make_shared<RunReport>(
             input_file_names.empty() ? fs::path{} : fs::path(input_file_names.front()).parent_path(), params.points_global_spill_directory);
@@ -330,9 +340,8 @@ bool load_data(
                 }
             });
 
-        if (fileSpans)
-            for (size_t i = 0; i < minSize; ++i)
-                fileSpans->imu.push_back(imu_file_span(csv_files[i], imuChunks[i]));
+        for (size_t i = 0; i < minSize; ++i)
+            fileSpans.imu.push_back(imu_file_span(csv_files[i], imuChunks[i]));
 
         // Merge all chunks sequentially at the end
         for (auto& chunk : imuChunks)
@@ -363,12 +372,9 @@ bool load_data(
                 {
                     murataChunks[i] = load_imu(murataFiles[i], imuNumberToUse);
                 });
-            if (fileSpans)
-            {
-                fileSpans->imu.clear();
-                for (size_t i = 0; i < murataFiles.size(); ++i)
-                    fileSpans->imu.push_back(imu_file_span(murataFiles[i], murataChunks[i]));
-            }
+            fileSpans.imu.clear();
+            for (size_t i = 0; i < murataFiles.size(); ++i)
+                fileSpans.imu.push_back(imu_file_span(murataFiles[i], murataChunks[i]));
             for (auto& chunk : murataChunks)
                 imu_data.insert(imu_data.end(), std::make_move_iterator(chunk.begin()), std::make_move_iterator(chunk.end()));
         }
@@ -457,9 +463,8 @@ bool load_data(
                     gaps_in_file[i] = find_lidar_gaps(data, kLidarGapWarningS);
                 });
             report_lidar_gaps(L.files, firstUsedFile, gaps_in_file, L.t_first, L.t_last);
-            if (fileSpans)
-                for (size_t i = 0; i < minSize; ++i)
-                    fileSpans->laz.push_back({ L.files[i], L.t_first[i], L.t_last[i], L.n[i] });
+            for (size_t i = 0; i < minSize; ++i)
+                fileSpans.laz.push_back({ L.files[i], L.t_first[i], L.t_last[i], L.n[i] });
             if (params.save_calibration_validation && minSize > 0) // as the eager load: the first file, then dropped
                 write_calibration_validation(wdp, L.load(0), params);
             size_t totalPoints = 0;
@@ -506,9 +511,8 @@ bool load_data(
                 pointsPerFile[i] = std::move(data);
             });
         report_lidar_gaps(laz_files, firstUsedFile, gaps_in_file, t_first, t_last);
-        if (fileSpans)
-            for (size_t i = 0; i < minSize; ++i)
-                fileSpans->laz.push_back({ laz_files[i], t_first[i], t_last[i], pointsPerFile[i].size() });
+        for (size_t i = 0; i < minSize; ++i)
+            fileSpans.laz.push_back({ laz_files[i], t_first[i], t_last[i], pointsPerFile[i].size() });
 
         if (params.skip_first_file && pointsPerFile.size() > 0)
             pointsPerFile.front().clear();

@@ -9,11 +9,11 @@
 namespace raylib_widgets
 {
 
-    void drawCompassRuler(Vector3 right, Vector3 up, float zoomDistance, Color rulerColor, CompassAxisLabels labels)
+    void drawCompassRuler(Vector3 right, Vector3 up, float zoomDistance, Color rulerColor, CompassAxisLabels labels, float bottomInset)
     {
         const float compassSize = 200.0f;
         const float originX = compassSize * 0.5f;
-        const float originY = static_cast<float>(GetScreenHeight()) - compassSize * 0.5f;
+        const float originY = static_cast<float>(GetScreenHeight()) - bottomInset - compassSize * 0.5f;
         const float axisPixelLength = compassSize * 0.35f;
 
         struct Axis

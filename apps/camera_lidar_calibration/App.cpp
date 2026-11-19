@@ -7,11 +7,14 @@
 #include <RaylibWidgets/CompassRuler.h>
 #include <RaylibWidgets/PointPicking.h>
 #include <RaylibWidgets/WindowFit.h>
+#include <algorithm>
 #include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
+#include <limits>
 #include <nlohmann/json.hpp>
 #include <opencv2/calib3d.hpp>
 #include <opencv2/imgcodecs.hpp>
@@ -103,7 +106,7 @@ void AppState::setPendingImagePoint(float u, float v)
     }
     else
     {
-        statusMsg = "Image point set -- Shift+click the matching point in the 3D View";
+        statusMsg = "Image point set -- Shift+click the matching point in the 3D View, or Shift+Alt+click it in the Image View";
     }
 }
 
@@ -134,6 +137,69 @@ void AppState::clearPending()
     statusMsg = "Pending pick cleared";
 }
 
+Intrinsics AppState::displayIntrinsics() const
+{
+    Intrinsics K = intrinsics;
+    if (imageRectified)
+    {
+        K.k1 = K.k2 = K.k3 = K.k4 = K.k5 = K.k6 = 0.f;
+        K.p1 = K.p2 = 0.f;
+    }
+    return K;
+}
+
+bool AppState::pickLidarPointAtPixel(float u, float v)
+{
+    if (cloud.empty())
+    {
+        statusMsg = "No point cloud loaded";
+        return false;
+    }
+
+    // Same projection, depth range and decimation as the GPU pass that drew
+    // the intensity image (Renderer::renderImageOverlay), so the pick is the
+    // point under the cursor. Points are square splats, pointSize px wide.
+    const Intrinsics K = displayIntrinsics();
+    const Eigen::Matrix3f R_wc = omFiKaToMat3(extrinsics.om, extrinsics.fi, extrinsics.ka);
+    const Eigen::Vector3f C(extrinsics.tx, extrinsics.ty, extrinsics.tz);
+    const float half = std::max(vizParams.pointSize, 1.f) * 0.5f;
+    constexpr float kNearbyPx = 8.f;
+
+    long covering = -1, nearby = -1;
+    float coveringDepth = std::numeric_limits<float>::max();
+    float nearbyDist2 = kNearbyPx * kNearbyPx;
+    for (size_t i = 0; i < cloud.points.size(); ++i)
+    {
+        if (!Renderer::isPointDrawn(i, vizParams.drawDecim))
+            continue;
+        const auto& p = cloud.points[i];
+        float pu, pv, depth;
+        if (!projectPoint(p.x, p.y, p.z, K, R_wc, C, pu, pv, depth) || depth < vizParams.depthMin || depth > vizParams.depthMax)
+            continue;
+        const float du = pu - u, dv = pv - v;
+        if (std::fabs(du) <= half && std::fabs(dv) <= half && depth < coveringDepth)
+        {
+            covering = static_cast<long>(i);
+            coveringDepth = depth;
+        }
+        if (du * du + dv * dv < nearbyDist2)
+        {
+            nearby = static_cast<long>(i);
+            nearbyDist2 = du * du + dv * dv;
+        }
+    }
+
+    const long hit = covering >= 0 ? covering : nearby;
+    if (hit < 0)
+    {
+        statusMsg = "No LiDAR point at that pixel";
+        return false;
+    }
+    const auto& p = cloud.points[static_cast<size_t>(hit)];
+    setPendingCloudPoint(p.x, p.y, p.z);
+    return true;
+}
+
 void AppState::removePair(int index)
 {
     if (index < 0 || index >= static_cast<int>(pairs.size()))
@@ -145,11 +211,139 @@ void AppState::removePair(int index)
         selectedPairIndex--;
 }
 
+// ── AppState pairs file ───────────────────────────────────────────────────────
+void AppState::savePairs(const char* path)
+{
+    nlohmann::json j;
+    // u/v are pixels of the displayed image: rectified or raw, at this size.
+    // The paths are a note of what the pairs were picked on; loading ignores them.
+    j["image"] = { { "path", imagePath }, { "width", imageW }, { "height", imageH }, { "rectified", imageRectified } };
+    j["clouds"] = cloudPaths;
+    j["pairs"] = nlohmann::json::array();
+    for (const auto& p : pairs)
+        j["pairs"].push_back({ { "u", p.u }, { "v", p.v }, { "point", { p.px, p.py, p.pz } } });
+
+    std::ofstream f(path);
+    if (!f)
+    {
+        statusMsg = std::string("Cannot write: ") + path;
+        return;
+    }
+    f << j.dump(2);
+    pairsPath = path;
+    statusMsg = "Saved " + std::to_string(pairs.size()) + " pairs to " + path;
+}
+
+bool AppState::isPairsFile(const char* path)
+{
+    std::string ext = std::filesystem::path(path).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    if (ext != ".json")
+        return false;
+    std::ifstream f(path);
+    const nlohmann::json j = nlohmann::json::parse(f, nullptr, false);
+    return j.is_object() && j.contains("pairs") && j["pairs"].is_array();
+}
+
+void AppState::loadPairs(const char* path)
+{
+    std::ifstream f(path);
+    if (!f)
+    {
+        statusMsg = std::string("Cannot open: ") + path;
+        return;
+    }
+    std::vector<CorrespondencePair> loaded;
+    int fileW = 0, fileH = 0;
+    bool fileRectified = false;
+    try
+    {
+        nlohmann::json j;
+        f >> j;
+        if (!j.contains("pairs") || !j["pairs"].is_array())
+        {
+            statusMsg = std::string("No pairs found in: ") + path;
+            return;
+        }
+        const nlohmann::json ji = j.value("image", nlohmann::json::object());
+        fileW = ji.value("width", 0);
+        fileH = ji.value("height", 0);
+        fileRectified = ji.value("rectified", false);
+        for (const auto& jp : j["pairs"])
+        {
+            const auto& pt = jp.at("point");
+            CorrespondencePair p;
+            p.u = jp.at("u").get<float>();
+            p.v = jp.at("v").get<float>();
+            p.px = pt.at(0).get<float>();
+            p.py = pt.at(1).get<float>();
+            p.pz = pt.at(2).get<float>();
+            loaded.push_back(p);
+        }
+    } catch (const nlohmann::json::exception& e)
+    {
+        statusMsg = std::string("Bad pairs file ") + path + ": " + e.what();
+        return;
+    }
+
+    std::string notes;
+    if (imageLoaded && fileW > 0 && fileH > 0 && (fileW != imageW || fileH != imageH))
+    {
+        const float sx = static_cast<float>(imageW) / fileW, sy = static_cast<float>(imageH) / fileH;
+        for (auto& p : loaded)
+        {
+            p.u *= sx;
+            p.v *= sy;
+        }
+        notes += "; pixels scaled from " + std::to_string(fileW) + "x" + std::to_string(fileH) + " to the loaded image";
+    }
+    if (imageLoaded && fileRectified != imageRectified)
+        notes += std::string("; WARNING: picked in the ") + (fileRectified ? "rectified" : "raw") + " image, the shown one is " +
+            (imageRectified ? "rectified" : "raw");
+
+    pairs = std::move(loaded);
+    pairsPath = path;
+    selectedPairIndex = -1;
+    lastSolveRmsPixels = -1.0;
+    statusMsg = "Loaded " + std::to_string(pairs.size()) + " pairs from " + path + notes;
+}
+
+calib::ExtrinsicsPriors AppState::defaultPriors()
+{
+    calib::ExtrinsicsPriors priors;
+    for (int i = 0; i < 6; ++i)
+        priors[i].sigma = i < 3 ? 0.01 : 0.5;
+    return priors;
+}
+
+std::string AppState::refinedIntrinsicsLabel() const
+{
+    if (intrinsics.model != CameraModel::Mei)
+        return "";
+    std::string label;
+    auto add = [&label](bool on, const char* names)
+    {
+        if (on)
+            label += (label.empty() ? "" : ", ") + std::string(names);
+    };
+    add(refineIntrinsics.focal, "fx, fy");
+    add(refineIntrinsics.principalPoint, "cx, cy");
+    add(refineIntrinsics.xi, "xi");
+    add(refineIntrinsics.distortion, "k1-k3, p1, p2");
+    return label;
+}
+
 bool AppState::solvePairs()
 {
+    const std::string refined = refinedIntrinsicsLabel();
     if (pairs.size() < 3)
     {
         statusMsg = "Need at least 3 pairs to solve";
+        return false;
+    }
+    if (lockTranslation && lockRotation && refined.empty())
+    {
+        statusMsg = "Translation and rotation are both locked -- nothing to solve";
         return false;
     }
 
@@ -167,11 +361,20 @@ bool AppState::solvePairs()
     double rms = -1.0;
     std::string solveErr;
     // Pinhole's observation equations are a plain rectilinear projection, so
-    // Mei and Fisheye use solveExtrinsicsCeres instead. See
-    // CameraCalibrationSolver.h.
+    // Mei and Fisheye use the Ceres solver instead, which can also refine Mei
+    // intrinsics. See CameraCalibrationSolver.h.
     bool ok = (intrinsics.model == CameraModel::Mei || intrinsics.model == CameraModel::Fisheye)
-        ? calib::solveExtrinsicsCeres(corr, intrinsics, extrinsics, solveErr, &rms, lockTranslation)
-        : calib::solveExtrinsicsFromCorrespondences(corr, intrinsics, extrinsics, &rms, lockTranslation);
+        ? calib::solveExtrinsicsAndIntrinsicsCeres(
+              corr,
+              intrinsics,
+              extrinsics,
+              refined.empty() ? calib::MeiIntrinsicsRefinement{} : refineIntrinsics,
+              solveErr,
+              &rms,
+              lockTranslation,
+              lockRotation,
+              priors)
+        : calib::solveExtrinsicsFromCorrespondences(corr, intrinsics, extrinsics, &rms, lockTranslation, lockRotation, priors);
     if (!ok)
     {
         statusMsg = !solveErr.empty() ? ("Solve failed: " + solveErr) : "Solve failed (degenerate correspondences)";
@@ -179,9 +382,30 @@ bool AppState::solvePairs()
     }
 
     lastSolveRmsPixels = rms;
-    statusMsg =
-        lockTranslation ? "Solved rotation (translation locked): RMS reprojection error " : "Solved extrinsics: RMS reprojection error ";
-    statusMsg += std::to_string(rms) + " px";
+    std::string solved;
+    if (lockTranslation && lockRotation)
+        solved = refined + " (extrinsics locked)";
+    else
+    {
+        if (lockTranslation)
+            solved = "rotation (translation locked)";
+        else if (lockRotation)
+            solved = "translation (rotation locked)";
+        else
+            solved = "extrinsics";
+        if (!refined.empty())
+            solved += " + " + refined;
+    }
+    statusMsg = "Solved " + solved + ": RMS reprojection error " + std::to_string(rms) + " px";
+    const int nPriors = static_cast<int>(std::count_if(
+        priors.begin(),
+        priors.end(),
+        [](const auto& p)
+        {
+            return p.enabled;
+        }));
+    if (nPriors > 0)
+        statusMsg += " (" + std::to_string(nPriors) + (nPriors == 1 ? " prior)" : " priors)");
     if (!imageRectified && intrinsicsLoaded == false)
         statusMsg += " (no intrinsics loaded -- distortion assumed zero)";
     return true;
@@ -208,6 +432,55 @@ void AppState::loadImage(const char* path)
     statusMsg = imageRectified ? "Image loaded and rectified" : "Image loaded (raw)";
     if (!scaleNote.empty())
         statusMsg += "; " + scaleNote;
+}
+
+// ── AppState::loadImageClosestToCloudTime ─────────────────────────────────────
+void AppState::loadImageClosestToCloudTime(const char* dir)
+{
+    int64_t t0 = std::numeric_limits<int64_t>::max(), t1 = std::numeric_limits<int64_t>::min();
+    for (const auto& p : cloud.points)
+        if (p.ts_ns != 0)
+        {
+            t0 = std::min(t0, p.ts_ns);
+            t1 = std::max(t1, p.ts_ns);
+        }
+    if (t0 > t1)
+    {
+        statusMsg = std::string("No point times in the loaded clouds, so no image picked from ") + dir;
+        return;
+    }
+    const int64_t mid = t0 + (t1 - t0) / 2;
+    const auto image = calib::closestImage(dir, mid);
+    if (!image)
+    {
+        statusMsg = std::string("No image with a capture time in ") + dir;
+        return;
+    }
+    loadImage(image->path.c_str());
+    if (imagePath != image->path)
+        return; // loadImage said why
+    char buf[256];
+    std::snprintf(
+        buf,
+        sizeof(buf),
+        "%s is %+.3f s from the middle of the clouds' %.1f s; ",
+        std::filesystem::path(image->path).filename().string().c_str(),
+        static_cast<double>(image->tsNs - mid) * 1e-9,
+        static_cast<double>(t1 - t0) * 1e-9);
+    statusMsg = buf + statusMsg;
+}
+
+// ── AppState::focusOnSensors ──────────────────────────────────────────────────
+void AppState::focusOnSensors()
+{
+    // LiDAR origin and optical centre in raylib coords (x, z, -y).
+    const Vector3 lidar = { 0.f, 0.f, 0.f };
+    const Vector3 camera = { extrinsics.tx, extrinsics.tz, -extrinsics.ty };
+    // Holds both bodies: the X5 reaches ~0.1 m from its optical centre.
+    const float radius = 0.5f * Vector3Distance(lidar, camera) + 0.1f;
+    orbit.target = Vector3Scale(Vector3Add(lidar, camera), 0.5f);
+    // Fits that sphere in OrbitCamera's 45 deg vertical FOV, no closer than its 0.5 m wheel-zoom limit.
+    orbit.distance = std::max(0.5f, radius / std::sin(22.5f * DEG2RAD));
 }
 
 // ── AppState::loadCloud ───────────────────────────────────────────────────────
@@ -736,8 +1009,8 @@ void App::run()
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(W, H, ("LiDAR-Camera Calibration " HDMAPPING_CONFIGURE_PROJECT_VERSION));
     raylib_widgets::fitWindowToScreen();
-    // The 340px-wide side panel is fixed-width; below this the 3D/image
-    // views and the panel start overlapping instead of scrolling.
+    // Below this the 3D/image views and the side panel (340 px wide until
+    // resized) start overlapping instead of scrolling.
     SetWindowMinSize(900, 500);
     SetTargetFPS(60);
 
@@ -754,6 +1027,22 @@ void App::run()
         state.loadIntrinsics(pendingIntrinsics.c_str());
     if (!pendingCalibration.empty())
         state.loadCalibration(pendingCalibration.c_str());
+    // Last, so its message is the one left in the status line.
+    if (!pendingImageDirByTime.empty())
+    {
+        state.loadImageClosestToCloudTime(pendingImageDirByTime.c_str());
+        std::printf("%s\n", state.statusMsg.c_str());
+    }
+    if (!pendingPairs.empty())
+    {
+        if (std::filesystem::exists(pendingPairs))
+            state.loadPairs(pendingPairs.c_str());
+        else
+        {
+            state.pairsPath = pendingPairs;
+            state.statusMsg = "New pairs file " + pendingPairs + ": Ctrl+S saves the picked pairs there";
+        }
+    }
 
     while (!WindowShouldClose())
     {
@@ -775,6 +1064,13 @@ void App::run()
 static bool shiftHeld()
 {
     return IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
+}
+
+// Alt on top of Shift turns the Image View into the LiDAR intensity image,
+// to pick the LiDAR point there instead of the pixel.
+static bool altHeld()
+{
+    return IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT);
 }
 
 // Loads one dropped file by extension -- the same extension -> action mapping as main.cpp's
@@ -820,15 +1116,25 @@ void App::update()
     state.orbit.update(allowOrbit);
 
     // Drag & drop images (*.jpg/*.jpeg/*.png/*.bmp), point clouds (*.laz/*.las), intrinsics
-    // (*.yml/*.yaml) or a calibration (*.json) onto the window to load them -- raylib's GLFW
-    // backend surfaces OS drag & drop the same way on Windows, Linux and macOS, so no
-    // platform-specific code is needed here.
+    // (*.yml/*.yaml), a calibration or saved pairs (*.json) onto the window to load them --
+    // raylib's GLFW backend surfaces OS drag & drop the same way on Windows, Linux and macOS,
+    // so no platform-specific code is needed here.
     if (IsFileDropped())
     {
         FilePathList dropped = LoadDroppedFiles();
         bool sawCloud = false;
+        // Pairs go last, so the image and calibration dropped with them are what
+        // loadPairs() rescales to and checks rectification against.
+        std::vector<std::string> pairFiles;
         for (unsigned int i = 0; i < dropped.count; i++)
-            handleDroppedFile(state, dropped.paths[i], sawCloud);
+        {
+            if (AppState::isPairsFile(dropped.paths[i]))
+                pairFiles.push_back(dropped.paths[i]);
+            else
+                handleDroppedFile(state, dropped.paths[i], sawCloud);
+        }
+        for (const std::string& path : pairFiles)
+            state.loadPairs(path.c_str());
         UnloadDroppedFiles(dropped);
     }
 }
@@ -872,15 +1178,25 @@ static void updateAndDrawPicking3D(
     }
 
     // Large 3-axis cross for the pair selected in the Correspondences
-    // panel, so it's easy to spot in the (usually much busier) 3D view.
-    if (state.selectedPairIndex >= 0 && state.selectedPairIndex < (int)state.pairs.size())
+    // panel, so it's easy to spot in the (usually much busier) 3D view;
+    // a red one for the pair whose Remove button is hovered.
+    auto pairCross = [&state](int index, Color color)
     {
-        const auto& p = state.pairs[state.selectedPairIndex];
+        if (index < 0 || index >= (int)state.pairs.size())
+            return;
+        const auto& p = state.pairs[index];
         Vector3 wp = { p.px, p.pz, -p.py };
         const float armLen = 0.5f;
-        DrawLine3D(Vector3{ wp.x - armLen, wp.y, wp.z }, Vector3{ wp.x + armLen, wp.y, wp.z }, MAGENTA);
-        DrawLine3D(Vector3{ wp.x, wp.y - armLen, wp.z }, Vector3{ wp.x, wp.y + armLen, wp.z }, MAGENTA);
-        DrawLine3D(Vector3{ wp.x, wp.y, wp.z - armLen }, Vector3{ wp.x, wp.y, wp.z + armLen }, MAGENTA);
+        DrawLine3D(Vector3{ wp.x - armLen, wp.y, wp.z }, Vector3{ wp.x + armLen, wp.y, wp.z }, color);
+        DrawLine3D(Vector3{ wp.x, wp.y - armLen, wp.z }, Vector3{ wp.x, wp.y + armLen, wp.z }, color);
+        DrawLine3D(Vector3{ wp.x, wp.y, wp.z - armLen }, Vector3{ wp.x, wp.y, wp.z + armLen }, color);
+    };
+    pairCross(state.selectedPairIndex, MAGENTA);
+    pairCross(state.hoveredRemoveIndex, RED);
+    if (state.hoveredRemoveIndex >= 0 && state.hoveredRemoveIndex < (int)state.pairs.size())
+    {
+        const auto& p = state.pairs[state.hoveredRemoveIndex];
+        DrawSphereWires(Vector3{ p.px, p.pz, -p.py }, 0.12f, 6, 8, RED);
     }
 
     if (state.pendingHasCloud)
@@ -930,13 +1246,13 @@ static void updateAndDrawPicking3D(
 void App::draw()
 {
     float menuBarH = ImGui::GetFrameHeight();
-    float panelW = 340.f;
-    float viewW = (float)GetScreenWidth() - panelW;
+    float viewW = (float)GetScreenWidth() - state.panelW;
     float viewH = (float)GetScreenHeight() - menuBarH;
 
     // ── Image + projection overlay (GPU, into render texture)
-    // Hide the projected-point overlay while Shift is held (picking mode)
-    // so it doesn't obscure the pixel the user is aiming for.
+    // Shift (picking a pixel) hides the projected points so they don't
+    // obscure the pixel the user is aiming for; Shift+Alt (picking a LiDAR
+    // point) shows those points alone, as an intensity image.
     if (state.imageLoaded)
         state.renderer.renderImageOverlay(
             state.imageTexture,
@@ -946,7 +1262,9 @@ void App::draw()
             state.extrinsics,
             !state.imageRectified,
             state.vizParams,
-            !shiftHeld());
+            !shiftHeld()    ? ImageOverlay::Points
+                : altHeld() ? ImageOverlay::LidarIntensity
+                            : ImageOverlay::None);
 
     // ── 3D scene renders as the raylib background, filling the whole view
     BeginDrawing();
@@ -970,6 +1288,10 @@ void App::draw()
     if (state.imageLoaded)
         state.renderer.drawCameraFrustum(state.intrinsics, state.extrinsics, state.imageW, state.imageH);
     state.renderer.drawAxes(2.f);
+    if (state.showLidarModel)
+        state.renderer.drawLidarModel();
+    if (state.showCameraModel)
+        state.renderer.drawCameraModel(state.extrinsics, state.cameraBody);
 
     // Grid on ground plane
     DrawGrid(20, 1.f);
@@ -998,7 +1320,7 @@ void App::draw()
     if (shiftHeld())
         DrawText("Shift+click to pick a 3D point (green = candidate)", 8, (int)menuBarH + 4, 14, YELLOW);
     else
-        DrawText("3D View  [LMB: orbit | RMB: pan | Scroll: zoom | Shift: pick]", 8, (int)menuBarH + 4, 14, LIGHTGRAY);
+        DrawText("3D View  [LMB: orbit | RMB: pan | Scroll: zoom | Shift: pick | F: focus sensors]", 8, (int)menuBarH + 4, 14, LIGHTGRAY);
 
     DrawFPS((int)viewW - 90, (int)menuBarH + 4);
 

@@ -2,6 +2,7 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <cmath>
+#include <cstdint>
 #include <optional>
 #include <string>
 
@@ -245,4 +246,26 @@ namespace calib
     //! @return the timestamp in nanoseconds, or nullopt if the sidecar is
     //!         missing, unreadable, or has no FRAME_WALL_CLOCK field
     std::optional<double> LoadTimestampFromSideCar(const std::string& path);
+
+    //! Capture time of a camera frame: its sidecar's FRAME_WALL_CLOCK (@ref
+    //! LoadTimestampFromSideCar) when there is one, else the digits after the
+    //! last '_' of the file name ("cam0_<ns>.jpg", "front_<ns>.jpg") or the
+    //! whole name ("<ns>.jpg").
+    //! @param path image file
+    //! @return nanoseconds since epoch, or nullopt when neither gives a time
+    std::optional<int64_t> imageTimestampNs(const std::string& path);
+
+    //! A camera frame and its capture time.
+    struct TimedImage
+    {
+        std::string path;
+        int64_t tsNs = 0; //!< see @ref imageTimestampNs
+    };
+
+    //! The frame in `dir` (not its subfolders) captured closest to `tsNs`.
+    //! @param dir folder of .jpg/.jpeg/.png/.bmp frames
+    //! @param tsNs time to match, nanoseconds since epoch
+    //! @return the closest frame, the earlier one on a tie, or nullopt when no
+    //!         image in `dir` has a capture time
+    std::optional<TimedImage> closestImage(const std::string& dir, int64_t tsNs);
 } // namespace calib

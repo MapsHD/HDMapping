@@ -16,12 +16,40 @@
 using Trajectory = std::map<double, std::tuple<Eigen::Matrix4d, double, RawIMUData>>;
 using Imu = std::vector<std::tuple<std::pair<double, double>, Eigen::Vector3f, Eigen::Vector3f>>;
 
+//! Time span of one input file as load_data read it.
+struct InputFileSpan
+{
+    std::string file;
+    double first = 0.0; //!< first sample's LiDAR-clock time [s]; 0 when count is 0
+    double last = 0.0; //!< last sample's LiDAR-clock time [s]
+    size_t count = 0; //!< points or IMU samples read
+};
+
+//! Per-file spans load_data reports when asked, e.g. for a Gantt chart of the session.
+struct InputFileSpans
+{
+    //! LAZ files paired with an IMU file, the first one included although load_data drops its points
+    //! (count 0 for it with lazy_load_raw_clouds, which never reads it)
+    std::vector<InputFileSpan> laz;
+    //! IMU files the samples came from: imu****.csv, or MURATA_IMU's csv files when those are used
+    std::vector<InputFileSpan> imu;
+};
+
 bool load_data(
     std::vector<std::string>& input_file_names,
     LidarOdometryParams& params,
     std::vector<std::vector<Point3Di>>& pointsPerFile,
     Imu& imu_data,
     bool debugMsg);
+//! As above, and reports each input file's time span.
+//! @param fileSpans receives the spans; reset first
+bool load_data(
+    std::vector<std::string>& input_file_names,
+    LidarOdometryParams& params,
+    std::vector<std::vector<Point3Di>>& pointsPerFile,
+    Imu& imu_data,
+    bool debugMsg,
+    InputFileSpans& fileSpans);
 void calculate_trajectory(Trajectory& trajectory, Imu& imu_data, LidarOdometryParams& params, bool debugMsg);
 // pointsPerFile is read, and with lazy_load_raw_clouds loaded and freed file by file
 bool compute_step_1(

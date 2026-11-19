@@ -3,6 +3,7 @@
 #include "UI.h"
 #include "raylib.h"
 #include <CalibCore/Camera.h>
+#include <CalibCore/CameraCalibrationSolver.h>
 #include <CalibCore/PointCloud.h>
 #include <opencv2/core.hpp>
 #include <string>
@@ -58,6 +59,14 @@ struct AppState
     // ── visualization ─────────────────────────────────────────────────────────
     VisualizationParams vizParams;
     bool showCompassRuler = true;
+    //! Simplified real-size sensor models in the 3D view: a Mid-360 at the
+    //! LiDAR origin, cameraBody at the camera pose.
+    bool showLidarModel = true;
+    bool showCameraModel = true;
+    CameraBody cameraBody = CameraBody::Insta360X5;
+
+    //! Width of the Controls panel on the right, px; dragging its left edge changes it.
+    float panelW = 340.f;
 
     // ── 3D camera ─────────────────────────────────────────────────────────────
     OrbitCamera orbit;
@@ -82,6 +91,9 @@ struct AppState
     // Row selected in the Correspondences panel list (-1 = none); drawn as
     // a large cross in both the 3D view and the image view.
     int selectedPairIndex = -1;
+    //! Pair whose Remove button is hovered (-1 = none), marked in red in both views
+    //! so it is clear which pair the click removes. Set by UI::draw each frame.
+    int hoveredRemoveIndex = -1;
     // When set, "Solve Extrinsics from Pairs" refines orientation only and
     // leaves tx/ty/tz exactly as they are -- for when the camera's position
     // relative to the LiDAR is already known (e.g. measured by hand) and
@@ -89,15 +101,61 @@ struct AppState
     // disables the tx/ty/tz drag sliders in the Extrinsics panel so they
     // can't be nudged by accident while locked.
     bool lockTranslation = false;
+    //! Rotation counterpart of lockTranslation: the solve refines tx/ty/tz
+    //! only and the om/fi/ka sliders are disabled.
+    bool lockRotation = false;
+    //! Soft constraints for "Solve Extrinsics from Pairs": each enabled one
+    //! adds an observation equation pulling that parameter towards its
+    //! target, e.g. to keep the camera height (tz) from drifting when the
+    //! pairs barely constrain it. Indexed as calib::kPriorTx..kPriorKa.
+    calib::ExtrinsicsPriors priors = defaultPriors();
+    //! Mei intrinsics "Solve Extrinsics from Pairs" refines too; ignored for
+    //! other models.
+    calib::MeiIntrinsicsRefinement refineIntrinsics;
+    //! @return the intrinsics the solve refines, e.g. "fx, fy, xi"; empty when none
+    std::string refinedIntrinsicsLabel() const;
+
+    /**
+     * @brief Priors all disabled, with a sigma of 1 cm for tx/ty/tz and
+     *        0.5 deg for om/fi/ka.
+     * @return the default priors
+     */
+    static calib::ExtrinsicsPriors defaultPriors();
 
     void setPendingImagePoint(float u, float v); // completes the pair if a cloud point is already pending
     void setPendingCloudPoint(float px, float py, float pz); // completes the pair if an image point is already pending
     void clearPending(); // discards the in-progress pending pick, if any
+    //! Makes the LiDAR point drawn at pixel (u, v) of the Image View's
+    //! intensity image (Shift+Alt) the pending cloud point: the nearest one
+    //! whose splat covers the pixel, else the closest within a few pixels.
+    //! @return false, with the reason in statusMsg, when there is none
+    bool pickLidarPointAtPixel(float u, float v);
+    //! `intrinsics` as the displayed image needs them: distortion zeroed when
+    //! the image is rectified.
+    Intrinsics displayIntrinsics() const;
     void removePair(int index);
     bool solvePairs(); // solves extrinsics from `pairs`, updates statusMsg
+    //! Writes `pairs` to a JSON file, with the size and rectification of the
+    //! image their u/v were picked in.
+    void savePairs(const char* path);
+    //! Replaces `pairs` with those in a savePairs() file, rescaling u/v when the
+    //! loaded image's size differs from the file's.
+    void loadPairs(const char* path);
+    //! @return whether `path` is a savePairs() file, i.e. a .json with a "pairs" array
+    static bool isPairsFile(const char* path);
+    //! File Ctrl+S saves the pairs to: --pairs, else the last pairs file loaded or
+    //! saved; empty = ask for one.
+    std::string pairsPath;
 
     // ── operations ────────────────────────────────────────────────────────────
+    //! Points the 3D view at the LiDAR origin and the camera pose, close enough
+    //! to see the sensor models, keeping the current viewing angle.
+    void focusOnSensors();
     void loadImage(const char* path);
+    //! Loads the image in `dir` taken closest to the middle of the loaded
+    //! clouds' point times (calib::closestImage); leaves the image as it is,
+    //! saying why in statusMsg, when the clouds or images carry no times.
+    void loadImageClosestToCloudTime(const char* dir);
     void loadCloud(const char* path); // clear + load
     void addCloud(const char* path); // merge into existing cloud
     void loadIntrinsics(const char* path);
@@ -134,6 +192,18 @@ public:
     {
         pendingCalibration = path;
     }
+    //! After the clouds load, replace the image with the one in `dir` taken
+    //! closest to their time (AppState::loadImageClosestToCloudTime).
+    void preloadImageClosestToClouds(const char* dir)
+    {
+        pendingImageDirByTime = dir;
+    }
+    //! Picked pairs file: loaded after everything else, as from a drop, when it
+    //! exists; Ctrl+S saves the pairs to it either way.
+    void preloadPairs(const char* path)
+    {
+        pendingPairs = path;
+    }
 
     void run();
 
@@ -143,6 +213,8 @@ private:
     std::vector<std::string> pendingClouds;
     std::string pendingIntrinsics;
     std::string pendingCalibration;
+    std::string pendingImageDirByTime;
+    std::string pendingPairs;
 
     void update();
     void draw();

@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <nlohmann/json.hpp>
 
@@ -72,20 +73,26 @@ static void drawSensorIds(const AppState& state)
 // ── Main draw ────────────────────────────────────────────────────────────────
 void UI::draw(AppState& state)
 {
+    // Set again below while a Remove button is hovered; the 3D view, drawn
+    // before the UI, shows the previous frame's.
+    state.hoveredRemoveIndex = -1;
     panelMenuBar(state);
     handleShortcuts(state);
 
     ImGuiIO& io = ImGui::GetIO();
     float menuBarH = ImGui::GetFrameHeight();
-    float panelW = 340.f;
     float panelH = (float)GetScreenHeight() - menuBarH;
 
-    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x - panelW, menuBarH), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(panelW, panelH), ImGuiCond_Always);
-    ImGui::Begin(
-        "Controls",
-        nullptr,
-        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse);
+    // Pinned to the right edge at full height; dragging its left edge resizes
+    // it, between kMinPanelW and leaving the 3D view kMinViewW.
+    constexpr float kMinPanelW = 260.f, kMinViewW = 400.f;
+    const float maxPanelW = std::max(kMinPanelW, io.DisplaySize.x - kMinViewW);
+    state.panelW = std::clamp(state.panelW, kMinPanelW, maxPanelW);
+    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x - state.panelW, menuBarH), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(state.panelW, panelH), ImGuiCond_Always);
+    ImGui::SetNextWindowSizeConstraints(ImVec2(kMinPanelW, panelH), ImVec2(maxPanelW, panelH));
+    ImGui::Begin("Controls", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse);
+    state.panelW = ImGui::GetWindowWidth();
 
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.f, 1.f), "LiDAR-Camera Calibration");
     ImGui::Separator();
@@ -94,16 +101,25 @@ void UI::draw(AppState& state)
 
     // Alt/Cmd = toggle Camera RGB ↔ Intensity (works anywhere in the window).
     // Cmd (Super) alongside Alt for macOS, where Option is awkward to use as
-    // a modifier (it composes special characters).
-    if (ImGui::IsKeyPressed(ImGuiKey_LeftAlt) || ImGui::IsKeyPressed(ImGuiKey_RightAlt) || ImGui::IsKeyPressed(ImGuiKey_LeftSuper) ||
-        ImGui::IsKeyPressed(ImGuiKey_RightSuper))
+    // a modifier (it composes special characters). Fires on release, unless
+    // Shift joined in: Shift+Alt is the Image View's LiDAR-pick chord.
+    const bool altDown = ImGui::IsKeyDown(ImGuiKey_LeftAlt) || ImGui::IsKeyDown(ImGuiKey_RightAlt) ||
+        ImGui::IsKeyDown(ImGuiKey_LeftSuper) || ImGui::IsKeyDown(ImGuiKey_RightSuper);
+    if (altDown && io.KeyShift)
+        altChorded = true;
+    if (altWasDown && !altDown)
     {
-        auto& cm = state.vizParams.colorMode;
-        if (cm == 3)
-            cm = 1; // RGB → Intensity
-        else
-            cm = 3; // anything → RGB
+        if (!altChorded)
+        {
+            auto& cm = state.vizParams.colorMode;
+            if (cm == 3)
+                cm = 1; // RGB → Intensity
+            else
+                cm = 3; // anything → RGB
+        }
+        altChorded = false;
     }
+    altWasDown = altDown;
 
     panelStatus(state);
     ImGui::Spacing();
@@ -130,7 +146,7 @@ void UI::draw(AppState& state)
     // persists.
     if (state.renderer.imageTexValid)
     {
-        float viewW = io.DisplaySize.x - panelW;
+        float viewW = io.DisplaySize.x - state.panelW;
         float viewH = io.DisplaySize.y - menuBarH;
         ImGui::SetNextWindowPos(ImVec2(0, menuBarH), ImGuiCond_FirstUseEver);
         ImGui::SetNextWindowSize(ImVec2(viewW * 0.6f, viewH * 0.6f), ImGuiCond_FirstUseEver);
@@ -172,9 +188,15 @@ void UI::drawImageView(AppState& state)
     // Shift is the modifier that dedicates the mouse to picking, mirroring
     // App.cpp's 3D-view picking and the CTRL-to-pick convention
     // core/src/control_points.cpp already uses elsewhere in this codebase.
+    // Adding Alt picks the LiDAR point instead, in the intensity image
+    // App::draw renders here meanwhile.
     const bool picking = ImGui::GetIO().KeyShift;
+    const bool pickingLidar = picking && ImGui::GetIO().KeyAlt;
     ImGui::TextColored(
-        ImVec4(1, 1, 0, 0.8f), picking ? "Shift+click to pick a point" : "Scroll: zoom | Drag: pan with middle | Dbl-click: reset zoom");
+        ImVec4(1, 1, 0, 0.8f),
+        pickingLidar  ? "LiDAR intensity image: Shift+Alt+click to pick a LiDAR point"
+            : picking ? "Shift+click to pick a pixel | add Alt to pick a LiDAR point"
+                      : "Scroll: zoom | Drag: pan with middle | Dbl-click: reset zoom");
 
     ImGui::BeginChild("image_scroll", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
@@ -207,7 +229,10 @@ void UI::drawImageView(AppState& state)
             if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
             {
                 ImVec2 p = screenToImg(io.MousePos);
-                state.setPendingImagePoint(std::clamp(p.x, 0.f, imgW), std::clamp(p.y, 0.f, imgH));
+                if (pickingLidar)
+                    state.pickLidarPointAtPixel(p.x, p.y);
+                else
+                    state.setPendingImagePoint(std::clamp(p.x, 0.f, imgW), std::clamp(p.y, 0.f, imgH));
             }
         }
         else if (ImGui::IsMouseDragging(ImGuiMouseButton_Middle))
@@ -264,12 +289,42 @@ void UI::drawImageView(AppState& state)
             dl->AddCircle(s, 6.f, IM_COL32(255, 140, 0, 255), 0, 2.f);
         }
         // Large cross for the pair selected in the Correspondences panel --
-        // matches the magenta cross drawn for it in the 3D view.
-        if (state.selectedPairIndex >= 0 && state.selectedPairIndex < (int)state.pairs.size())
+        // matches the magenta cross drawn for it in the 3D view -- and a red
+        // one, ringed, for the pair whose Remove button is hovered.
+        auto pairCross = [&](int index, ImU32 color)
         {
-            ImVec2 s = imgToScreen(ImVec2(state.pairs[state.selectedPairIndex].u, state.pairs[state.selectedPairIndex].v));
-            dl->AddLine(ImVec2(s.x - 18, s.y), ImVec2(s.x + 18, s.y), IM_COL32(255, 0, 255, 255), 2.f);
-            dl->AddLine(ImVec2(s.x, s.y - 18), ImVec2(s.x, s.y + 18), IM_COL32(255, 0, 255, 255), 2.f);
+            if (index < 0 || index >= (int)state.pairs.size())
+                return ImVec2(0, 0);
+            ImVec2 s = imgToScreen(ImVec2(state.pairs[index].u, state.pairs[index].v));
+            dl->AddLine(ImVec2(s.x - 18, s.y), ImVec2(s.x + 18, s.y), color, 2.f);
+            dl->AddLine(ImVec2(s.x, s.y - 18), ImVec2(s.x, s.y + 18), color, 2.f);
+            return s;
+        };
+        pairCross(state.selectedPairIndex, IM_COL32(255, 0, 255, 255));
+        if (state.hoveredRemoveIndex >= 0 && state.hoveredRemoveIndex < (int)state.pairs.size())
+            dl->AddCircle(pairCross(state.hoveredRemoveIndex, IM_COL32(255, 40, 40, 255)), 12.f, IM_COL32(255, 40, 40, 255), 0, 2.f);
+
+        // In the intensity image, also the LiDAR side of each pair,
+        // projected through the current calibration (cyan squares).
+        if (pickingLidar)
+        {
+            const Intrinsics K = state.displayIntrinsics();
+            const Eigen::Matrix3f R_wc = omFiKaToMat3(state.extrinsics.om, state.extrinsics.fi, state.extrinsics.ka);
+            const Eigen::Vector3f C(state.extrinsics.tx, state.extrinsics.ty, state.extrinsics.tz);
+            auto lidarMarker = [&](float x, float y, float z, ImU32 color, const char* label)
+            {
+                float u, v, depth;
+                if (!projectPoint(x, y, z, K, R_wc, C, u, v, depth))
+                    return;
+                ImVec2 s = imgToScreen(ImVec2(u, v));
+                dl->AddRect(ImVec2(s.x - 6, s.y - 6), ImVec2(s.x + 6, s.y + 6), color, 0.f, 0, 2.f);
+                if (label)
+                    dl->AddText(ImVec2(s.x + 8, s.y - 8), color, label);
+            };
+            for (size_t i = 0; i < state.pairs.size(); i++)
+                lidarMarker(state.pairs[i].px, state.pairs[i].py, state.pairs[i].pz, IM_COL32(0, 255, 255, 255), std::to_string(i).c_str());
+            if (state.pendingHasCloud)
+                lidarMarker(state.pendingPair.px, state.pendingPair.py, state.pendingPair.pz, IM_COL32(255, 140, 0, 255), nullptr);
         }
     }
 
@@ -345,6 +400,32 @@ void UI::actionSaveCalibration(AppState& state)
     }
 }
 
+static const std::vector<std::string> kPairsFilter = { "Picked pairs (*.json)", "*.json", "All files", "*" };
+
+void UI::actionLoadPairs(AppState& state)
+{
+    std::string path = mandeye::fd::OpenFileDialogOneFile("Load picked pairs", kPairsFilter);
+    if (!path.empty())
+        state.loadPairs(path.c_str());
+}
+
+void UI::actionSavePairs(AppState& state)
+{
+    if (!state.pairsPath.empty())
+        state.savePairs(state.pairsPath.c_str());
+    else if (state.pairs.empty())
+        state.statusMsg = "No pairs to save";
+    else
+        actionSavePairsAs(state);
+}
+
+void UI::actionSavePairsAs(AppState& state)
+{
+    std::string path = mandeye::fd::SaveFileDialog("Save picked pairs", kPairsFilter, ".json", "pairs.json");
+    if (!path.empty())
+        state.savePairs(path.c_str());
+}
+
 // ── Keyboard shortcuts ───────────────────────────────────────────────────────
 // Ctrl-combos follow the io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_X, false)
 // + io.AddKeyEvent(...) reset convention used by mandeye_single_session_viewer
@@ -377,11 +458,15 @@ void UI::handleShortcuts(AppState& state)
         actionOpenIntrinsics(state);
     if (ctrlPressed(ImGuiKey_L))
         actionOpenCalibration(state);
-    if (ctrlPressed(ImGuiKey_S))
+    if (io.KeyShift && ctrlPressed(ImGuiKey_S))
         actionSaveCalibration(state);
+    else if (ctrlPressed(ImGuiKey_S))
+        actionSavePairs(state);
 
     if (ImGui::IsKeyPressed(ImGuiKey_C, false))
         state.showCompassRuler = !state.showCompassRuler;
+    if (ImGui::IsKeyPressed(ImGuiKey_F, false))
+        state.focusOnSensors();
 }
 
 void UI::panelMenuBar(AppState& state)
@@ -403,8 +488,15 @@ void UI::panelMenuBar(AppState& state)
         ImGui::Separator();
         if (ImGui::MenuItem("Open Calibration...", "Ctrl+L"))
             actionOpenCalibration(state);
-        if (ImGui::MenuItem("Save Calibration...", "Ctrl+S"))
+        if (ImGui::MenuItem("Save Calibration...", "Ctrl+Shift+S"))
             actionSaveCalibration(state);
+        ImGui::Separator();
+        if (ImGui::MenuItem("Load Pairs..."))
+            actionLoadPairs(state);
+        if (ImGui::MenuItem("Save Pairs", "Ctrl+S", false, !state.pairs.empty() || !state.pairsPath.empty()))
+            actionSavePairs(state);
+        if (ImGui::MenuItem("Save Pairs As...", nullptr, false, !state.pairs.empty()))
+            actionSavePairsAs(state);
         ImGui::EndMenu();
     }
 
@@ -417,6 +509,8 @@ void UI::panelMenuBar(AppState& state)
         ImGui::SliderInt("Draw decimation", &state.vizParams.drawDecim, 1, 64);
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Renders only every Nth point -- raise this if the 3D view is slow with a large cloud.");
+        if (ImGui::MenuItem("Focus on sensors", "F"))
+            state.focusOnSensors();
         ImGui::EndMenu();
     }
 
@@ -515,6 +609,22 @@ void UI::panelIntrinsics(AppState& state)
         helpMarker(
             "Drag to adjust. Hold Ctrl+click to type a value.\nUnlike Pinhole, the displayed image is never undistorted for "
             "Mei -- the projection overlay and Camera RGB coloring apply this distortion to the raw image directly.");
+
+        ImGui::Text("Refine with \"Solve Extrinsics from Pairs\":");
+        // Own ID scope: "xi" is also the drag field's label above.
+        ImGui::PushID("refine");
+        ImGui::Checkbox("fx, fy", &state.refineIntrinsics.focal);
+        ImGui::SameLine();
+        ImGui::Checkbox("cx, cy", &state.refineIntrinsics.principalPoint);
+        ImGui::SameLine();
+        ImGui::Checkbox("xi", &state.refineIntrinsics.xi);
+        ImGui::Checkbox("k1-k3, p1, p2", &state.refineIntrinsics.distortion);
+        ImGui::PopID();
+        helpMarker(
+            "Solved together with the extrinsics; the values above are replaced.\n"
+            "Each pair gives 2 equations. xi trades off against fx/fy, and a few\n"
+            "pairs barely pin the distortion -- refine only what the pairs support.\n"
+            "Reload the calibration to undo.");
     }
     else if (K.model == CameraModel::Fisheye)
     {
@@ -561,6 +671,12 @@ void UI::panelExtrinsics(AppState& state)
         ImGui::SetTooltip(
             "Blocks tx/ty/tz from being edited here or changed by\n\"Solve Extrinsics from Pairs\" -- use when the camera\nposition is "
             "already known and only orientation needs solving.");
+    ImGui::SameLine();
+    ImGui::Checkbox("Lock rotation", &state.lockRotation);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip(
+            "Blocks om/fi/ka from being edited here or changed by\n\"Solve Extrinsics from Pairs\" -- use when the camera\norientation is "
+            "already known and only position needs solving.");
 
     ImGui::Text("Camera position in world (m):");
     ImGui::BeginDisabled(state.lockTranslation);
@@ -571,30 +687,94 @@ void UI::panelExtrinsics(AppState& state)
 
     ImGui::Spacing();
     ImGui::Text("Camera orientation in world, om/fi/ka (deg):");
+    ImGui::BeginDisabled(state.lockRotation);
     dragFloat("om", &E.om, 0.1f, -180.f, 180.f, "%.2f");
     dragFloat("fi", &E.fi, 0.1f, -180.f, 180.f, "%.2f");
     dragFloat("ka", &E.ka, 0.1f, -180.f, 180.f, "%.2f");
+    ImGui::EndDisabled();
     helpMarker(
         "R_wc = Rx(om)*Ry(fi)*Rz(ka): camera orientation in LiDAR world.\nT_lidar2cam = R_wc^T * (p - C).\nAt fi=+/-90 deg (gimbal lock), "
         "om and ka are not individually\nunique -- only om+ka (or om-ka) is determined.");
 
     ImGui::Spacing();
+    ImGui::BeginDisabled(state.lockTranslation && state.lockRotation);
     if (ImGui::Button("Reset Extrinsics", ImVec2(-1, 0)))
     {
-        // Respect the translation lock: only reset orientation while locked.
-        Extrinsics defaults;
-        if (state.lockTranslation)
+        // Respect the locks: reset only the unlocked half.
+        const Extrinsics defaults;
+        if (!state.lockTranslation)
+        {
+            E.tx = defaults.tx;
+            E.ty = defaults.ty;
+            E.tz = defaults.tz;
+        }
+        if (!state.lockRotation)
         {
             E.om = defaults.om;
             E.fi = defaults.fi;
             E.ka = defaults.ka;
         }
-        else
-        {
-            E = defaults;
-        }
     }
+    ImGui::EndDisabled();
     ImGui::PopItemWidth();
+
+    if (ImGui::TreeNode("Priors (soft constraints)"))
+    {
+        helpMarker(
+            "Each enabled prior adds an observation equation\n(value - target) / sigma to \"Solve Extrinsics from Pairs\".\n"
+            "A parameter sigma away from its target costs as much\nas 1 px of reprojection error, so it stays near the\n"
+            "target unless the pairs clearly say otherwise.\nUse it for directions the pairs barely constrain,\n"
+            "e.g. the camera height tz. Ignored while locked.");
+        static const char* const kNames[6] = { "tx", "ty", "tz", "om", "fi", "ka" };
+        float* const current[6] = { &E.tx, &E.ty, &E.tz, &E.om, &E.fi, &E.ka };
+        if (ImGui::BeginTable("priors", 4, ImGuiTableFlags_SizingStretchProp))
+        {
+            ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed);
+            ImGui::TableSetupColumn("target");
+            ImGui::TableSetupColumn("sigma");
+            ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed);
+            ImGui::TableHeadersRow();
+            for (int i = 0; i < 6; ++i)
+            {
+                const bool isTranslation = i < 3;
+                calib::ParameterPrior& prior = state.priors[i];
+                ImGui::PushID(i);
+                ImGui::BeginDisabled(isTranslation ? state.lockTranslation : state.lockRotation);
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                // Enabling a prior holds the parameter where it is now.
+                if (ImGui::Checkbox(kNames[i], &prior.enabled) && prior.enabled)
+                    prior.target = *current[i];
+                ImGui::BeginDisabled(!prior.enabled);
+                ImGui::TableNextColumn();
+                ImGui::SetNextItemWidth(-FLT_MIN);
+                float target = static_cast<float>(prior.target);
+                if (dragFloat("##target", &target, isTranslation ? 0.01f : 0.1f, -180.f, 180.f, isTranslation ? "%.3f m" : "%.2f deg"))
+                    prior.target = target;
+                ImGui::TableNextColumn();
+                ImGui::SetNextItemWidth(-FLT_MIN);
+                float sigma = static_cast<float>(prior.sigma);
+                if (dragFloat(
+                        "##sigma",
+                        &sigma,
+                        isTranslation ? 0.001f : 0.01f,
+                        isTranslation ? 0.0001f : 0.001f,
+                        isTranslation ? 10.f : 90.f,
+                        isTranslation ? "%.4f m" : "%.3f deg"))
+                    prior.sigma = std::max(sigma, isTranslation ? 0.0001f : 0.001f);
+                ImGui::TableNextColumn();
+                if (ImGui::SmallButton("= current"))
+                    prior.target = *current[i];
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Set the target to the current %s", kNames[i]);
+                ImGui::EndDisabled();
+                ImGui::EndDisabled();
+                ImGui::PopID();
+            }
+            ImGui::EndTable();
+        }
+        ImGui::TreePop();
+    }
 
     // Show current rotation matrix
     if (ImGui::TreeNode("Rotation matrix"))
@@ -627,6 +807,29 @@ void UI::panelVisualization(AppState& state)
     ImGui::PopItemWidth();
 
     ImGui::Checkbox("Show compass/ruler (C)", &state.showCompassRuler);
+    ImGui::Checkbox("Lidar model", &state.showLidarModel);
+    ImGui::SameLine();
+    ImGui::Checkbox("Camera model", &state.showCameraModel);
+    helpMarker(
+        "Simplified, real-size Livox Mid-360 at the LiDAR origin (connector at the back, -x) and\n"
+        "the camera body below at the camera pose. The yellow ring marks the lens these extrinsics describe.\n"
+        "Focus on sensors (F) zooms in on them.");
+
+    // Order matches CameraBody's enumerators.
+    const char* bodies[] = { "Insta360 X5", "PCB camera" };
+    int body = static_cast<int>(state.cameraBody);
+    ImGui::BeginDisabled(!state.showCameraModel);
+    ImGui::PushItemWidth(-140.f);
+    if (ImGui::Combo("Camera body", &body, bodies, IM_ARRAYSIZE(bodies)))
+        state.cameraBody = static_cast<CameraBody>(body);
+    ImGui::PopItemWidth();
+    ImGui::EndDisabled();
+    helpMarker(
+        "PCB camera: a bare board in the Raspberry Pi camera format (25 x 24 mm, e.g. an IMX519\n"
+        "module), ribbon connector at the bottom of the image.");
+
+    if (ImGui::Button("Focus on sensors (F)"))
+        state.focusOnSensors();
 }
 
 // ── Correspondences ──────────────────────────────────────────────────────────
@@ -635,7 +838,9 @@ void UI::panelVisualization(AppState& state)
 // ControlPoints::imgui (core/src/control_points.cpp).
 void UI::panelCorrespondences(AppState& state)
 {
-    ImGui::TextWrapped("Hold Shift and click a point in the Image View or the 3D View. Picking both sides completes a pair.");
+    ImGui::TextWrapped(
+        "Shift+click the pixel in the Image View, and the LiDAR point in the 3D View -- or Shift+Alt+click it in the Image View, "
+        "which shows the LiDAR intensity image while both are held. Picking both sides completes a pair.");
 
     ImGui::Text("Pending pair:");
     ImGui::SameLine();
@@ -685,18 +890,48 @@ void UI::panelCorrespondences(AppState& state)
         ImGui::SameLine();
         if (ImGui::SmallButton("Remove"))
             removeIndex = i;
+        if (ImGui::IsItemHovered())
+            state.hoveredRemoveIndex = i;
         ImGui::PopID();
     }
     if (removeIndex >= 0)
         state.removePair(removeIndex);
 
+    ImGui::BeginDisabled(state.pairs.empty() && state.pairsPath.empty());
+    if (ImGui::Button("Save pairs"))
+        actionSavePairs(state);
+    ImGui::EndDisabled();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+    {
+        if (state.pairsPath.empty())
+            ImGui::SetTooltip("Ctrl+S; asks for a file");
+        else
+            ImGui::SetTooltip("Ctrl+S, to %s", state.pairsPath.c_str());
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Load pairs..."))
+        actionLoadPairs(state);
+    helpMarker(
+        "Or drop a saved pairs .json on the window, or pass --pairs <file.json>.\n"
+        "Loading replaces the current pairs. Ctrl+S saves to the last pairs file\n"
+        "loaded or saved, or the --pairs one (created if it does not exist yet).\n"
+        "Pixels are of the shown image (rectified or raw) -- load the same image and calibration first.");
+    if (!state.pairsPath.empty())
+        ImGui::TextDisabled("Pairs file: %s", std::filesystem::path(state.pairsPath).filename().string().c_str());
+
     ImGui::Spacing();
-    ImGui::BeginDisabled(state.pairs.size() < 3);
+    const std::string refined = state.refinedIntrinsicsLabel();
+    const bool nothingFree = state.lockTranslation && state.lockRotation && refined.empty();
+    ImGui::BeginDisabled(state.pairs.size() < 3 || nothingFree);
     if (ImGui::Button("Solve Extrinsics from Pairs", ImVec2(-1, 0)))
         state.solvePairs();
     ImGui::EndDisabled();
     if (state.pairs.size() < 3)
         ImGui::TextDisabled("At least 3 pairs needed");
+    else if (nothingFree)
+        ImGui::TextDisabled("Translation and rotation are both locked");
+    if (!refined.empty())
+        ImGui::TextDisabled("Also refines %s", refined.c_str());
     if (state.lastSolveRmsPixels >= 0.0)
         ImGui::Text("Last solve RMS reprojection error: %.2f px", state.lastSolveRmsPixels);
 }

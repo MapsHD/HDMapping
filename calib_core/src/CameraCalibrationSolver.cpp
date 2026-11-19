@@ -44,21 +44,57 @@ namespace calib
             }
             return sumSq;
         }
+
+        //! One prior as a linear observation equation on the solver's own
+        //! parameter vector x = [tx',ty',tz',om,fi,ka] (rotated position,
+        //! radians): residual = (target - J*x) * invSigma.
+        struct PriorRow
+        {
+            Eigen::Matrix<double, 1, 6> J = Eigen::Matrix<double, 1, 6>::Zero();
+            double target = 0.0;
+            double invSigma = 1.0;
+        };
+
+        double priorSumSquared(const std::vector<PriorRow>& rows, const Eigen::Matrix<double, 6, 1>& x)
+        {
+            double sumSq = 0.0;
+            for (const auto& r : rows)
+            {
+                const double res = (r.target - r.J.dot(x)) * r.invSigma;
+                sumSq += res * res;
+            }
+            return sumSq;
+        }
     } // namespace
+
+    bool extrinsicsPriorsValid(const ExtrinsicsPriors& priors)
+    {
+        for (const auto& p : priors)
+            if (p.enabled && !(p.sigma > 0.0))
+                return false;
+        return true;
+    }
 
     bool solveExtrinsicsFromCorrespondences(
         const std::vector<PointPixelCorrespondence>& correspondences,
         const Intrinsics& K,
         Extrinsics& extrinsicsInOut,
         double* outRmsPixels,
-        bool fixTranslation)
+        bool fixTranslation,
+        bool fixRotation,
+        const ExtrinsicsPriors& priors)
     {
         // Free parameters are always a contiguous slice of the full
         // [tx,ty,tz,om,fi,ka] (columns 0-5 of the 2x9 jacobian): all 6 of
-        // them normally, or just [om,fi,ka] (columns 3-5) when translation
-        // is pinned -- tx/ty/tz then never appear in the normal equations
-        // at all, so they cannot move.
-        const int nParams = fixTranslation ? 3 : 6;
+        // them normally, just [om,fi,ka] (columns 3-5) when translation is
+        // pinned, or just [tx,ty,tz] (columns 0-2) when rotation is pinned
+        // -- the pinned ones then never appear in the normal equations at
+        // all, so they cannot move.
+        if (fixTranslation && fixRotation)
+            return false;
+        if (!extrinsicsPriorsValid(priors))
+            return false;
+        const int nParams = (fixTranslation || fixRotation) ? 3 : 6;
         const int colOffset = fixTranslation ? 3 : 0;
         if (static_cast<int>(correspondences.size()) < 3 || static_cast<int>(correspondences.size()) * 2 < nParams)
             return false;
@@ -96,7 +132,41 @@ namespace calib
 
         const double fx = K.fx, fy = K.fy, cx = K.cx, cy = K.cy;
 
-        double cost = sumSquaredResiduals(rotated, fx, fy, cx, cy, tx, ty, tz, om, fi, ka);
+        // Priors are on the real Extrinsics (C, om/fi/ka in degrees), but the
+        // solver's position is C' = offset^T * C, so a prior on C's i-th
+        // component is a prior on offset.row(i) * C'. A locked parameter's
+        // prior is dropped: it cannot move anyway.
+        const Eigen::Matrix3d offset = kCameraLidarAxisOffset.cast<double>();
+        std::vector<PriorRow> priorRows;
+        for (int i = 0; i < 6; ++i)
+        {
+            const ParameterPrior& prior = priors[i];
+            const bool isTranslation = i < 3;
+            if (!prior.enabled || (isTranslation && fixTranslation) || (!isTranslation && fixRotation))
+                continue;
+            PriorRow row;
+            if (isTranslation)
+            {
+                row.J.head<3>() = offset.row(i);
+                row.target = prior.target;
+                row.invSigma = 1.0 / prior.sigma;
+            }
+            else
+            {
+                row.J(i) = 1.0;
+                row.target = prior.target * d2r;
+                row.invSigma = 1.0 / (prior.sigma * d2r);
+            }
+            priorRows.push_back(row);
+        }
+        auto totalCost = [&](double tx_, double ty_, double tz_, double om_, double fi_, double ka_)
+        {
+            Eigen::Matrix<double, 6, 1> x;
+            x << tx_, ty_, tz_, om_, fi_, ka_;
+            return sumSquaredResiduals(rotated, fx, fy, cx, cy, tx_, ty_, tz_, om_, fi_, ka_) + priorSumSquared(priorRows, x);
+        };
+
+        double cost = totalCost(tx, ty, tz, om, fi, ka);
         bool solvedOnce = false;
 
         // Levenberg-Marquardt: plain (undamped) Gauss-Newton can take huge,
@@ -129,12 +199,27 @@ namespace calib
 
                 // Only the free-parameter columns -- the 3D points
                 // (columns 6-8) are fixed observations, not solved for, and
-                // translation (columns 0-2) is skipped entirely when
-                // fixTranslation is set.
+                // translation (columns 0-2) or rotation (columns 3-5) is
+                // skipped entirely when its fix flag is set.
                 Eigen::MatrixXd A = -jFull.block(0, colOffset, 2, nParams);
 
                 AtA += A.transpose() * A;
                 AtB += A.transpose() * delta;
+            }
+
+            // Prior observation equations, same convention: A = d(predicted)/dx,
+            // delta = observed - predicted, both scaled by 1/sigma.
+            if (!priorRows.empty())
+            {
+                Eigen::Matrix<double, 6, 1> x;
+                x << tx, ty, tz, om, fi, ka;
+                for (const auto& r : priorRows)
+                {
+                    const Eigen::VectorXd a = (r.J.segment(colOffset, nParams) * r.invSigma).transpose();
+                    const double delta = (r.target - r.J.dot(x)) * r.invSigma;
+                    AtA += a * a.transpose();
+                    AtB += a * delta;
+                }
             }
 
             bool improved = false;
@@ -153,22 +238,10 @@ namespace calib
 
                 Eigen::VectorXd x = lu.solve(AtB);
                 double tx2 = tx, ty2 = ty, tz2 = tz, om2 = om, fi2 = fi, ka2 = ka;
-                if (fixTranslation)
-                {
-                    om2 += x(0);
-                    fi2 += x(1);
-                    ka2 += x(2);
-                }
-                else
-                {
-                    tx2 += x(0);
-                    ty2 += x(1);
-                    tz2 += x(2);
-                    om2 += x(3);
-                    fi2 += x(4);
-                    ka2 += x(5);
-                }
-                double newCost = sumSquaredResiduals(rotated, fx, fy, cx, cy, tx2, ty2, tz2, om2, fi2, ka2);
+                double* const all[6] = { &tx2, &ty2, &tz2, &om2, &fi2, &ka2 };
+                for (int k = 0; k < nParams; ++k)
+                    *all[colOffset + k] += x(k);
+                double newCost = totalCost(tx2, ty2, tz2, om2, fi2, ka2);
 
                 if (newCost < cost)
                 {
@@ -210,8 +283,10 @@ namespace calib
         extrinsicsInOut.fi = static_cast<float>(fi / d2r);
         extrinsicsInOut.ka = static_cast<float>(ka / d2r);
 
+        // Reprojection error only, without the priors' share of the cost.
         if (outRmsPixels)
-            *outRmsPixels = std::sqrt(cost / (2.0 * static_cast<double>(correspondences.size())));
+            *outRmsPixels = std::sqrt(
+                sumSquaredResiduals(rotated, fx, fy, cx, cy, tx, ty, tz, om, fi, ka) / (2.0 * static_cast<double>(correspondences.size())));
 
         return true;
     }

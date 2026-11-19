@@ -20,6 +20,7 @@
 #include <Core/raylib_utils.hpp>
 #include <Core/transformations.h>
 
+#include <RaylibWidgets/PlatformKeys.h>
 #include <RaylibWidgets/Timeline.h>
 
 #include <Eigen/Eigen>
@@ -1739,7 +1740,7 @@ static void playbackBar()
         ImGui::SetNextItemWidth(160.f);
         ImGui::SliderFloat("Speed", &playback_speed, 0.1f, 50.f, "%.1fx", ImGuiSliderFlags_Logarithmic);
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Playback rate, as a multiple of real time (Ctrl+click to type)");
+            ImGui::SetTooltip("Playback rate, as a multiple of real time (" SHORTCUT_CTRL "+click to type)");
 
         ImGui::SameLine();
         ImGui::Dummy(ImVec2(20, 0));
@@ -2039,7 +2040,7 @@ void display()
             if (ImGui::Button("Open folder"))
                 openFolder();
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Select folder containing files for analyze (Ctrl+O), or drop folders/files on the window");
+                ImGui::SetTooltip("Select folder containing files for analyze (" SHORTCUT_CTRL "+O), or drop folders/files on the window");
 
             ImGui::SameLine();
 

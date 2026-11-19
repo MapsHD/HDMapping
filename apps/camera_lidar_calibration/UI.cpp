@@ -3,6 +3,7 @@
 #include "imgui.h"
 #include "rlImGui.h"
 #include <Core/pfd_wrapper.hpp>
+#include <RaylibWidgets/PlatformKeys.h>
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -99,10 +100,12 @@ void UI::draw(AppState& state)
 
     drawSensorIds(state);
 
-    // Alt/Cmd = toggle Camera RGB ↔ Intensity (works anywhere in the window).
-    // Cmd (Super) alongside Alt for macOS, where Option is awkward to use as
-    // a modifier (it composes special characters). Fires on release, unless
-    // Shift joined in: Shift+Alt is the Image View's LiDAR-pick chord.
+    // Alt/Super = toggle Camera RGB ↔ Intensity (works anywhere in the window).
+    // Super alongside Alt for macOS, where Option is awkward to use as a
+    // modifier (it composes special characters); ImGui swaps Cmd and Ctrl
+    // there, so Super is the physical Ctrl key and Cmd stays free for
+    // shortcuts. Fires on release, unless Shift joined in: Shift+Alt is the
+    // Image View's LiDAR-pick chord.
     const bool altDown = ImGui::IsKeyDown(ImGuiKey_LeftAlt) || ImGui::IsKeyDown(ImGuiKey_RightAlt) ||
         ImGui::IsKeyDown(ImGuiKey_LeftSuper) || ImGui::IsKeyDown(ImGuiKey_RightSuper);
     if (altDown && io.KeyShift)
@@ -194,8 +197,8 @@ void UI::drawImageView(AppState& state)
     const bool pickingLidar = picking && ImGui::GetIO().KeyAlt;
     ImGui::TextColored(
         ImVec4(1, 1, 0, 0.8f),
-        pickingLidar  ? "LiDAR intensity image: Shift+Alt+click to pick a LiDAR point"
-            : picking ? "Shift+click to pick a pixel | add Alt to pick a LiDAR point"
+        pickingLidar  ? "LiDAR intensity image: Shift+" SHORTCUT_ALT "+click to pick a LiDAR point"
+            : picking ? "Shift+click to pick a pixel | add " SHORTCUT_ALT " to pick a LiDAR point"
                       : "Scroll: zoom | Drag: pan with middle | Dbl-click: reset zoom");
 
     ImGui::BeginChild("image_scroll", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
@@ -476,24 +479,24 @@ void UI::panelMenuBar(AppState& state)
 
     if (ImGui::BeginMenu("File"))
     {
-        if (ImGui::MenuItem("Open Image...", "Ctrl+I"))
+        if (ImGui::MenuItem("Open Image...", SHORTCUT_CTRL "+I"))
             actionOpenImage(state);
-        if (ImGui::MenuItem("Open Point Cloud...", "Ctrl+O"))
+        if (ImGui::MenuItem("Open Point Cloud...", SHORTCUT_CTRL "+O"))
             actionOpenPointCloud(state);
-        if (ImGui::MenuItem("Add Point Cloud...", "Ctrl+Shift+O"))
+        if (ImGui::MenuItem("Add Point Cloud...", SHORTCUT_CTRL "+Shift+O"))
             actionAddPointCloud(state);
         ImGui::Separator();
-        if (ImGui::MenuItem("Open Intrinsics...", "Ctrl+K"))
+        if (ImGui::MenuItem("Open Intrinsics...", SHORTCUT_CTRL "+K"))
             actionOpenIntrinsics(state);
         ImGui::Separator();
-        if (ImGui::MenuItem("Open Calibration...", "Ctrl+L"))
+        if (ImGui::MenuItem("Open Calibration...", SHORTCUT_CTRL "+L"))
             actionOpenCalibration(state);
-        if (ImGui::MenuItem("Save Calibration...", "Ctrl+Shift+S"))
+        if (ImGui::MenuItem("Save Calibration...", SHORTCUT_CTRL "+Shift+S"))
             actionSaveCalibration(state);
         ImGui::Separator();
         if (ImGui::MenuItem("Load Pairs..."))
             actionLoadPairs(state);
-        if (ImGui::MenuItem("Save Pairs", "Ctrl+S", false, !state.pairs.empty() || !state.pairsPath.empty()))
+        if (ImGui::MenuItem("Save Pairs", SHORTCUT_CTRL "+S", false, !state.pairs.empty() || !state.pairsPath.empty()))
             actionSavePairs(state);
         if (ImGui::MenuItem("Save Pairs As...", nullptr, false, !state.pairs.empty()))
             actionSavePairsAs(state);
@@ -607,7 +610,7 @@ void UI::panelIntrinsics(AppState& state)
         drag("p1", &K.p1, 0.0001f, -1.f, 1.f, "%.5f");
         drag("p2", &K.p2, 0.0001f, -1.f, 1.f, "%.5f");
         helpMarker(
-            "Drag to adjust. Hold Ctrl+click to type a value.\nUnlike Pinhole, the displayed image is never undistorted for "
+            "Drag to adjust. Hold " SHORTCUT_CTRL "+click to type a value.\nUnlike Pinhole, the displayed image is never undistorted for "
             "Mei -- the projection overlay and Camera RGB coloring apply this distortion to the raw image directly.");
 
         ImGui::Text("Refine with \"Solve Extrinsics from Pairs\":");
@@ -636,7 +639,7 @@ void UI::panelIntrinsics(AppState& state)
         drag("k3", &K.k3, 0.001f, -100.f, 100.f, "%.4f");
         drag("k4", &K.k4, 0.001f, -100.f, 100.f, "%.4f");
         helpMarker(
-            "Drag to adjust. Hold Ctrl+click to type a value.\nUnlike Pinhole, the displayed image is never undistorted for "
+            "Drag to adjust. Hold " SHORTCUT_CTRL "+click to type a value.\nUnlike Pinhole, the displayed image is never undistorted for "
             "Fisheye -- the projection overlay and Camera RGB coloring apply this distortion to the raw image directly.");
     }
     else
@@ -651,7 +654,7 @@ void UI::panelIntrinsics(AppState& state)
         ImGui::Text("Tangential:");
         drag("p1", &K.p1, 0.0001f, -1.f, 1.f, "%.5f");
         drag("p2", &K.p2, 0.0001f, -1.f, 1.f, "%.5f");
-        helpMarker("Drag to adjust. Hold Ctrl+click to type a value.");
+        helpMarker("Drag to adjust. Hold " SHORTCUT_CTRL "+click to type a value.");
     }
     ImGui::PopItemWidth();
 
@@ -839,7 +842,8 @@ void UI::panelVisualization(AppState& state)
 void UI::panelCorrespondences(AppState& state)
 {
     ImGui::TextWrapped(
-        "Shift+click the pixel in the Image View, and the LiDAR point in the 3D View -- or Shift+Alt+click it in the Image View, "
+        "Shift+click the pixel in the Image View, and the LiDAR point in the 3D View -- or Shift+" SHORTCUT_ALT
+        "+click it in the Image View, "
         "which shows the LiDAR intensity image while both are held. Picking both sides completes a pair.");
 
     ImGui::Text("Pending pair:");
@@ -904,16 +908,16 @@ void UI::panelCorrespondences(AppState& state)
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
     {
         if (state.pairsPath.empty())
-            ImGui::SetTooltip("Ctrl+S; asks for a file");
+            ImGui::SetTooltip(SHORTCUT_CTRL "+S; asks for a file");
         else
-            ImGui::SetTooltip("Ctrl+S, to %s", state.pairsPath.c_str());
+            ImGui::SetTooltip(SHORTCUT_CTRL "+S, to %s", state.pairsPath.c_str());
     }
     ImGui::SameLine();
     if (ImGui::Button("Load pairs..."))
         actionLoadPairs(state);
     helpMarker(
         "Or drop a saved pairs .json on the window, or pass --pairs <file.json>.\n"
-        "Loading replaces the current pairs. Ctrl+S saves to the last pairs file\n"
+        "Loading replaces the current pairs. " SHORTCUT_CTRL "+S saves to the last pairs file\n"
         "loaded or saved, or the --pairs one (created if it does not exist yet).\n"
         "Pixels are of the shown image (rectified or raw) -- load the same image and calibration first.");
     if (!state.pairsPath.empty())

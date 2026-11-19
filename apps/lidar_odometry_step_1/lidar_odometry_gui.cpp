@@ -27,6 +27,7 @@
 #include <Core/raylib_utils.hpp>
 #include <Core/registration_plane_feature.h>
 #include <Core/session.h>
+#include <RaylibWidgets/PlatformKeys.h>
 
 #include "toml_io.h"
 #include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
@@ -74,7 +75,7 @@ static const std::vector<ShortcutEntry> appShortcuts = { { "Help", "F1", "Show /
                                                          { "", "Shift + scroll", "Faster zoom in perspective view" },
                                                          { "", "Double left click", "Explore nearest trajectory point" },
                                                          { "", "Double right click", "Return to processing head" },
-                                                         { "Camera", "Ctrl + arrows", "Rotate camera" },
+                                                         { "Camera", SHORTCUT_CTRL " + arrows", "Rotate camera" },
                                                          { "", "Shift + arrows", "Pan camera" },
                                                          { "", "F / B", "Front / back view" },
                                                          { "", "L / R", "Left / right view" },
@@ -86,9 +87,9 @@ static const std::vector<ShortcutEntry> appShortcuts = { { "Help", "F1", "Show /
                                                          { "", "C", "Show / hide compass and ruler" },
                                                          { "", "X", "Show / hide axes" },
                                                          { "", "1-9", "Set point size" },
-                                                         { "Data", "Ctrl + O", "Load and process data when idle" },
+                                                         { "Data", SHORTCUT_CTRL " + O", "Load and process data when idle" },
                                                          { "Free exploration", "Shift + R", "Open rotation-center coordinates" },
-                                                         { "", "Ctrl + right/middle click", "Choose rotation center on Z=0" } };
+                                                         { "", SHORTCUT_CTRL " + right/middle click", "Choose rotation center on Z=0" } };
 
 namespace fs = std::filesystem;
 
@@ -2559,7 +2560,8 @@ void display()
             if (ImGui::Button("Load & process scanning"))
                 openData();
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Select folder from where to load data and start processing (Ctrl+O), or drop the folder on the window");
+                ImGui::SetTooltip(
+                    "Select folder from where to load data and start processing (" SHORTCUT_CTRL "+O), or drop the folder on the window");
 
             ImGui::SameLine();
             ImGui::Dummy(ImVec2(20, 0));

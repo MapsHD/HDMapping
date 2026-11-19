@@ -18,6 +18,7 @@ add_library(raylib_widgets STATIC
     src/CompassRuler.cpp
     src/WindowFit.cpp
     src/ShortcutsTable.cpp
+    src/PlatformKeys.cpp
     src/OrbitCamera.cpp
     src/CenterOfRotationWindow.cpp
     src/PointPicking.cpp

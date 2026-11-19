@@ -18,6 +18,7 @@
 #include <RaylibWidgets/CenterOfRotationWindow.h>
 #include <RaylibWidgets/CompassRuler.h>
 #include <RaylibWidgets/OrbitCamera.h>
+#include <RaylibWidgets/PlatformKeys.h>
 #include <RaylibWidgets/PointBufferParts.h>
 #include <RaylibWidgets/PointPicking.h>
 #include <RaylibWidgets/ShortcutsTable.h>
@@ -56,11 +57,11 @@ static const std::vector<raylib_widgets::ShortcutEntry> appShortcuts = {
     { "Normal keys", "C", "Toggle compass/ruler" },
     { "", "P", "Toggle show path" },
     { "", "V", "Toggle show frustums" },
-    { "", "Ctrl (tap)", "Toggle Intensity <-> RGB point color" },
-    { "", "Ctrl+O", "Select session (.mjs)" },
-    { "", "Ctrl+Shift+O", "Select CAMERA_0 directory" },
-    { "", "Ctrl+Shift+C", "Open calibration" },
-    { "", "Ctrl+S", "Export colored point cloud (LAS/LAZ)" },
+    { "", SHORTCUT_CTRL " (tap)", "Toggle Intensity <-> RGB point color" },
+    { "", SHORTCUT_CTRL "+O", "Select session (.mjs)" },
+    { "", SHORTCUT_CTRL "+Shift+O", "Select CAMERA_0 directory" },
+    { "", SHORTCUT_CTRL "+Shift+C", "Open calibration" },
+    { "", SHORTCUT_CTRL "+S", "Export colored point cloud (LAS/LAZ)" },
     { "Camera", "F", "Front view" },
     { "", "B", "Back view" },
     { "", "L", "Left view" },
@@ -77,8 +78,8 @@ static const std::vector<raylib_widgets::ShortcutEntry> appShortcuts = {
     { "Mouse related", "Left click + drag", "Orbit camera (flyover: look around)" },
     { "", "Right click + drag", "Pan camera" },
     { "", "Scroll", "Zoom camera" },
-    { "", "Ctrl+Right click", "Set center of rotation (ground plane)" },
-    { "", "Ctrl+Middle click", "Set center of rotation (nearest trajectory point)" },
+    { "", SHORTCUT_CTRL "+Right click", "Set center of rotation (ground plane)" },
+    { "", SHORTCUT_CTRL "+Middle click", "Set center of rotation (nearest trajectory point)" },
     { "", "Shift+R", "Open 'Center of rotation' dialog" },
 };
 
@@ -2483,14 +2484,12 @@ int main(int argc, char* argv[])
         // Ctrl toggles point coloring: intensity (jet) <-> RGB
         if (!ImGui::GetIO().WantCaptureKeyboard)
         {
-            if (IsKeyPressed(KEY_LEFT_CONTROL) || IsKeyPressed(KEY_RIGHT_CONTROL))
+            if (raylib_widgets::isShortcutModifierPressed())
                 s.colorMode = (s.colorMode == 1) ? 0 : 1;
 
             // Chords avoid colliding in meaning with step2's, and keep Ctrl+O
-            // and bare C/P aligned with it. Super counts as ctrlDown so macOS
-            // Cmd works, where it is a distinct key from Ctrl.
-            bool ctrlDown =
-                IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL) || IsKeyDown(KEY_LEFT_SUPER) || IsKeyDown(KEY_RIGHT_SUPER);
+            // and bare C/P aligned with it. Ctrl here is Cmd on macOS.
+            bool ctrlDown = raylib_widgets::isShortcutModifierDown();
             bool shiftDown = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
             if (ctrlDown && shiftDown && IsKeyPressed(KEY_O))
                 actionSelectCamera0Dir(s);
@@ -2770,17 +2769,17 @@ int main(int argc, char* argv[])
         {
             if (ImGui::BeginMenu("File"))
             {
-                if (ImGui::MenuItem("Select Session (.mjs)...", "Ctrl+O"))
+                if (ImGui::MenuItem("Select Session (.mjs)...", SHORTCUT_CTRL "+O"))
                     actionSelectSession(s);
-                if (ImGui::MenuItem("Select CAMERA_0 Directory...", "Ctrl+Shift+O"))
+                if (ImGui::MenuItem("Select CAMERA_0 Directory...", SHORTCUT_CTRL "+Shift+O"))
                     actionSelectCamera0Dir(s);
                 ImGui::Separator();
-                if (ImGui::MenuItem("Open Calibration...", "Ctrl+Shift+C"))
+                if (ImGui::MenuItem("Open Calibration...", SHORTCUT_CTRL "+Shift+C"))
                     actionOpenCalibration(s);
                 if (ImGui::MenuItem("Open Image Mask..."))
                     actionOpenMask(s);
                 ImGui::Separator();
-                if (ImGui::MenuItem("Export Colored Point Cloud (LAS/LAZ)...", "Ctrl+S"))
+                if (ImGui::MenuItem("Export Colored Point Cloud (LAS/LAZ)...", SHORTCUT_CTRL "+S"))
                     actionExportColoredLAZ(s);
                 if (ImGui::MenuItem("Export Colored Point Cloud (E57)..."))
                     actionExportColoredE57(s);
@@ -2862,12 +2861,12 @@ int main(int argc, char* argv[])
                 }
                 if (s.lazHasRgb && s.imagesFilenamesInTime.empty())
                 {
-                    if (ImGui::MenuItem("RGB (LAZ)", "Ctrl", s.colorMode == 1))
+                    if (ImGui::MenuItem("RGB (LAZ)", SHORTCUT_CTRL, s.colorMode == 1))
                         s.colorMode = 1;
                 }
                 if (!s.imagesFilenamesInTime.empty())
                 {
-                    if (ImGui::MenuItem(s.lazHasRgb ? "RGB (image, LAZ fallback)" : "RGB (image)", "Ctrl", s.colorMode == 1))
+                    if (ImGui::MenuItem(s.lazHasRgb ? "RGB (image, LAZ fallback)" : "RGB (image)", SHORTCUT_CTRL, s.colorMode == 1))
                         s.colorMode = 1;
                     if (ImGui::MenuItem("Camera ID", nullptr, s.colorMode == 2))
                         s.colorMode = 2;
@@ -3349,7 +3348,7 @@ int main(int argc, char* argv[])
             ImGui::SetNextItemWidth(160.f);
             ImGui::SliderFloat("Speed", &s.flyoverSpeed, 0.1f, 50.f, "%.1fx", ImGuiSliderFlags_Logarithmic);
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Playback rate, as a multiple of real time (Ctrl+click to type)");
+                ImGui::SetTooltip("Playback rate, as a multiple of real time (" SHORTCUT_CTRL "+click to type)");
             ImGui::SameLine();
             ImGui::SetNextItemWidth(120.f);
             ImGui::SliderFloat("Smoothing", &s.flyoverSmoothingSec, 0.f, 5.f, "%.1f s");

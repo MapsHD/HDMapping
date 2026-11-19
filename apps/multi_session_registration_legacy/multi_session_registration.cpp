@@ -28,6 +28,7 @@
 #include <portable-file-dialogs.h>
 
 #include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
+#include <HDMapping/SessionPaths.h>
 
 #ifdef _WIN32
 #include "resource.h"
@@ -1617,7 +1618,7 @@ bool save_project_settings(const std::string& file_name, const ProjectSettings& 
     nlohmann::json jsession_file_names;
     for (const auto& pc : _project_settings.session_file_names)
     {
-        nlohmann::json jfn{ { "session_file_name", pc } };
+        nlohmann::json jfn{ { "session_file_name", toSessionPath(pc, file_name) } };
         jsession_file_names.push_back(jfn);
     }
     jj["session_file_names"] = jsession_file_names;
@@ -1749,7 +1750,7 @@ bool loadProject(const std::string& file_name, ProjectSettings& _project_setting
 
         for (const auto& fn_json : data["session_file_names"])
         {
-            const std::string fn = fn_json["session_file_name"];
+            const std::string fn = resolveProjectPath(fn_json["session_file_name"].get<std::string>(), file_name);
             _project_settings.session_file_names.push_back(fn);
             std::cout << "'" << fn << "'";
             if (!fs::exists(fn))

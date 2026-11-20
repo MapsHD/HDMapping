@@ -1,5 +1,6 @@
 #include "App.h"
 #include <CalibCore/CliArgs.h>
+#include <RaylibWidgets/PlatformKeys.h>
 #include <algorithm>
 #include <cstdio>
 #include <filesystem>
@@ -42,8 +43,9 @@ static void preloadByExt(App& app, const std::string& p)
 static constexpr const char* kClosestToLaz = "  --closest_to_laz             with --camera_dir <dir>: load the image taken closest\n"
                                              "                               to the middle of the --laz clouds' point times";
 
-static constexpr const char* kPairs = "  --pairs <file.json>          picked pairs: loaded when the file exists; Ctrl+S saves\n"
-                                      "                               the pairs to it";
+static constexpr const char* kPairs =
+    "  --pairs <file.json>          picked pairs: loaded when the file exists; " SHORTCUT_CTRL "+S saves\n"
+    "                               the pairs to it";
 
 int main(int argc, char* argv[])
 {

@@ -126,6 +126,7 @@
 #include <RaylibWidgets/CenterOfRotationWindow.h>
 #include <RaylibWidgets/CompassRuler.h>
 #include <RaylibWidgets/OrbitCamera.h>
+#include <RaylibWidgets/PlatformKeys.h>
 #include <RaylibWidgets/PointPicking.h>
 #include <RaylibWidgets/RayPlaneD.h>
 #include <RaylibWidgets/Shaders.h>
@@ -888,86 +889,88 @@ std::vector<std::string> infoLines = {
 // a "Ctrl+J" entry, silently shifting every entry after "J" by one row
 // against the generic list's descriptions; and "Right click + drag" had a
 // stray "n" instead of its real "camera pan" description.
-static const std::vector<ShortcutEntry> appShortcuts = { { "Normal keys", "A", "" },
-                                                         { "", "Ctrl+A", "point cloud Alignment" },
-                                                         { "", "B", "camera Back" },
-                                                         { "", "Ctrl+B", "" },
-                                                         { "", "C", "Compass/ruler" },
-                                                         { "", "Ctrl+C", "Control points" },
-                                                         { "", "D", "" },
-                                                         { "", "Ctrl+D", "" },
-                                                         { "", "E", "" },
-                                                         { "", "Ctrl+E", "lio segments Editor" },
-                                                         { "", "F", "camera Front" },
-                                                         { "", "Ctrl+F", "" },
-                                                         { "", "G", "" },
-                                                         { "", "Ctrl+G", "Ground control points" },
-                                                         { "", "H", "" },
-                                                         { "", "Ctrl+H", "" },
-                                                         { "", "I", "camera Isometric" },
-                                                         { "", "Ctrl+I", "" },
-                                                         { "", "J", "" },
-                                                         { "", "Ctrl+J", "" },
-                                                         { "", "K", "" },
-                                                         { "", "Ctrl+K", "" },
-                                                         { "", "L", "camera Left" },
-                                                         { "", "Ctrl+L", "manual Loop closure" },
-                                                         { "", "M", "" },
-                                                         { "", "Ctrl+M", "Measure distance" },
-                                                         { "", "N", "Next edge (manual loop closure, BoW preview)" },
-                                                         { "", "Ctrl+N", "" },
-                                                         { "", "O", "Ortographic view" },
-                                                         { "", "Ctrl+O", "Open/load session/data" },
-                                                         { "", "P", "Previous edge (manual loop closure, BoW preview)" },
-                                                         { "", "Ctrl+P", "Pose graph slam" },
-                                                         { "", "Q", "" },
-                                                         { "", "Ctrl+Q", "" },
-                                                         { "", "R", "camera Right" },
-                                                         { "", "Ctrl+R", "Random cloud colors" },
-                                                         { "", "Shift+R", "Rotation center" },
-                                                         { "", "S", "" },
-                                                         { "", "Ctrl+S", "Save session" },
-                                                         { "", "Ctrl+Shift+S", "Save subsession" },
-                                                         { "", "T", "camera Top" },
-                                                         { "", "Ctrl+T", "Solid cloud color" },
-                                                         { "", "U", "camera bottom (Under)" },
-                                                         { "", "Ctrl+U", "" },
-                                                         { "", "V", "" },
-                                                         { "", "Ctrl+V", "" },
-                                                         { "", "W", "" },
-                                                         { "", "Ctrl+W", "" },
-                                                         { "", "X", "show aXes" },
-                                                         { "", "Ctrl+X", "" },
-                                                         { "", "Y", "" },
-                                                         { "", "Ctrl+Y", "" },
-                                                         { "", "Z", "camera reset" },
-                                                         { "", "Ctrl+Z", "" },
-                                                         { "", "Shift+Z", "Lock Z" },
-                                                         { "", "1-9", "point size" },
-                                                         { "Special keys", "Up arrow", "" },
-                                                         { "", "Shift + up arrow", "camera translate Up" },
-                                                         { "", "Ctrl + up arrow", "" },
-                                                         { "", "Down arrow", "" },
-                                                         { "", "Shift + down arrow", "camera translate Down" },
-                                                         { "", "Ctrl + down arrow", "" },
-                                                         { "", "Left arrow", "" },
-                                                         { "", "Shift + left arrow", "camera translate Left" },
-                                                         { "", "Ctrl + left arrow", "" },
-                                                         { "", "Right arrow", "" },
-                                                         { "", "Shift + right arrow", "camera translate Right" },
-                                                         { "", "Ctrl + right arrow", "" },
-                                                         { "", "Pg down", "" },
-                                                         { "", "Pg up", "" },
-                                                         { "", "- key", "" },
-                                                         { "", "+ key", "" },
-                                                         { "Mouse related", "Left click + drag", "camera rotate" },
-                                                         { "", "Right click + drag", "camera pan" },
-                                                         { "", "Scroll", "camera zoom" },
-                                                         { "", "Shift + scroll", "camera 5x zoom" },
-                                                         { "", "Shift + drag", "Dock window to screen edges" },
-                                                         { "", "Ctrl + left click", "" },
-                                                         { "", "Ctrl + right click", "change center of rotation" },
-                                                         { "", "Ctrl + middle click", "change center of rotation (if no CP GUI active)" } };
+static const std::vector<ShortcutEntry> appShortcuts = {
+    { "Normal keys", "A", "" },
+    { "", SHORTCUT_CTRL "+A", "point cloud Alignment" },
+    { "", "B", "camera Back" },
+    { "", SHORTCUT_CTRL "+B", "" },
+    { "", "C", "Compass/ruler" },
+    { "", SHORTCUT_CTRL "+C", "Control points" },
+    { "", "D", "" },
+    { "", SHORTCUT_CTRL "+D", "" },
+    { "", "E", "" },
+    { "", SHORTCUT_CTRL "+E", "lio segments Editor" },
+    { "", "F", "camera Front" },
+    { "", SHORTCUT_CTRL "+F", "" },
+    { "", "G", "" },
+    { "", SHORTCUT_CTRL "+G", "Ground control points" },
+    { "", "H", "" },
+    { "", SHORTCUT_CTRL "+H", "" },
+    { "", "I", "camera Isometric" },
+    { "", SHORTCUT_CTRL "+I", "" },
+    { "", "J", "" },
+    { "", SHORTCUT_CTRL "+J", "" },
+    { "", "K", "" },
+    { "", SHORTCUT_CTRL "+K", "" },
+    { "", "L", "camera Left" },
+    { "", SHORTCUT_CTRL "+L", "manual Loop closure" },
+    { "", "M", "" },
+    { "", SHORTCUT_CTRL "+M", "Measure distance" },
+    { "", "N", "Next edge (manual loop closure, BoW preview)" },
+    { "", SHORTCUT_CTRL "+N", "" },
+    { "", "O", "Ortographic view" },
+    { "", SHORTCUT_CTRL "+O", "Open/load session/data" },
+    { "", "P", "Previous edge (manual loop closure, BoW preview)" },
+    { "", SHORTCUT_CTRL "+P", "Pose graph slam" },
+    { "", "Q", "" },
+    { "", SHORTCUT_CTRL "+Q", "" },
+    { "", "R", "camera Right" },
+    { "", SHORTCUT_CTRL "+R", "Random cloud colors" },
+    { "", "Shift+R", "Rotation center" },
+    { "", "S", "" },
+    { "", SHORTCUT_CTRL "+S", "Save session" },
+    { "", SHORTCUT_CTRL "+Shift+S", "Save subsession" },
+    { "", "T", "camera Top" },
+    { "", SHORTCUT_CTRL "+T", "Solid cloud color" },
+    { "", "U", "camera bottom (Under)" },
+    { "", SHORTCUT_CTRL "+U", "" },
+    { "", "V", "" },
+    { "", SHORTCUT_CTRL "+V", "" },
+    { "", "W", "" },
+    { "", SHORTCUT_CTRL "+W", "" },
+    { "", "X", "show aXes" },
+    { "", SHORTCUT_CTRL "+X", "" },
+    { "", "Y", "" },
+    { "", SHORTCUT_CTRL "+Y", "" },
+    { "", "Z", "camera reset" },
+    { "", SHORTCUT_CTRL "+Z", "" },
+    { "", "Shift+Z", "Lock Z" },
+    { "", "1-9", "point size" },
+    { "Special keys", "Up arrow", "" },
+    { "", "Shift + up arrow", "camera translate Up" },
+    { "", SHORTCUT_CTRL " + up arrow", "" },
+    { "", "Down arrow", "" },
+    { "", "Shift + down arrow", "camera translate Down" },
+    { "", SHORTCUT_CTRL " + down arrow", "" },
+    { "", "Left arrow", "" },
+    { "", "Shift + left arrow", "camera translate Left" },
+    { "", SHORTCUT_CTRL " + left arrow", "" },
+    { "", "Right arrow", "" },
+    { "", "Shift + right arrow", "camera translate Right" },
+    { "", SHORTCUT_CTRL " + right arrow", "" },
+    { "", "Pg down", "" },
+    { "", "Pg up", "" },
+    { "", "- key", "" },
+    { "", "+ key", "" },
+    { "Mouse related", "Left click + drag", "camera rotate" },
+    { "", "Right click + drag", "camera pan" },
+    { "", "Scroll", "camera zoom" },
+    { "", "Shift + scroll", "camera 5x zoom" },
+    { "", "Shift + drag", "Dock window to screen edges" },
+    { "", SHORTCUT_CTRL " + left click", "" },
+    { "", SHORTCUT_CTRL " + right click", "change center of rotation" },
+    { "", SHORTCUT_CTRL " + middle click", "change center of rotation (if no CP GUI active)" }
+};
 
 namespace fs = std::filesystem;
 
@@ -5878,7 +5881,7 @@ void display()
             if (ImGui::Button("Open session"))
                 openSession();
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Select session to open (Ctrl+O)");
+                ImGui::SetTooltip("Select session to open (" SHORTCUT_CTRL "+O)");
 
             ImGui::SameLine();
 
@@ -5926,7 +5929,7 @@ void display()
                     if (ImGui::MenuItem("Open session"))
                         openSession();
                     if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip("Replace the current session with another one (Ctrl+O)");
+                        ImGui::SetTooltip("Replace the current session with another one (" SHORTCUT_CTRL "+O)");
 
                     if (ImGui::MenuItem("Open las/laz"))
                         openLaz(fillInSession);
@@ -5966,7 +5969,7 @@ void display()
 
                 ImGui::Separator();
 
-                if (ImGui::MenuItem("Save session as", "Ctrl+S"))
+                if (ImGui::MenuItem("Save session as", SHORTCUT_CTRL "+S"))
                     saveSession();
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Save changes of full session with posibility to change filename");
@@ -5974,7 +5977,7 @@ void display()
                 // ImGui::BeginDisabled(!((index_begin > 0) || (index_end <
                 // static_cast<int>(session.point_clouds_container.point_clouds.size() - 1))));
                 //{
-                if (ImGui::MenuItem("Save subsession", "Ctrl+Shift+S"))
+                if (ImGui::MenuItem("Save subsession", SHORTCUT_CTRL "+Shift+S"))
                     saveSubsession();
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Save session according to selections from 'LIO segments editor' window");
@@ -6604,7 +6607,7 @@ void display()
 
             if (ImGui::BeginMenu("Tools"))
             {
-                ImGui::MenuItem("Point Cloud Alignment", "Ctrl+A", &is_pca_gui);
+                ImGui::MenuItem("Point Cloud Alignment", SHORTCUT_CTRL "+A", &is_pca_gui);
                 if (ImGui::IsItemHovered())
                 {
                     ImGui::BeginTooltip();
@@ -6618,21 +6621,22 @@ void display()
                     ImGui::EndTooltip();
                 }
                 ImGui::Separator();
-                ImGui::MenuItem("Pose Graph SLAM", "Ctrl+P", &is_pose_graph_slam);
+                ImGui::MenuItem("Pose Graph SLAM", SHORTCUT_CTRL "+P", &is_pose_graph_slam);
                 ImGui::MenuItem("Observations", nullptr, &is_manual_analisys);
 
                 ImGui::Separator();
 
-                ImGui::MenuItem("Control Points", "Ctrl+C", &session.control_points.is_imgui, !session.ground_control_points.is_imgui);
+                ImGui::MenuItem(
+                    "Control Points", SHORTCUT_CTRL "+C", &session.control_points.is_imgui, !session.ground_control_points.is_imgui);
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Known reference points used to align or verify the scan");
 
                 ImGui::MenuItem(
-                    "Ground Control Points", "Ctrl+G", &session.ground_control_points.is_imgui, !session.control_points.is_imgui);
+                    "Ground Control Points", SHORTCUT_CTRL "+G", &session.ground_control_points.is_imgui, !session.control_points.is_imgui);
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Accurate real-world points used to georeference the scan");
 
-                ImGui::MenuItem("Manual Loop Closure", "Ctrl+L", &is_loop_closure_gui, !is_lio_segments_gui);
+                ImGui::MenuItem("Manual Loop Closure", SHORTCUT_CTRL "+L", &is_loop_closure_gui, !is_lio_segments_gui);
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Manually connect overlapping scan sections");
 
@@ -6641,7 +6645,7 @@ void display()
                     ImGui::SetTooltip("Detect loop closure candidates from CAMERA_0 images (fbow); review before adding edges");
 
                 ImGui::Separator();
-                ImGui::MenuItem("LIO segments editor", "Ctrl+E", &is_lio_segments_gui, !is_loop_closure_gui);
+                ImGui::MenuItem("LIO segments editor", SHORTCUT_CTRL "+E", &is_lio_segments_gui, !is_loop_closure_gui);
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Manually adjust or review Lidar Inertial Odometry trajectory segments");
 
@@ -6650,7 +6654,7 @@ void display()
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Define new coordinate frame from 3 picked points and transform all clouds");
 
-                ImGui::MenuItem("Measure distance", "Ctrl+M", &is_measure_gui);
+                ImGui::MenuItem("Measure distance", SHORTCUT_CTRL "+M", &is_measure_gui);
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Pick 2 points on the point cloud and measure the distance between them");
 
@@ -6818,7 +6822,7 @@ void display()
                     if (ImGui::MenuItem("> Solid", nullptr, (csPointCloud == CS_SOLID)))
                         csPointCloud = CS_SOLID;
 
-                    if (ImGui::MenuItem("> Random per segment", "Ctrl+R", (csPointCloud == CS_RANDOM)))
+                    if (ImGui::MenuItem("> Random per segment", SHORTCUT_CTRL "+R", (csPointCloud == CS_RANDOM)))
                     {
                         csPointCloud = CS_RANDOM;
 

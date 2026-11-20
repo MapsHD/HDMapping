@@ -5,6 +5,7 @@
 #include <CalibCore/CameraCalibrationSolver.h>
 #include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
 #include <RaylibWidgets/CompassRuler.h>
+#include <RaylibWidgets/PlatformKeys.h>
 #include <RaylibWidgets/PointPicking.h>
 #include <RaylibWidgets/WindowFit.h>
 #include <algorithm>
@@ -106,7 +107,8 @@ void AppState::setPendingImagePoint(float u, float v)
     }
     else
     {
-        statusMsg = "Image point set -- Shift+click the matching point in the 3D View, or Shift+Alt+click it in the Image View";
+        statusMsg =
+            "Image point set -- Shift+click the matching point in the 3D View, or Shift+" SHORTCUT_ALT "+click it in the Image View";
     }
 }
 
@@ -1040,7 +1042,7 @@ void App::run()
         else
         {
             state.pairsPath = pendingPairs;
-            state.statusMsg = "New pairs file " + pendingPairs + ": Ctrl+S saves the picked pairs there";
+            state.statusMsg = "New pairs file " + pendingPairs + ": " SHORTCUT_CTRL "+S saves the picked pairs there";
         }
     }
 

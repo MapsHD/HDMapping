@@ -1808,6 +1808,57 @@ static void playbackBar()
     ImGui::End();
 }
 
+//! Writes the points of every motionless segment to `folder`/motionless_NNN.laz, in the LiDAR frame and
+//! with their recorded timestamps.
+static void saveMotionlessSegments(const fs::path& folder)
+{
+    std::vector<std::vector<Eigen::Vector3d>> points(motionless_segments.size());
+    std::vector<std::vector<unsigned short>> intensities(motionless_segments.size());
+    std::vector<std::vector<double>> timestamps(motionless_segments.size());
+
+    // The segments are sorted and disjoint, so a point can only fall into the last one starting before it.
+    for (const auto& file_points : g_points_per_file)
+    {
+        for (const auto& p : file_points)
+        {
+            const auto next = std::upper_bound(
+                motionless_segments.begin(),
+                motionless_segments.end(),
+                p.timestamp,
+                [](double t, const std::pair<double, double>& segment)
+                {
+                    return t < segment.first;
+                });
+            if (next == motionless_segments.begin())
+                continue;
+            const size_t s = static_cast<size_t>(std::distance(motionless_segments.begin(), next)) - 1;
+            if (p.timestamp > motionless_segments[s].second)
+                continue;
+            points[s].push_back(p.point);
+            intensities[s].push_back(static_cast<unsigned short>(p.intensity));
+            timestamps[s].push_back(p.timestamp);
+        }
+    }
+
+    for (size_t s = 0; s < motionless_segments.size(); s++)
+    {
+        const auto [from, to] = motionless_segments[s];
+        std::ostringstream name;
+        name << "motionless_" << std::setw(3) << std::setfill('0') << s << ".laz";
+        const fs::path file = folder / name.str();
+        if (points[s].empty())
+        {
+            spdlog::warn("motionless segment {} has no points, '{}' not written", s, file.string());
+            continue;
+        }
+        const double origin = chunkStartSec(0);
+        if (exportLaz(file.string(), points[s], intensities[s], timestamps[s]))
+            spdlog::info("saved '{}': {:.3f} .. {:.3f} s, {} points", file.string(), from - origin, to - origin, points[s].size());
+        else
+            spdlog::error("problem with saving file: '{}'", file.string());
+    }
+}
+
 void display()
 {
     ImGuiIO& io = ImGui::GetIO();
@@ -2074,6 +2125,16 @@ void display()
                 ImGui::MenuItem("Skip first file", nullptr, &skip_first_file);
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Drop the points of the first LAZ file on the next load, as step 1 does");
+
+                ImGui::Separator();
+                if (ImGui::MenuItem("Save motionless segments as LAZ", nullptr, false, is_init && !motionless_segments.empty()))
+                {
+                    const std::string folder = mandeye::fd::SelectFolder("Select folder for motionless segments");
+                    if (!folder.empty())
+                        saveMotionlessSegments(folder);
+                }
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                    ImGui::SetTooltip("Write the points of each green 'motionless' band to its own motionless_NNN.laz in a chosen folder");
 
                 ImGui::EndPopup();
             }

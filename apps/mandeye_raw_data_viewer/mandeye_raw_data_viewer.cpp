@@ -1161,15 +1161,33 @@ void loadFiles(std::vector<std::string> input_file_names)
         bool resting = false;
         double rest_start = 0.0, previous_t = 0.0;
 
+        // VQF resets rest detection on any single sample deviating more than restThGyr / restThAcc, so
+        // the per-sample noise of an IMU much faster than SAMPLE_PERIOD (e.g. a 1451 Hz Murata) never lets
+        // it detect rest. Feed VQF a moving average over SAMPLE_PERIOD; at 200 Hz that is a single sample.
+        const size_t vqf_window = std::max<size_t>(1, static_cast<size_t>(std::lround(SAMPLE_PERIOD / avg_dt)));
+        if (vqf_window > 1)
+            spdlog::info("VQF input averaged over {} samples", vqf_window);
+
         int counter = 1;
 
-        for (const auto& [timestamp_pair, gyr, acc] : imu_data)
+        for (size_t i = 0; i < imu_data.size(); i++)
         {
+            const auto& [timestamp_pair, gyr, acc] = imu_data[i];
+
+            const size_t window_begin = i + 1 >= vqf_window ? i + 1 - vqf_window : 0;
+            Eigen::Vector3d gyr_avg = Eigen::Vector3d::Zero();
+            Eigen::Vector3d acc_avg = Eigen::Vector3d::Zero();
+            for (size_t k = window_begin; k <= i; k++)
+            {
+                gyr_avg += std::get<1>(imu_data[k]).cast<double>();
+                acc_avg += std::get<2>(imu_data[k]).cast<double>();
+            }
+            gyr_avg /= static_cast<double>(i + 1 - window_begin);
+            acc_avg /= static_cast<double>(i + 1 - window_begin);
+
             const double g = 9.81;
-            vqf_real_t gyr_vqf[3] = { static_cast<double>(gyr.x()), static_cast<double>(gyr.y()), static_cast<double>(gyr.z()) };
-            vqf_real_t acc_vqf[3] = { static_cast<double>(acc.x()) * g,
-                                      static_cast<double>(acc.y()) * g,
-                                      static_cast<double>(acc.z()) * g };
+            vqf_real_t gyr_vqf[3] = { gyr_avg.x(), gyr_avg.y(), gyr_avg.z() };
+            vqf_real_t acc_vqf[3] = { acc_avg.x() * g, acc_avg.y() * g, acc_avg.z() * g };
 
             vqf.update(gyr_vqf, acc_vqf);
 
@@ -1790,6 +1808,57 @@ static void playbackBar()
     ImGui::End();
 }
 
+//! Writes the points of every motionless segment to `folder`/motionless_NNN.laz, in the LiDAR frame and
+//! with their recorded timestamps.
+static void saveMotionlessSegments(const fs::path& folder)
+{
+    std::vector<std::vector<Eigen::Vector3d>> points(motionless_segments.size());
+    std::vector<std::vector<unsigned short>> intensities(motionless_segments.size());
+    std::vector<std::vector<double>> timestamps(motionless_segments.size());
+
+    // The segments are sorted and disjoint, so a point can only fall into the last one starting before it.
+    for (const auto& file_points : g_points_per_file)
+    {
+        for (const auto& p : file_points)
+        {
+            const auto next = std::upper_bound(
+                motionless_segments.begin(),
+                motionless_segments.end(),
+                p.timestamp,
+                [](double t, const std::pair<double, double>& segment)
+                {
+                    return t < segment.first;
+                });
+            if (next == motionless_segments.begin())
+                continue;
+            const size_t s = static_cast<size_t>(std::distance(motionless_segments.begin(), next)) - 1;
+            if (p.timestamp > motionless_segments[s].second)
+                continue;
+            points[s].push_back(p.point);
+            intensities[s].push_back(static_cast<unsigned short>(p.intensity));
+            timestamps[s].push_back(p.timestamp);
+        }
+    }
+
+    for (size_t s = 0; s < motionless_segments.size(); s++)
+    {
+        const auto [from, to] = motionless_segments[s];
+        std::ostringstream name;
+        name << "motionless_" << std::setw(3) << std::setfill('0') << s << ".laz";
+        const fs::path file = folder / name.str();
+        if (points[s].empty())
+        {
+            spdlog::warn("motionless segment {} has no points, '{}' not written", s, file.string());
+            continue;
+        }
+        const double origin = chunkStartSec(0);
+        if (exportLaz(file.string(), points[s], intensities[s], timestamps[s]))
+            spdlog::info("saved '{}': {:.3f} .. {:.3f} s, {} points", file.string(), from - origin, to - origin, points[s].size());
+        else
+            spdlog::error("problem with saving file: '{}'", file.string());
+    }
+}
+
 void display()
 {
     ImGuiIO& io = ImGui::GetIO();
@@ -2056,6 +2125,16 @@ void display()
                 ImGui::MenuItem("Skip first file", nullptr, &skip_first_file);
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Drop the points of the first LAZ file on the next load, as step 1 does");
+
+                ImGui::Separator();
+                if (ImGui::MenuItem("Save motionless segments as LAZ", nullptr, false, is_init && !motionless_segments.empty()))
+                {
+                    const std::string folder = mandeye::fd::SelectFolder("Select folder for motionless segments");
+                    if (!folder.empty())
+                        saveMotionlessSegments(folder);
+                }
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                    ImGui::SetTooltip("Write the points of each green 'motionless' band to its own motionless_NNN.laz in a chosen folder");
 
                 ImGui::EndPopup();
             }

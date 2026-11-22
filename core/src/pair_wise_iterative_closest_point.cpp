@@ -599,3 +599,284 @@ bool PairWiseICP::compute_fast(
 
     return true;
 }
+
+TaitBryanPose PairWiseICP::compute_icp_uncertainty(
+    const std::vector<Eigen::Vector3d>& source,
+    const std::vector<Eigen::Vector3d>& target,
+    const Eigen::Affine3d& m_pose_result,
+    double search_radious)
+{
+    bool multithread = true;
+    TaitBryanPose icp_uncertainty;
+    icp_uncertainty.px = 0;
+    icp_uncertainty.py = 0;
+    icp_uncertainty.pz = 0;
+    icp_uncertainty.om = 0;
+    icp_uncertainty.fi = 0;
+    icp_uncertainty.ka = 0;
+
+    // The target and the search radius don't change between iterations, so its bucket index is built once.
+    std::vector<std::pair<uint64_t, uint32_t>> indexes;
+
+    for (int i = 0; i < target.size(); i++)
+    {
+        uint64_t index = get_rgd_index_3d(target[i], { search_radious, search_radious, search_radious });
+        indexes.emplace_back(index, i);
+    }
+
+    // Ties broken by point index: std::sort leaves the order within a bucket to the standard library, and the
+    // search below skips each bucket's last point, so without this the result differs between platforms.
+    std::sort(
+        indexes.begin(),
+        indexes.end(),
+        [](const std::pair<uint64_t, uint32_t>& a, const std::pair<uint64_t, uint32_t>& b)
+        {
+            return a.first != b.first ? a.first < b.first : a.second < b.second;
+        });
+
+    std::unordered_map<uint64_t, std::pair<uint32_t, uint32_t>> buckets;
+
+    for (uint32_t i = 0; i < indexes.size(); i++)
+    {
+        uint64_t index_of_bucket = indexes[i].first;
+        if (buckets.contains(index_of_bucket))
+        {
+            buckets[index_of_bucket].second = i;
+        }
+        else
+        {
+            buckets[index_of_bucket].first = i;
+            buckets[index_of_bucket].second = i;
+        }
+    }
+
+    // Target points in bucket order, so a bucket's points are read from contiguous memory.
+    std::vector<Eigen::Vector3d> target_sorted(indexes.size());
+    for (size_t i = 0; i < indexes.size(); i++)
+    {
+        target_sorted[i] = target[indexes[i].second];
+    }
+    const double search_radious_squared = search_radious * search_radious;
+
+    // Normal equations are summed per block of source points, then the blocks in order: no lock per point, and
+    // the same sum on every run and machine.
+    struct NormalEquations
+    {
+        Eigen::Matrix<double, 6, 6> AtPA = Eigen::Matrix<double, 6, 6>::Zero();
+        Eigen::Matrix<double, 6, 1> AtPB = Eigen::Matrix<double, 6, 1>::Zero();
+        int counter_nn = 0;
+    };
+    constexpr size_t number_of_blocks = 256;
+    const size_t block_size = (source.size() + number_of_blocks - 1) / number_of_blocks;
+
+    for (int iter = 0; iter < number_of_iterations; iter++)
+    {
+        std::cout << "iteration: " << iter + 1 << " of: " << number_of_iterations << std::endl;
+        Eigen::MatrixXd AtPA(6, 6);
+        AtPA.setZero();
+        Eigen::MatrixXd AtPB(6, 1);
+        AtPB.setZero();
+        Eigen::Vector3d b(search_radious, search_radious, search_radious);
+
+        const TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(m_pose_result);
+        std::vector<NormalEquations> block_sums(number_of_blocks);
+
+        const auto hessian_fun = [&](const Eigen::Vector3d& source_i, NormalEquations& sum)
+        {
+            if (source_i.norm() < 0.1)
+            {
+                return;
+            }
+
+            Eigen::Vector3d source_point_global = m_pose_result * source_i;
+
+            double min_dist_squared = 1000000000.0;
+            Eigen::Vector3d target_i_nn;
+            bool nn_found = false;
+            for (double x = -search_radious; x <= search_radious; x += search_radious)
+            {
+                for (double y = -search_radious; y <= search_radious; y += search_radious)
+                {
+                    for (double z = -search_radious; z <= search_radious; z += search_radious)
+                    {
+                        Eigen::Vector3d source_point_global_ext = source_point_global + Eigen::Vector3d(x, y, z);
+                        uint64_t index_of_bucket =
+                            get_rgd_index_3d(source_point_global_ext, { search_radious, search_radious, search_radious });
+
+                        const auto bucket = buckets.find(index_of_bucket);
+                        if (bucket != buckets.end())
+                        {
+                            for (int index = bucket->second.first; index <= bucket->second.second; index++)
+                            {
+                                const Eigen::Vector3d& target_i = target_sorted[index];
+                                const double d_squared = (source_point_global - target_i).squaredNorm();
+
+                                if (d_squared < search_radious_squared)
+                                {
+                                    if (d_squared < min_dist_squared)
+                                    {
+                                        min_dist_squared = d_squared;
+                                        nn_found = true;
+                                        target_i_nn = target_i;
+                                    }
+                                    /**/
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (nn_found)
+            {
+                const Eigen::Vector3d& p_s = source_i;
+
+                Eigen::Matrix<double, 6, 6, Eigen::RowMajor> AtPA_;
+                point_to_point_source_to_target_tait_bryan_wc_AtPA_simplified(
+                    AtPA_,
+                    pose_s.px,
+                    pose_s.py,
+                    pose_s.pz,
+                    pose_s.om,
+                    pose_s.fi,
+                    pose_s.ka,
+                    p_s.x(),
+                    p_s.y(),
+                    p_s.z(),
+                    1,
+                    0,
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    0,
+                    1);
+
+                Eigen::Matrix<double, 6, 1> AtPB_;
+                point_to_point_source_to_target_tait_bryan_wc_AtPB_simplified(
+                    AtPB_,
+                    pose_s.px,
+                    pose_s.py,
+                    pose_s.pz,
+                    pose_s.om,
+                    pose_s.fi,
+                    pose_s.ka,
+                    p_s.x(),
+                    p_s.y(),
+                    p_s.z(),
+                    1,
+                    0,
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    0,
+                    1,
+                    target_i_nn.x(),
+                    target_i_nn.y(),
+                    target_i_nn.z());
+
+                sum.AtPA += AtPA_;
+                sum.AtPB -= AtPB_;
+                sum.counter_nn++;
+            }
+        };
+
+        const auto block_fun = [&](NormalEquations& sum)
+        {
+            const size_t block = &sum - block_sums.data();
+            const size_t begin = std::min(source.size(), block * block_size);
+            const size_t end = std::min(source.size(), begin + block_size);
+            for (size_t i = begin; i < end; i++)
+            {
+                hessian_fun(source[i], sum);
+            }
+        };
+
+        if (multithread)
+        {
+            // TBB rather than std::execution, which AppleClang's libc++ doesn't run in parallel.
+            tbb::parallel_for_each(block_sums.begin(), block_sums.end(), block_fun);
+        }
+        else
+        {
+            std::for_each(block_sums.begin(), block_sums.end(), block_fun);
+        }
+
+        int counter_nn = 0;
+        for (const auto& sum : block_sums)
+        {
+            AtPA += sum.AtPA;
+            AtPB += sum.AtPB;
+            counter_nn += sum.counter_nn;
+        }
+
+        if (AtPB(0, 0) == 0.0 && AtPB(1, 0) == 0.0 && AtPB(2, 0) == 0.0 && AtPB(3, 0) == 0.0 && AtPB(4, 0) == 0.0 && AtPB(5, 0) == 0.0)
+        {
+            std::cout
+                << "PairWiseICP::compute FAILED (Relative pose is not changed/solved/optimized --> please consider removing this edge)"
+                << std::endl;
+            return false;
+        }
+
+        if (counter_nn < 100)
+        {
+            std::cout << "not suficient number of observations" << std::endl;
+            std::cout
+                << "PairWiseICP::compute FAILED (Relative pose is not changed/solved/optimized --> please consider removing this edge)"
+                << std::endl;
+            return false;
+        }
+
+        Eigen::SparseMatrix<double> AtPAc(6, 6);
+        Eigen::SparseMatrix<double> AtPBc(6, 1);
+
+        AtPAc = AtPA.sparseView();
+        AtPBc = AtPB.sparseView();
+
+        Eigen::SparseMatrix<double> AtPA_I(6, 6);
+        AtPA_I.setIdentity();
+        AtPA += (AtPA_I * 100);
+
+        Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver(AtPAc);
+        Eigen::SparseMatrix<double> x = solver.solve(AtPBc);
+        std::vector<double> h_x;
+        for (int k = 0; k < x.outerSize(); ++k)
+        {
+            std::cout << "result pose updates" << std::endl;
+            for (Eigen::SparseMatrix<double>::InnerIterator it(x, k); it; ++it)
+            {
+                h_x.push_back(it.value());
+                std::cout << it.row() << " " << it.col() << " " << it.value() << std::endl;
+            }
+        }
+
+        if (h_x.size() == 6)
+        {
+            int counter = 0;
+            TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(m_pose_result);
+
+            pose.px += h_x[counter++];
+            pose.py += h_x[counter++];
+            pose.pz += h_x[counter++];
+            pose.om += h_x[counter++];
+            pose.fi += h_x[counter++];
+            pose.ka += h_x[counter++];
+
+            m_pose_result = affine_matrix_from_pose_tait_bryan(pose);
+            std::cout << "PairWiseICP::compute SUCCESS" << std::endl;
+            // return true;
+        }
+        else
+        {
+            std::cout
+                << "PairWiseICP::compute FAILED (Relative pose is not changed/solved/optimized --> please consider removing this edge)"
+                << std::endl;
+            return false;
+        }
+    }
+
+    return true;
+}

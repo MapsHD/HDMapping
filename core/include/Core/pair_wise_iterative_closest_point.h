@@ -22,4 +22,9 @@ public:
         int number_of_iterations,
         Eigen::Affine3d& m_pose_result,
         int dec);
+    TaitBryanPose compute_icp_uncertainty(
+        const std::vector<Eigen::Vector3d>& source,
+        const std::vector<Eigen::Vector3d>& target,
+        const Eigen::Affine3d& m_pose_result,
+        double search_radious);
 };

@@ -10,6 +10,7 @@
 #include <cmath>
 #include <limits>
 
+#include <python-scripts/point-to-feature-metrics/point_to_plane_tait_bryan_wc_jacobian.h>
 #include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian_simplified.h>
 
 bool PairWiseICP::compute(
@@ -289,19 +290,104 @@ bool PairWiseICP::compute(
 
 namespace
 {
-    //! Standard deviations of the pose parameters (px, py, pz in metres; om, fi, ka in radians) from the point-to-point
-    //! normal matrix AtPA = J^T J (unit weights). Covariance = sigma0^2 * AtPA^-1, where the variance factor
-    //! sigma0^2 = sum of squared residuals / (3 * number_of_correspondences - 6). Returns infinity for every parameter
-    //! when the problem is degenerate (e.g. a corridor or a plane leaves a direction unconstrained).
-    TaitBryanPose compute_icp_uncertainty_from_hessian(
-        const Eigen::Matrix<double, 6, 6>& AtPA, int number_of_correspondences, double sum_squared_residuals)
+    TaitBryanPose infinite_uncertainty()
     {
         constexpr double inf = std::numeric_limits<double>::infinity();
         TaitBryanPose sigma;
         sigma.px = sigma.py = sigma.pz = sigma.om = sigma.fi = sigma.ka = inf;
+        return sigma;
+    }
 
-        // Each correspondence gives 3 observations (x, y, z); the pose has 6 unknowns.
-        const int redundancy = 3 * number_of_correspondences - 6;
+    //! Bucket grid over a target cloud with the cell size equal to the search radius, so every neighbour of a query
+    //! point lies in the 27 cells around it.
+    class TargetGrid
+    {
+    public:
+        TargetGrid(const std::vector<Eigen::Vector3d>& target, double search_radious)
+            : radius(search_radious)
+            , radius_squared(search_radious * search_radious)
+            , cell(search_radious, search_radious, search_radious)
+        {
+            std::vector<std::pair<uint64_t, uint32_t>> indexes;
+            indexes.reserve(target.size());
+            for (uint32_t i = 0; i < target.size(); i++)
+            {
+                indexes.emplace_back(get_rgd_index_3d(target[i], cell), i);
+            }
+            // Ties broken by point index so the order within a bucket is the same on every platform.
+            std::sort(indexes.begin(), indexes.end());
+
+            sorted.resize(indexes.size());
+            for (uint32_t i = 0; i < indexes.size(); i++)
+            {
+                sorted[i] = target[indexes[i].second];
+                const auto [bucket, inserted] = buckets.try_emplace(indexes[i].first, i, i);
+                bucket->second.second = i;
+            }
+        }
+
+        //! Calls f(target_point, squared_distance) for every target point closer to query than the search radius.
+        template<typename F>
+        void for_each_neighbour(const Eigen::Vector3d& query, F&& f) const
+        {
+            for (int dx = -1; dx <= 1; dx++)
+            {
+                for (int dy = -1; dy <= 1; dy++)
+                {
+                    for (int dz = -1; dz <= 1; dz++)
+                    {
+                        const Eigen::Vector3d shifted = query + radius * Eigen::Vector3d(dx, dy, dz);
+                        const auto bucket = buckets.find(get_rgd_index_3d(shifted, cell));
+                        if (bucket == buckets.end())
+                        {
+                            continue;
+                        }
+                        for (uint32_t index = bucket->second.first; index <= bucket->second.second; index++)
+                        {
+                            const double d_squared = (query - sorted[index]).squaredNorm();
+                            if (d_squared < radius_squared)
+                            {
+                                f(sorted[index], d_squared);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+    private:
+        double radius;
+        double radius_squared;
+        Eigen::Vector3d cell;
+        std::vector<Eigen::Vector3d> sorted;
+        std::unordered_map<uint64_t, std::pair<uint32_t, uint32_t>> buckets;
+    };
+
+    //! Standard deviations of the pose parameters (px, py, pz in metres; om, fi, ka in radians) from the normal matrix
+    //! AtPA = J^T J (unit weights). Covariance = sigma0^2 * AtPA^-1, where the variance factor
+    //! sigma0^2 = sum of squared residuals / (number_of_observations - 6). Returns infinity for every parameter
+    //! when the problem is degenerate (e.g. a corridor or a plane leaves a direction unconstrained).
+    void fill_residual_statistics(
+        IcpResidualStatistics* statistics, double sum_squared_residuals, int number_of_correspondences, int number_of_observations)
+    {
+        if (statistics == nullptr)
+        {
+            return;
+        }
+        statistics->sum_squared_residuals = sum_squared_residuals;
+        statistics->number_of_correspondences = number_of_correspondences;
+        statistics->number_of_observations = number_of_observations;
+        statistics->sigma0 = number_of_observations > 6 ? std::sqrt(sum_squared_residuals / (number_of_observations - 6))
+                                                        : std::numeric_limits<double>::quiet_NaN();
+    }
+
+    TaitBryanPose compute_icp_uncertainty_from_hessian(
+        const Eigen::Matrix<double, 6, 6>& AtPA, int number_of_observations, double sum_squared_residuals)
+    {
+        TaitBryanPose sigma = infinite_uncertainty();
+
+        // The pose has 6 unknowns.
+        const int redundancy = number_of_observations - 6;
         if (redundancy <= 0)
         {
             return sigma;
@@ -338,7 +424,8 @@ TaitBryanPose PairWiseICP::compute_icp_uncertainty(
     const std::vector<Eigen::Vector3d>& source,
     const std::vector<Eigen::Vector3d>& target,
     const Eigen::Affine3d& m_pose_result,
-    double search_radious)
+    double search_radious,
+    IcpResidualStatistics* statistics)
 {
     bool multithread = true;
     TaitBryanPose icp_uncertainty;
@@ -449,6 +536,7 @@ TaitBryanPose PairWiseICP::compute_icp_uncertainty(
                             {
                                 if (d_squared < min_dist_squared)
                                 {
+                                    //std::cout << "sqrt_d_squared: " << sqrt(d_squared) << std::endl;
                                     min_dist_squared = d_squared;
                                     nn_found = true;
                                     target_i_nn = target_i;
@@ -523,6 +611,8 @@ TaitBryanPose PairWiseICP::compute_icp_uncertainty(
         sum_squared_residuals += sum.sum_squared_residuals;
         counter_nn += sum.counter_nn;
     }
+    // Each point-to-point correspondence gives 3 observations (x, y, z).
+    fill_residual_statistics(statistics, sum_squared_residuals, counter_nn, 3 * counter_nn);
 
     if (counter_nn < 100)
     {
@@ -553,7 +643,140 @@ TaitBryanPose PairWiseICP::compute_icp_uncertainty(
     make the uncertainty look smaller than it really is. It's fine for comparing edges with each other, but don't read it as an absolute
     error.
     */
-    icp_uncertainty = compute_icp_uncertainty_from_hessian(AtPA, counter_nn, sum_squared_residuals);
+    // Each point-to-point correspondence gives 3 observations (x, y, z).
+    icp_uncertainty = compute_icp_uncertainty_from_hessian(AtPA, 3 * counter_nn, sum_squared_residuals);
 
     return icp_uncertainty;
+}
+
+TaitBryanPose PairWiseICP::compute_icp_uncertainty_point_to_plane(
+    const std::vector<Eigen::Vector3d>& source,
+    const std::vector<Eigen::Vector3d>& target,
+    const Eigen::Affine3d& m_pose_result,
+    double search_radious,
+    IcpResidualStatistics* statistics)
+{
+    // A target neighbourhood is used as a plane only if it has enough points and is flat: smallest eigenvalue of
+    // its covariance at most this fraction of the middle one.
+    constexpr int min_neighbours = 5;
+    constexpr double planarity_threshold = 0.1;
+    constexpr int min_correspondences = 100;
+
+    const TargetGrid grid(target, search_radious);
+    const TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(m_pose_result);
+
+    // Normal equations are summed per block of source points, then the blocks in order: no lock per point, and
+    // the same sum on every run and machine.
+    struct NormalEquations
+    {
+        Eigen::Matrix<double, 6, 6> AtPA = Eigen::Matrix<double, 6, 6>::Zero();
+        double sum_squared_residuals = 0.0;
+        int counter = 0;
+    };
+    constexpr size_t number_of_blocks = 256;
+    const size_t block_size = (source.size() + number_of_blocks - 1) / number_of_blocks;
+    std::vector<NormalEquations> block_sums(number_of_blocks);
+
+    const auto add_observation = [&](const Eigen::Vector3d& source_i, NormalEquations& sum)
+    {
+        if (source_i.norm() < 0.1)
+        {
+            return;
+        }
+        const Eigen::Vector3d source_point_global = m_pose_result * source_i;
+
+        // Plane of the target neighbourhood from running sums (no per-point allocation). The sums are taken relative
+        // to the query point: with large global coordinates (e.g. UTM) E[pp^T] - mean*mean^T would lose all precision.
+        Eigen::Vector3d sum_p = Eigen::Vector3d::Zero();
+        Eigen::Matrix3d sum_ppt = Eigen::Matrix3d::Zero();
+        int k = 0;
+        grid.for_each_neighbour(
+            source_point_global,
+            [&](const Eigen::Vector3d& target_i, double)
+            {
+                const Eigen::Vector3d p = target_i - source_point_global;
+                sum_p += p;
+                sum_ppt += p * p.transpose();
+                k++;
+            });
+        if (k < min_neighbours)
+        {
+            return;
+        }
+        const Eigen::Vector3d mean_relative = sum_p / k;
+        const Eigen::Matrix3d covariance = sum_ppt / k - mean_relative * mean_relative.transpose();
+        const Eigen::Vector3d mean = source_point_global + mean_relative;
+        const Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(covariance);
+        if (eigen_solver.info() != Eigen::Success)
+        {
+            return;
+        }
+        const Eigen::Vector3d& eigenvalues = eigen_solver.eigenvalues(); // ascending
+        if (eigenvalues(0) > planarity_threshold * eigenvalues(1))
+        {
+            return;
+        }
+        const Eigen::Vector3d normal = eigen_solver.eigenvectors().col(0);
+
+        const double residual = -normal.dot(mean_relative);
+
+        Eigen::Matrix<double, 1, 6> j;
+        point_to_plane_tait_bryan_wc_jacobian(
+            j,
+            pose_s.px,
+            pose_s.py,
+            pose_s.pz,
+            pose_s.om,
+            pose_s.fi,
+            pose_s.ka,
+            source_i.x(),
+            source_i.y(),
+            source_i.z(),
+            mean.x(),
+            mean.y(),
+            mean.z(),
+            normal.x(),
+            normal.y(),
+            normal.z());
+
+        sum.AtPA += j.transpose() * j;
+        sum.sum_squared_residuals += residual * residual;
+        sum.counter++;
+    };
+
+    tbb::parallel_for_each(
+        block_sums.begin(),
+        block_sums.end(),
+        [&](NormalEquations& sum)
+        {
+            const size_t block = &sum - block_sums.data();
+            const size_t begin = std::min(source.size(), block * block_size);
+            const size_t end = std::min(source.size(), begin + block_size);
+            for (size_t i = begin; i < end; i++)
+            {
+                add_observation(source[i], sum);
+            }
+        });
+
+    Eigen::Matrix<double, 6, 6> AtPA = Eigen::Matrix<double, 6, 6>::Zero();
+    double sum_squared_residuals = 0.0;
+    int counter = 0;
+    for (const auto& sum : block_sums)
+    {
+        AtPA += sum.AtPA;
+        sum_squared_residuals += sum.sum_squared_residuals;
+        counter += sum.counter;
+    }
+    // Each point-to-plane correspondence gives 1 observation (distance along the normal).
+    fill_residual_statistics(statistics, sum_squared_residuals, counter, counter);
+
+    if (counter < min_correspondences)
+    {
+        std::cout << "PairWiseICP::compute_icp_uncertainty_point_to_plane: not enough planar correspondences (" << counter << ")"
+                  << std::endl;
+        return infinite_uncertainty();
+    }
+
+    // Each point-to-plane correspondence gives 1 observation (distance along the normal).
+    return compute_icp_uncertainty_from_hessian(AtPA, counter, sum_squared_residuals);
 }

@@ -91,6 +91,7 @@ int main(int argc, char* argv[])
     }
 
     std::vector<TaitBryanPose> icp_uncertainties;
+    std::vector<IcpResidualStatistics> icp_residuals;
     std::vector<std::pair<double, double>> node_timestamps; // <lidar_timestamp, unix_timestamp>
     std::vector<Eigen::Vector3d> node_positions;
 
@@ -111,10 +112,24 @@ int main(int argc, char* argv[])
             source_global.emplace_back(m_pose * p);
         }
 
+        //
+        /*std::ofstream csv("source.txt");
+            
+        for (size_t i = 0; i < source_global.size(); i++)
+        {
+            csv <<source_global[i].x() << ',' << source_global[i].y() << ',' << source_global[i].z() << '\n';
+        }
+
+        std::ofstream trg("target.txt");
+            
+        for (size_t i = 0; i < target_global.size(); i++)
+        {
+            trg <<target_global[i].x() << ',' << target_global[i].y() << ',' << target_global[i].z() << '\n';
+        }*/
+        //
+
         for (const auto& n : pointCloud.local_trajectory)
         {
-            // std::cout << "Source Global Point: " << p.transpose() << std::endl;
-
             Eigen::Affine3d m_global = m_pose * n.m_pose;
 
             Eigen::Affine3d m_local = m_global.inverse();
@@ -127,8 +142,10 @@ int main(int argc, char* argv[])
             }
 
             PairWiseICP icp;
+            IcpResidualStatistics residuals;
             TaitBryanPose icp_uncertainty =
-                icp.compute_icp_uncertainty(source_local_for_single_trajectory_node, target_global, m_global, 0.1);
+                icp.compute_icp_uncertainty(source_local_for_single_trajectory_node, target_global, m_global, 0.3, &residuals);
+            //icp.compute_icp_uncertainty_point_to_plane(source_local_for_single_trajectory_node, target_global, m_global, 0.3);
             std::cout << "sigma_px=" << icp_uncertainty.px << ", "
                       << "sigma_py=" << icp_uncertainty.py << ", "
                       << "sigma_pz=" << icp_uncertainty.pz << ", "
@@ -136,7 +153,11 @@ int main(int argc, char* argv[])
                       << "sigma_fi=" << icp_uncertainty.fi << ", "
                       << "sigma_ka=" << icp_uncertainty.ka << std::endl;
 
+
+             //TaitBryanPose icp_uncertainty_alternative_approach =
+
             icp_uncertainties.emplace_back(icp_uncertainty);
+            icp_residuals.emplace_back(residuals);
             node_timestamps.emplace_back(n.timestamps);
             node_positions.emplace_back(m_global.translation());
         }
@@ -150,14 +171,18 @@ int main(int argc, char* argv[])
     }
 
     // Standard deviations: sigma_px/py/pz in metres, sigma_om/fi/ka in radians (inf = pose not constrained).
-    csv << "timestamp_lidar,timestamp_unix,x,y,z,sigma_px,sigma_py,sigma_pz,sigma_om,sigma_fi,sigma_ka\n";
+    // Residuals: sum_squared_residuals in m^2, sigma0 = sqrt(sum_squared_residuals / (observations - 6)) in metres.
+    csv << "timestamp_lidar,timestamp_unix,x,y,z,sigma_px,sigma_py,sigma_pz,sigma_om,sigma_fi,sigma_ka,"
+           "sum_squared_residuals,number_of_correspondences,number_of_observations,sigma0(RMS)\n";
     csv << std::setprecision(std::numeric_limits<double>::max_digits10);
     for (size_t i = 0; i < icp_uncertainties.size(); i++)
     {
         const TaitBryanPose& u = icp_uncertainties[i];
+        const IcpResidualStatistics& r = icp_residuals[i];
         csv << node_timestamps[i].first << ',' << node_timestamps[i].second << ',' << node_positions[i].x() << ',' << node_positions[i].y()
             << ',' << node_positions[i].z() << ',' << u.px << ',' << u.py << ',' << u.pz << ',' << u.om << ',' << u.fi << ',' << u.ka
-            << '\n';
+            << ',' << r.sum_squared_residuals << ',' << r.number_of_correspondences << ',' << r.number_of_observations << ','
+            << r.sigma0 << '\n';
     }
 
     if (!csv)

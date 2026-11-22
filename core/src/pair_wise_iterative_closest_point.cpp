@@ -322,8 +322,7 @@ namespace
 
         const double sigma0_squared = sum_squared_residuals / redundancy;
         const Eigen::Matrix<double, 6, 6>& V = eigen_solver.eigenvectors();
-        const Eigen::Matrix<double, 6, 6> covariance =
-            sigma0_squared * V * eigenvalues.cwiseInverse().asDiagonal() * V.transpose();
+        const Eigen::Matrix<double, 6, 6> covariance = sigma0_squared * V * eigenvalues.cwiseInverse().asDiagonal() * V.transpose();
 
         sigma.px = std::sqrt(covariance(0, 0));
         sigma.py = std::sqrt(covariance(1, 1));
@@ -398,20 +397,19 @@ TaitBryanPose PairWiseICP::compute_icp_uncertainty(
     struct NormalEquations
     {
         Eigen::Matrix<double, 6, 6> AtPA = Eigen::Matrix<double, 6, 6>::Zero();
-        //Eigen::Matrix<double, 6, 1> AtPB = Eigen::Matrix<double, 6, 1>::Zero();
+        // Eigen::Matrix<double, 6, 1> AtPB = Eigen::Matrix<double, 6, 1>::Zero();
         double sum_squared_residuals = 0.0;
         int counter_nn = 0;
     };
     constexpr size_t number_of_blocks = 256;
     const size_t block_size = (source.size() + number_of_blocks - 1) / number_of_blocks;
 
-    
-    //std::cout << "iteration: " << iter + 1 << " of: " << number_of_iterations << std::endl;
+    // std::cout << "iteration: " << iter + 1 << " of: " << number_of_iterations << std::endl;
     Eigen::MatrixXd AtPA(6, 6);
     AtPA.setZero();
-    //Eigen::MatrixXd AtPB(6, 1);
-    //AtPB.setZero();
-    //Eigen::Vector3d b(search_radious, search_radious, search_radious);
+    // Eigen::MatrixXd AtPB(6, 1);
+    // AtPB.setZero();
+    // Eigen::Vector3d b(search_radious, search_radious, search_radious);
 
     const TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(m_pose_result);
 
@@ -469,25 +467,25 @@ TaitBryanPose PairWiseICP::compute_icp_uncertainty(
 
             Eigen::Matrix<double, 6, 6, Eigen::RowMajor> AtPA_;
             point_to_point_source_to_target_tait_bryan_wc_AtPA_simplified(
-                    AtPA_,
-                    pose_s.px,
-                    pose_s.py,
-                    pose_s.pz,
-                    pose_s.om,
-                    pose_s.fi,
-                    pose_s.ka,
-                    p_s.x(),
-                    p_s.y(),
-                    p_s.z(),
-                    1,
-                    0,
-                    0,
-                    0,
-                    1,
-                    0,
-                    0,
-                    0,
-                    1);
+                AtPA_,
+                pose_s.px,
+                pose_s.py,
+                pose_s.pz,
+                pose_s.om,
+                pose_s.fi,
+                pose_s.ka,
+                p_s.x(),
+                p_s.y(),
+                p_s.z(),
+                1,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                1);
 
             sum.AtPA += AtPA_;
             sum.sum_squared_residuals += min_dist_squared;
@@ -521,7 +519,7 @@ TaitBryanPose PairWiseICP::compute_icp_uncertainty(
     for (const auto& sum : block_sums)
     {
         AtPA += sum.AtPA;
-        //AtPB += sum.AtPB;
+        // AtPB += sum.AtPB;
         sum_squared_residuals += sum.sum_squared_residuals;
         counter_nn += sum.counter_nn;
     }
@@ -529,29 +527,31 @@ TaitBryanPose PairWiseICP::compute_icp_uncertainty(
     if (counter_nn < 100)
     {
         std::cout << "not suficient number of observations" << std::endl;
-        std::cout
-            << "PairWiseICP::compute FAILED (Relative pose is not changed/solved/optimized --> please consider removing this edge)"
-            << std::endl;
+        std::cout << "PairWiseICP::compute FAILED (Relative pose is not changed/solved/optimized --> please consider removing this edge)"
+                  << std::endl;
         return icp_uncertainty;
     }
 
     /*
-    Added compute_icp_uncertainty_from_hessian to pair_wise_iterative_closest_point.cpp. 
+    Added compute_icp_uncertainty_from_hessian to pair_wise_iterative_closest_point.cpp.
 
     How it works:
 
-    Covariance: it computes covariance = σ₀² · (AᵀPA)⁻¹ and returns the square root of each diagonal entry as a TaitBryanPose. px/py/pz are in metres and om/fi/ka in radians.
-    Scale factor: σ₀² = sum of squared residuals / (3·n − 6). Each match gives 3 observations and the pose has 6 unknowns.
-    Matrix inverse: it inverts through an eigen decomposition, which shows when the geometry leaves a direction unconstrained (a plane, a corridor). If the smallest eigenvalue is below 1e-12 of the largest, it prints a warning and returns infinity for every parameter.
-    Other changes:
+    Covariance: it computes covariance = σ₀² · (AᵀPA)⁻¹ and returns the square root of each diagonal entry as a TaitBryanPose. px/py/pz are
+    in metres and om/fi/ka in radians. Scale factor: σ₀² = sum of squared residuals / (3·n − 6). Each match gives 3 observations and the
+    pose has 6 unknowns. Matrix inverse: it inverts through an eigen decomposition, which shows when the geometry leaves a direction
+    unconstrained (a plane, a corridor). If the smallest eigenvalue is below 1e-12 of the largest, it prints a warning and returns infinity
+    for every parameter. Other changes:
 
-    Extra parameter: the Hessian only gives the shape of the uncertainty, not its size, so the function needs the residuals too. The call is now compute_icp_uncertainty_from_hessian(AtPA, counter_nn, sum_squared_residuals).
-    Residual sum: NormalEquations gets a sum_squared_residuals field. Each match adds its min_dist_squared, and the block sums are added up alongside AtPA.
-    Includes: added <cmath> and <limits>.
-    Things to check:
+    Extra parameter: the Hessian only gives the shape of the uncertainty, not its size, so the function needs the residuals too. The call is
+    now compute_icp_uncertainty_from_hessian(AtPA, counter_nn, sum_squared_residuals). Residual sum: NormalEquations gets a
+    sum_squared_residuals field. Each match adds its min_dist_squared, and the block sums are added up alongside AtPA. Includes: added
+    <cmath> and <limits>. Things to check:
 
-    Wasted work: hessian_fun still calls point_to_point_source_to_target_tait_bryan_wc_AtPB_simplified for every point and never uses the result. You can delete that call.
-    Over-confident result: neighbouring LiDAR points are correlated, so this formal covariance tends to make the uncertainty look smaller than it really is. It's fine for comparing edges with each other, but don't read it as an absolute error.
+    Wasted work: hessian_fun still calls point_to_point_source_to_target_tait_bryan_wc_AtPB_simplified for every point and never uses the
+    result. You can delete that call. Over-confident result: neighbouring LiDAR points are correlated, so this formal covariance tends to
+    make the uncertainty look smaller than it really is. It's fine for comparing edges with each other, but don't read it as an absolute
+    error.
     */
     icp_uncertainty = compute_icp_uncertainty_from_hessian(AtPA, counter_nn, sum_squared_residuals);
 

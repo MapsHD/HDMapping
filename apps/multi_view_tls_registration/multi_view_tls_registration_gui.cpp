@@ -3771,8 +3771,8 @@ void settings_gui()
         static bool hide_lecacy = true;
         ImGui::Checkbox("Hide legacy functions", &hide_lecacy);
 
-        if(!hide_lecacy){
-
+        if (!hide_lecacy)
+        {
             ImGui::Separator();
             // common_data
             // manual_pose_graph_loop_closure_mode

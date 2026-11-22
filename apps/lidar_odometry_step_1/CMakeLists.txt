@@ -33,8 +33,18 @@ if(WIN32)
     list(APPEND SOURCES "resource.rc")
 endif()
 
+# ROS1 bag / MCAP recordings (bag_source): the rosbags readers. McapWriter.cpp holds the single MCAP_IMPLEMENTATION
+# that McapReader.cpp relies on.
+set(BAG_SOURCES
+  ${REPOSITORY_DIRECTORY}/recording_sources/bag_source.h ${REPOSITORY_DIRECTORY}/recording_sources/bag_source.cpp
+  ${REPOSITORY_DIRECTORY}/recording_sources/bag_source_ui.h ${REPOSITORY_DIRECTORY}/recording_sources/bag_source_ui.cpp
+  ${REPOSITORY_DIRECTORY}/rosbags/McapReader.cpp
+  ${REPOSITORY_DIRECTORY}/rosbags/McapWriter.cpp
+  ${REPOSITORY_DIRECTORY}/rosbags/Ros1Bag.cpp
+)
+
 add_executable(
-  lidar_odometry_step_1 lidar_odometry_gui.cpp ${SOURCES}
+  lidar_odometry_step_1 lidar_odometry_gui.cpp ${SOURCES} ${BAG_SOURCES}
   )
 
 target_compile_definitions(lidar_odometry_step_1 PRIVATE WITH_GUI=1)
@@ -59,11 +69,14 @@ target_include_directories(
           ${LASZIP_INCLUDE_DIR}/LASzip/include
           ${THIRDPARTY_DIRECTORY}/observation_equations/codes
           ${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp
-          ${THIRDPARTY_DIRECTORY}/Fusion/Fusion)
+          ${THIRDPARTY_DIRECTORY}/Fusion/Fusion
+          ${REPOSITORY_DIRECTORY}/rosbags)
 
 target_link_libraries(
           lidar_odometry_step_1
           PRIVATE
+          mcap
+          ros1bag_compression
           step1_run_report
           # core_raylib_utils brings in core_raylib (core, raylib), raylib_widgets and rlImGui.
           core_raylib_utils

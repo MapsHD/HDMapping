@@ -12,6 +12,11 @@ set(SOURCES
   ../lidar_odometry_step_1/points_global_spill.cpp
   ${REPOSITORY_DIRECTORY}/recording_sources/laz_csv_source.cpp
   ${REPOSITORY_DIRECTORY}/recording_sources/raw_cloud_loader.cpp
+  ${REPOSITORY_DIRECTORY}/recording_sources/bag_source.cpp
+  ${REPOSITORY_DIRECTORY}/recording_sources/bag_source_ui.cpp
+  ${REPOSITORY_DIRECTORY}/rosbags/McapReader.cpp
+  ${REPOSITORY_DIRECTORY}/rosbags/McapWriter.cpp
+  ${REPOSITORY_DIRECTORY}/rosbags/Ros1Bag.cpp
 )
 
 # Windows: add resource file
@@ -41,11 +46,14 @@ target_include_directories(
   ${LASZIP_INCLUDE_DIR}/LASzip/include
   ${THIRDPARTY_DIRECTORY}/observation_equations/codes
   ${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp
-  ${THIRDPARTY_DIRECTORY}/Fusion/Fusion)
+  ${THIRDPARTY_DIRECTORY}/Fusion/Fusion
+  ${REPOSITORY_DIRECTORY}/rosbags)
 
 target_link_libraries(
   mandeye_raw_data_viewer
   PRIVATE
+  mcap
+  ros1bag_compression
   step1_run_report
   # core_raylib_utils brings in core_raylib (core, raylib), raylib_widgets and rlImGui.
   core_raylib_utils

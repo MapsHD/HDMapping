@@ -27,6 +27,8 @@
 
 #include "../lidar_odometry_step_1/lidar_odometry.h"
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
+#include "bag_source.h"
+#include "bag_source_ui.h"
 #include <algorithm>
 #include <cmath>
 #include <ctime>
@@ -1034,7 +1036,9 @@ void rebuildAllData(bool preserve_position)
         playback_playing = false;
 }
 
-void loadFiles(std::vector<std::string> input_file_names)
+//! Loads the files of a Mandeye data folder, or the prepared recording when source is set (input_file_names is then
+//! empty).
+void loadFiles(std::vector<std::string> input_file_names, const std::shared_ptr<RecordingSource>& source = nullptr)
 {
     LidarOdometryParams params; // dummy for load_data function
     params.save_calibration_validation = false;
@@ -1047,10 +1051,12 @@ void loadFiles(std::vector<std::string> input_file_names)
     Imu imu_data;
 
     // no files selected, quit loading
-    if (input_file_names.empty())
+    if (input_file_names.empty() && !source)
         return;
 
-    if (load_data(input_file_names, params, pointsPerFile, imu_data, false, file_spans))
+    const bool loaded = source ? load_data(source, params, pointsPerFile, imu_data, file_spans)
+                               : load_data(input_file_names, params, pointsPerFile, imu_data, false, file_spans);
+    if (loaded)
     {
         // clear possible previous data
 
@@ -1121,6 +1127,11 @@ void loadFiles(std::vector<std::string> input_file_names)
                 }
             }
         }
+
+        // a recording's chunks have no files of their own: name them as load_data did
+        if (source)
+            for (const auto& span : file_spans.laz)
+                laz_files.push_back(span.file);
 
         // rest of RAW data viewer processing
 
@@ -1292,9 +1303,17 @@ void openFolder()
     loadFiles(input_file_names);
 }
 
-//! Drag and drop: dropped folders load like "Open folder", dropped files like "Open files".
+void openBag(const std::string& file = "");
+
+//! Drag and drop: dropped folders load like "Open folder", dropped files like "Open files",
+//! a single dropped ROS1 bag or MCAP file opens its window.
 void openDropped(const std::vector<std::string>& paths)
 {
+    if (paths.size() == 1 && is_bag_file(paths.front()) && fs::is_regular_file(paths.front()))
+    {
+        openBag(paths.front());
+        return;
+    }
     std::vector<std::string> input_file_names;
     for (const auto& path : paths)
     {
@@ -1313,6 +1332,45 @@ void openFiles()
     std::vector<std::string> input_file_names = mandeye::fd::OpenFileDialog("Load all files", mandeye::fd::All_Filter, true);
 
     loadFiles(input_file_names);
+}
+
+std::unique_ptr<BagSourceConfigUi> bag_config_ui; //!< the open ROS bag / MCAP window, if any
+std::string bag_open_error;
+
+//! Opens the window that configures a ROS1 bag or MCAP file; asks for the file when none is given.
+void openBag(const std::string& file)
+{
+    std::string path = file;
+    if (path.empty())
+    {
+        const auto files = mandeye::fd::OpenFileDialog("Select ROS1 bag or MCAP file", mandeye::fd::Bag_filter, false);
+        if (files.empty())
+            return;
+        path = files.front();
+    }
+    bag_open_error.clear();
+    bag_config_ui = std::make_unique<BagSourceConfigUi>(path);
+}
+
+//! Window with the topic choice of the selected bag; Open loads it.
+void bag_source_window()
+{
+    bool open = true;
+    ImGui::Begin("Open ROS bag / MCAP", &open, ImGuiWindowFlags_AlwaysAutoResize);
+    if (bag_config_ui->draw())
+    {
+        const auto source = open_bag_source(bag_config_ui->config(), bag_open_error);
+        if (source)
+        {
+            loadFiles({}, source);
+            open = false;
+        }
+    }
+    if (!bag_open_error.empty())
+        ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", bag_open_error.c_str());
+    ImGui::End();
+    if (!open)
+        bag_config_ui.reset();
 }
 
 void imu_data_gui()
@@ -2122,6 +2180,11 @@ void display()
                     openFiles();
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Select files for analyze");
+                if (ImGui::MenuItem("Open ROS bag / MCAP"))
+                    openBag();
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(
+                        "Select a ROS1 bag (*.bag) or an MCAP file (*.mcap) and choose its topics, or drop the file on the window");
                 ImGui::MenuItem("Skip first file", nullptr, &skip_first_file);
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Drop the points of the first LAZ file on the next load, as step 1 does");
@@ -2295,6 +2358,9 @@ void display()
 
     if (is_settings_gui)
         settings_gui();
+
+    if (bag_config_ui)
+        bag_source_window();
 
     rlImGuiEnd();
 }

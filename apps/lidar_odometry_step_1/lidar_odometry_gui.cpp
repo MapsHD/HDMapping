@@ -15,6 +15,8 @@
 #undef ShowCursor
 #endif
 
+#include "bag_source.h"
+#include "bag_source_ui.h"
 #include "lidar_odometry.h"
 #include "lidar_odometry_utils.h"
 #include "render_cache.h"
@@ -204,6 +206,9 @@ bool pipelinePending = false;
 bool pendingCompute = true, pendingSave = true;
 std::string pendingFolder;
 void startPipeline(const std::string& folder, bool compute, bool save);
+std::shared_ptr<RecordingSource> pending_recording; //!< set with startPipeline; step1() loads it instead of the folder
+std::unique_ptr<BagSourceConfigUi> bag_config_ui; //!< the open ROS bag / MCAP window, if any
+std::string bag_open_error;
 
 static void resources_gui()
 {
@@ -696,20 +701,35 @@ void step1(const std::string& input_folder_name, const std::atomic<bool>& loPaus
 {
     trajectory_points_dirty = true;
     std::vector<std::string> input_file_names;
+    // a recording prepared in the ROS bag / MCAP window is loaded instead of the folder's files
+    const std::shared_ptr<RecordingSource> recording = std::exchange(pending_recording, nullptr);
 
     std::cout << "Selected folder: '" << input_folder_name << std::endl;
 
-    if (fs::exists(input_folder_name))
+    if (recording || fs::exists(input_folder_name))
     {
-        RunReport::Scope discovery(params.run_report.get(), RunReport::Stage::Loading);
-        for (const auto& entry : fs::directory_iterator(input_folder_name))
-            if (entry.is_regular_file())
-                input_file_names.push_back(entry.path().string());
-
-        discovery.finish();
-        if (load_data(input_file_names, params, pointsPerFile, imu_data, full_debug_messages))
+        bool loaded = false;
+        if (recording)
         {
-            working_directory = fs::path(input_file_names[0]).parent_path().string();
+            InputFileSpans spans;
+            loaded = load_data(recording, params, pointsPerFile, imu_data, spans);
+            if (loaded)
+                working_directory = recording->workingDirectory().string();
+        }
+        else
+        {
+            RunReport::Scope discovery(params.run_report.get(), RunReport::Stage::Loading);
+            for (const auto& entry : fs::directory_iterator(input_folder_name))
+                if (entry.is_regular_file())
+                    input_file_names.push_back(entry.path().string());
+
+            discovery.finish();
+            loaded = load_data(input_file_names, params, pointsPerFile, imu_data, full_debug_messages);
+            if (loaded)
+                working_directory = fs::path(input_file_names[0]).parent_path().string();
+        }
+        if (loaded)
+        {
             calculate_trajectory(trajectory, imu_data, params, full_debug_messages);
             if (compute_step_1(pointsPerFile, params, trajectory, worker_data, loPause))
             {
@@ -1885,6 +1905,43 @@ void startPipeline(const std::string& folder, bool compute, bool save)
     pipelinePending = true;
 }
 
+//! Opens the window that configures a ROS1 bag or MCAP file; asks for the file when none is given.
+void openBag(const std::string& file = "")
+{
+    std::string path = file;
+    if (path.empty())
+    {
+        const auto files = mandeye::fd::OpenFileDialog("Select ROS1 bag or MCAP file", mandeye::fd::Bag_filter, false);
+        if (files.empty())
+            return;
+        path = files.front();
+    }
+    bag_open_error.clear();
+    bag_config_ui = std::make_unique<BagSourceConfigUi>(path);
+}
+
+//! Window with the topic choice of the selected bag; Open loads it and starts processing.
+static void bag_source_window()
+{
+    bool open = true;
+    ImGui::Begin("Open ROS bag / MCAP", &open, ImGuiWindowFlags_AlwaysAutoResize);
+    if (bag_config_ui->draw())
+    {
+        auto source = open_bag_source(bag_config_ui->config(), bag_open_error);
+        if (source)
+        {
+            pending_recording = std::move(source);
+            startPipeline(pending_recording->workingDirectory().string(), true, true);
+            open = false;
+        }
+    }
+    if (!bag_open_error.empty())
+        ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", bag_open_error.c_str());
+    ImGui::End();
+    if (!open)
+        bag_config_ui.reset();
+}
+
 static void launchPipeline(const std::string& folder, bool compute, bool save)
 {
     if (loRunning)
@@ -1999,23 +2056,49 @@ bool step1(
     std::vector<WorkerData>& worker_data,
     const std::atomic<bool>& loPause)
 {
-    params.run_report = std::make_shared<RunReport>(folder, params.points_global_spill_directory, "cli");
+    // a ROS1 bag or MCAP file is read with its only lidar and IMU topics (the GUI lets the user choose)
+    const bool bag = is_bag_file(folder) && fs::is_regular_file(folder);
+    params.run_report =
+        std::make_shared<RunReport>(bag ? fs::path(folder).parent_path() : fs::path(folder), params.points_global_spill_directory, "cli");
     std::vector<std::string> input_file_names;
     RunReport::Scope discovery(params.run_report.get(), RunReport::Stage::Loading);
 
-    for (const auto& entry : fs::directory_iterator(folder))
+    bool loaded = false;
+    if (bag)
     {
-        if (!entry.is_directory())
+        BagSourceConfig config;
+        config.file = folder;
+        std::string error;
+        const auto source = open_bag_source(config, error);
+        discovery.finish();
+        if (!source)
         {
-            std::cout << entry.path() << std::endl;
-            input_file_names.push_back(entry.path().string());
+            std::cerr << "Cannot read '" << folder << "': " << error << std::endl;
+            return false;
         }
+        InputFileSpans spans;
+        loaded = load_data(source, params, pointsPerFile, imu_data, spans);
+        if (loaded)
+            working_directory = source->workingDirectory().string();
     }
-
-    discovery.finish();
-    if (load_data(input_file_names, params, pointsPerFile, imu_data, full_debug_messages))
+    else
     {
-        working_directory = fs::path(input_file_names[0]).parent_path().string();
+        for (const auto& entry : fs::directory_iterator(folder))
+        {
+            if (!entry.is_directory())
+            {
+                std::cout << entry.path() << std::endl;
+                input_file_names.push_back(entry.path().string());
+            }
+        }
+
+        discovery.finish();
+        loaded = load_data(input_file_names, params, pointsPerFile, imu_data, full_debug_messages);
+        if (loaded)
+            working_directory = fs::path(input_file_names[0]).parent_path().string();
+    }
+    if (loaded)
+    {
         calculate_trajectory(trajectory, imu_data, params, full_debug_messages);
         if (!compute_step_1(pointsPerFile, params, trajectory, worker_data, loPause))
             return false;
@@ -2343,9 +2426,12 @@ void display()
 
     view_kbd_shortcuts();
 
-    // Drag and drop: a Mandeye data folder, or any file in one, is processed like "Load & process scanning".
+    // Drag and drop: a Mandeye data folder, or any file in one, is processed like "Load & process scanning";
+    // a ROS1 bag or MCAP file opens its window first.
     const auto dropped = takeDroppedFiles();
-    if (!dropped.empty() && !loRunning && !pipelinePending)
+    if (!dropped.empty() && !loRunning && !pipelinePending && is_bag_file(dropped[0]) && fs::is_regular_file(dropped[0]))
+        openBag(dropped[0]);
+    else if (!dropped.empty() && !loRunning && !pipelinePending)
     {
         fs::path folder(dropped[0]);
         if (!fs::is_directory(folder))
@@ -2564,6 +2650,12 @@ void display()
                     "Select folder from where to load data and start processing (" SHORTCUT_CTRL "+O), or drop the folder on the window");
 
             ImGui::SameLine();
+            if (ImGui::Button("Load & process ROS bag / MCAP"))
+                openBag();
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Select a ROS1 bag (*.bag) or an MCAP file (*.mcap), choose its topics and start processing");
+
+            ImGui::SameLine();
             ImGui::Dummy(ImVec2(20, 0));
             ImGui::SameLine();
 
@@ -2731,6 +2823,9 @@ void display()
         settings_gui();
     }
 
+    if (!loRunning && bag_config_ui)
+        bag_source_window();
+
     if (loRunning)
         progress_window();
 
@@ -2790,7 +2885,8 @@ int main(int argc, char* argv[])
                       << std::filesystem::path(argv[0]).stem().string() << " <input_folder>\n"
                       << std::filesystem::path(argv[0]).stem().string() << " --dump-default-params <file.toml>\n\n"
                       << "where\n"
-                      << "   <input_folder>       Path where scan files are located (*.csv, *.laz, *.sn)\n"
+                      << "   <input_folder>       Path where scan files are located (*.csv, *.laz, *.sn), or a ROS1 bag\n"
+                      << "                        (*.bag) / MCAP file (*.mcap) with one lidar and one IMU topic\n"
                       << "   <parameter_file>     Path to TOML parameter file (*.toml)\n"
                       << "   <output_folder>      Path where processed session should be stored\n"
                       << "                        (with <input_folder> alone, default parameters are used and the\n"
@@ -2833,8 +2929,10 @@ int main(int argc, char* argv[])
         if (argc == 2) // running from command line
         {
             auto path = fs::path(argv[1]);
-            if (is_directory(path))
+            if (is_directory(path) || (is_bag_file(path) && fs::is_regular_file(path)))
             {
+                // results and failure reports go next to a bag file, or into the data folder
+                const fs::path input_dir = is_directory(path) ? path : path.parent_path();
                 std::string working_directory;
                 std::vector<WorkerData> worker_data;
 
@@ -2846,7 +2944,7 @@ int main(int argc, char* argv[])
                     !step2(worker_data, params, loPause))
                 {
                     std::cerr << "Lidar odometry failed: no point-cloud results saved" << std::endl;
-                    save_failed_run_report(params, get_next_result_path(path.string()), "Loading/preparation/odometry failed");
+                    save_failed_run_report(params, get_next_result_path(input_dir.string()), "Loading/preparation/odometry failed");
                     remove_cache(params);
                     return 1;
                 }

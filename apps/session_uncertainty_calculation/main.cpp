@@ -5,7 +5,10 @@
 #include <algorithm>
 #include <cctype>
 #include <filesystem>
+#include <fstream>
+#include <iomanip>
 #include <iostream>
+#include <limits>
 #include <string>
 
 int main(int argc, char* argv[])
@@ -86,6 +89,10 @@ int main(int argc, char* argv[])
         target_global.emplace_back(p.point);
     }
 
+    std::vector<TaitBryanPose> icp_uncertainties;
+    std::vector<std::pair<double, double>> node_timestamps; // <lidar_timestamp, unix_timestamp>
+    std::vector<Eigen::Vector3d> node_positions;
+
     for(const auto& pointCloud : session.point_clouds_container.point_clouds){
         std::vector<Eigen::Vector3d> source_local;
         for(const auto& p : pointCloud.points_local){
@@ -94,75 +101,65 @@ int main(int argc, char* argv[])
 
         Eigen::Affine3d m_pose = pointCloud.m_pose;
 
-        PairWiseICP icp;
-        icp.compute(source_local, target_global, 0.1, 1, m_pose);
+        std::vector<Eigen::Vector3d> source_global;
+
+        for(const auto& p : source_local){
+            source_global.emplace_back(m_pose * p);
+        }
+
+        for(const auto& n:pointCloud.local_trajectory){
+            //std::cout << "Source Global Point: " << p.transpose() << std::endl;
+
+            Eigen::Affine3d m_global = m_pose * n.m_pose;
+
+            Eigen::Affine3d m_local = m_global.inverse();
+
+            std::vector<Eigen::Vector3d> source_local_for_single_trajectory_node;
+
+            for(const auto& p : source_global){
+                source_local_for_single_trajectory_node.emplace_back(m_local * p);
+            }
+
+            PairWiseICP icp;
+            TaitBryanPose icp_uncertainty = icp.compute_icp_uncertainty(source_local_for_single_trajectory_node, target_global, m_global, 0.1);
+            std::cout << "px=" << icp_uncertainty.px << ", "
+                    << "py=" << icp_uncertainty.py << ", "
+                    << "pz=" << icp_uncertainty.pz << ", "
+                    << "om=" << icp_uncertainty.om << ", "
+                    << "fi=" << icp_uncertainty.fi << ", "
+                    << "ka=" << icp_uncertainty.ka
+                    << std::endl;
+
+            icp_uncertainties.emplace_back(icp_uncertainty);
+            node_timestamps.emplace_back(n.timestamps);
+            node_positions.emplace_back(m_global.translation());
+        }
     }
 
+    std::ofstream csv(outputFile);
+    if (!csv)
+    {
+        std::cerr << "Failed to open output file: " << outputFile.string() << std::endl;
+        return 1;
+    }
 
+    // Standard deviations: sigma_px/py/pz in metres, sigma_om/fi/ka in radians (inf = pose not constrained).
+    csv << "timestamp_lidar,timestamp_unix,x,y,z,sigma_px,sigma_py,sigma_pz,sigma_om,sigma_fi,sigma_ka\n";
+    csv << std::setprecision(std::numeric_limits<double>::max_digits10);
+    for (size_t i = 0; i < icp_uncertainties.size(); i++)
+    {
+        const TaitBryanPose& u = icp_uncertainties[i];
+        csv << node_timestamps[i].first << ',' << node_timestamps[i].second << ',' << node_positions[i].x() << ','
+            << node_positions[i].y() << ',' << node_positions[i].z() << ',' << u.px << ',' << u.py << ',' << u.pz << ','
+            << u.om << ',' << u.fi << ',' << u.ka << '\n';
+    }
 
-        // session.
+    if (!csv)
+    {
+        std::cerr << "Failed to write output file: " << outputFile.string() << std::endl;
+        return 1;
+    }
+    std::cout << "Saved " << icp_uncertainties.size() << " node uncertainties to " << outputFile.string() << std::endl;
 
-        /*PairWiseICP icp;
-        auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-        // std::vector<Eigen::Vector3d> source = point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
-        // std::vector<Eigen::Vector3d> target = point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
-
-        ////////////////////////////////
-        std::vector<Eigen::Vector3d> source;
-        auto& e = edges[index_active_edge];
-        for (int i = -num_edge_extended_before; i <= num_edge_extended_after; i++)
-        {
-            int index_src = e.index_to + i;
-            if (index_src >= 0 && index_src < point_clouds_container.point_clouds.size())
-            {
-                Eigen::Affine3d m_src = point_clouds_container.point_clouds.at(index_src).m_pose;
-                for (int k = 0; k < point_clouds_container.point_clouds[index_src].points_local.size(); k++)
-                {
-                    Eigen::Vector3d p_g = m_src * point_clouds_container.point_clouds[index_src].points_local[k];
-                    source.push_back(p_g);
-                }
-                // point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
-            }
-        }
-        std::vector<Eigen::Vector3d> target;
-
-        for (int i = -num_edge_extended_before; i <= num_edge_extended_after; i++)
-        {
-            int index_trg = e.index_from + i;
-            if (index_trg >= 0 && index_trg < point_clouds_container.point_clouds.size())
-            {
-                Eigen::Affine3d m_trg = point_clouds_container.point_clouds.at(index_trg).m_pose;
-                for (int k = 0; k < point_clouds_container.point_clouds[index_trg].points_local.size(); k++)
-                {
-                    Eigen::Vector3d p_g = m_trg * point_clouds_container.point_clouds[index_trg].points_local[k];
-                    target.push_back(p_g);
-                }
-                // point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
-            }
-        }
-
-        Eigen::Affine3d m_src_inv = point_clouds_container.point_clouds[e.index_to].m_pose.inverse();
-
-        for (auto& p : source)
-        {
-            p = m_src_inv * p;
-        }
-
-        Eigen::Affine3d m_trg_inv = point_clouds_container.point_clouds[e.index_from].m_pose.inverse();
-
-        for (auto& p : target)
-        {
-            p = m_trg_inv * p;
-        }
-        ////////////////////////////////
-
-        if (icp.compute(source, target, search_radius, number_of_iterations, m_pose))
-        {
-            edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
-            return true;
-        }*/
-
-        //////////////////////////////////////////////////////////////////////////////////////////
-
-        return 0;
+    return 0;
 }

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <Core/structures.h>
+
 #include <Eigen/Eigen>
 #include <vector>
 

@@ -3768,184 +3768,190 @@ void settings_gui()
             ImGui::SetTooltip(zText);
         ImGui::PopItemWidth();
 
-        ImGui::Separator();
-        // common_data
-        // manual_pose_graph_loop_closure_mode
+        static bool hide_lecacy = true;
+        ImGui::Checkbox("Hide legacy functions", &hide_lecacy);
 
-        if (ImGui::Button("Load RESSO file (transformation_GroundTruth.reg)"))
-        {
-            std::string input_file_name = "";
-            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load RESSO", mandeye::fd::Resso_filter);
-            spdlog::info("RESSO file: '{}'", input_file_name);
+        if(!hide_lecacy){
 
-            if (input_file_name.size() > 0)
+            ImGui::Separator();
+            // common_data
+            // manual_pose_graph_loop_closure_mode
+
+            if (ImGui::Button("Load RESSO file (transformation_GroundTruth.reg)"))
             {
-                session.working_directory = fs::path(input_file_name).parent_path().string();
+                std::string input_file_name = "";
+                input_file_name = mandeye::fd::OpenFileDialogOneFile("Load RESSO", mandeye::fd::Resso_filter);
+                spdlog::info("RESSO file: '{}'", input_file_name);
 
-                if (!session.point_clouds_container.load(
-                        session.working_directory.c_str(),
-                        input_file_name.c_str(),
-                        tls_registration.is_decimate,
-                        tls_registration.bucket_x,
-                        tls_registration.bucket_y,
-                        tls_registration.bucket_z,
-                        session.load_cache_mode))
+                if (input_file_name.size() > 0)
                 {
-                    spdlog::error("Error loading file!");
-                    return;
-                }
-                else
-                    spdlog::info("Loaded: {} point_clouds", session.point_clouds_container.point_clouds.size());
-            }
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Save RESSO file"))
-        {
-            const auto output_file_name = mandeye::fd::SaveFileDialog("Save RESSO file", mandeye::fd::Resso_filter);
-            spdlog::info("RESSO file to save: '{}'", output_file_name);
-            if (output_file_name.size() > 0)
-                session.point_clouds_container.save_poses(fs::path(output_file_name).string(), false);
-        }
-        ImGui::Text("RESSO dataset: ");
-        ImGui::SameLine();
-        ImGuiHyperlink("https://3d.bk.tudelft.nl/liangliang/publications/2019/plade/resso.html");
+                    session.working_directory = fs::path(input_file_name).parent_path().string();
 
-        ImGui::NewLine();
-
-        if (ImGui::Button("Load ETH file (pairs.txt)"))
-        {
-            std::string input_file_name = "";
-            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load ETH file", {});
-            if (input_file_name.size() > 0)
-            {
-                session.working_directory = fs::path(input_file_name).parent_path().string();
-
-                if (!session.point_clouds_container.load_eth(
-                        session.working_directory.c_str(),
-                        input_file_name.c_str(),
-                        tls_registration.is_decimate,
-                        tls_registration.bucket_x,
-                        tls_registration.bucket_y,
-                        tls_registration.bucket_z))
-                {
-                    spdlog::error("Error loading file!");
-                    return;
-                }
-                else
-                    spdlog::info("Loaded: {} point_clouds", session.point_clouds_container.point_clouds.size());
-            }
-        }
-        ImGui::Text("ETH dataset: ");
-        ImGui::SameLine();
-        ImGuiHyperlink("https://prs.igp.ethz.ch/research/completed_projects/automatic_registration_of_point_clouds.html");
-
-        ImGui::NewLine();
-
-        if (ImGui::Button("Load 3DTK files (select all *.txt files)"))
-        {
-            session.point_clouds_container.point_clouds.clear();
-            std::vector<std::string> input_file_names;
-            input_file_names = mandeye::fd::OpenFileDialog("Load txt files", {}, true);
-
-            if (input_file_names.size() > 0)
-            {
-                session.working_directory = fs::path(input_file_names[0]).parent_path().string();
-
-                spdlog::info("TXT files:");
-                for (size_t i = 0; i < input_file_names.size(); i++)
-                    spdlog::info("{}", input_file_names[i]);
-
-                if (!session.point_clouds_container.load_3DTK_tls(
-                        input_file_names,
-                        tls_registration.is_decimate,
-                        tls_registration.bucket_x,
-                        tls_registration.bucket_y,
-                        tls_registration.bucket_z))
-                {
-                    spdlog::error("Error loading file!");
-                    return;
-                }
-                else
-                    spdlog::info("Loaded: {} point_clouds", session.point_clouds_container.point_clouds.size());
-            }
-        }
-        ImGui::Text("3DTK dataset (18: the campus of the Jacobs University Bremen)");
-        ImGui::SameLine();
-        ImGuiHyperlink("http://kos.informatik.uni-osnabrueck.de/3Dscans/");
-
-        ImGui::NewLine();
-
-        if (ImGui::Button("Update initial poses from RESSO file"))
-        {
-            std::string input_file_name;
-            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load RESSO file", {});
-            if (input_file_name.size() > 0)
-            {
-                session.working_directory = fs::path(input_file_name).parent_path().string();
-
-                if (!session.point_clouds_container.update_initial_poses_from_RESSO(
-                        session.working_directory.c_str(), input_file_name.c_str()))
-                {
-                    spdlog::error("Error loading file!");
-                    return;
-                }
-                else
-                {
-                    session.point_clouds_container.initial_poses_file_name = input_file_name;
-                    spdlog::info("Updated: {} point_clouds", session.point_clouds_container.point_clouds.size());
+                    if (!session.point_clouds_container.load(
+                            session.working_directory.c_str(),
+                            input_file_name.c_str(),
+                            tls_registration.is_decimate,
+                            tls_registration.bucket_x,
+                            tls_registration.bucket_y,
+                            tls_registration.bucket_z,
+                            session.load_cache_mode))
+                    {
+                        spdlog::error("Error loading file!");
+                        return;
+                    }
+                    else
+                        spdlog::info("Loaded: {} point_clouds", session.point_clouds_container.point_clouds.size());
                 }
             }
-        }
-        ImGui::SameLine();
-        ImGui::Text(session.point_clouds_container.initial_poses_file_name.c_str());
-
-        if (ImGui::Button("Update poses from RESSO file"))
-        {
-            std::string input_file_name;
-            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load RESSO file", {});
-
-            if (input_file_name.size() > 0)
+            ImGui::SameLine();
+            if (ImGui::Button("Save RESSO file"))
             {
-                session.working_directory = fs::path(input_file_name).parent_path().string();
+                const auto output_file_name = mandeye::fd::SaveFileDialog("Save RESSO file", mandeye::fd::Resso_filter);
+                spdlog::info("RESSO file to save: '{}'", output_file_name);
+                if (output_file_name.size() > 0)
+                    session.point_clouds_container.save_poses(fs::path(output_file_name).string(), false);
+            }
+            ImGui::Text("RESSO dataset: ");
+            ImGui::SameLine();
+            ImGuiHyperlink("https://3d.bk.tudelft.nl/liangliang/publications/2019/plade/resso.html");
 
-                if (!session.point_clouds_container.update_poses_from_RESSO(session.working_directory.c_str(), input_file_name.c_str()))
+            ImGui::NewLine();
+
+            if (ImGui::Button("Load ETH file (pairs.txt)"))
+            {
+                std::string input_file_name = "";
+                input_file_name = mandeye::fd::OpenFileDialogOneFile("Load ETH file", {});
+                if (input_file_name.size() > 0)
                 {
-                    spdlog::error("Error loading file!");
-                    return;
-                }
-                else
-                {
-                    spdlog::info("Updated: {} point_clouds", session.point_clouds_container.point_clouds.size());
-                    session.point_clouds_container.poses_file_name = input_file_name;
+                    session.working_directory = fs::path(input_file_name).parent_path().string();
+
+                    if (!session.point_clouds_container.load_eth(
+                            session.working_directory.c_str(),
+                            input_file_name.c_str(),
+                            tls_registration.is_decimate,
+                            tls_registration.bucket_x,
+                            tls_registration.bucket_y,
+                            tls_registration.bucket_z))
+                    {
+                        spdlog::error("Error loading file!");
+                        return;
+                    }
+                    else
+                        spdlog::info("Loaded: {} point_clouds", session.point_clouds_container.point_clouds.size());
                 }
             }
-        }
-        ImGui::SameLine();
+            ImGui::Text("ETH dataset: ");
+            ImGui::SameLine();
+            ImGuiHyperlink("https://prs.igp.ethz.ch/research/completed_projects/automatic_registration_of_point_clouds.html");
 
-        if (ImGui::Button("Update poses from RESSO file (inverse)"))
-        {
-            std::string input_file_name;
-            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load RESSO file", {});
+            ImGui::NewLine();
 
-            if (input_file_name.size() > 0)
+            if (ImGui::Button("Load 3DTK files (select all *.txt files)"))
             {
-                session.working_directory = fs::path(input_file_name).parent_path().string();
+                session.point_clouds_container.point_clouds.clear();
+                std::vector<std::string> input_file_names;
+                input_file_names = mandeye::fd::OpenFileDialog("Load txt files", {}, true);
 
-                if (!session.point_clouds_container.update_poses_from_RESSO_inverse(
-                        session.working_directory.c_str(), input_file_name.c_str()))
+                if (input_file_names.size() > 0)
                 {
-                    spdlog::error("Error loading file!");
-                    return;
-                }
-                else
-                {
-                    spdlog::info("Updated: {} point_clouds", session.point_clouds_container.point_clouds.size());
-                    session.point_clouds_container.poses_file_name = input_file_name;
+                    session.working_directory = fs::path(input_file_names[0]).parent_path().string();
+
+                    spdlog::info("TXT files:");
+                    for (size_t i = 0; i < input_file_names.size(); i++)
+                        spdlog::info("{}", input_file_names[i]);
+
+                    if (!session.point_clouds_container.load_3DTK_tls(
+                            input_file_names,
+                            tls_registration.is_decimate,
+                            tls_registration.bucket_x,
+                            tls_registration.bucket_y,
+                            tls_registration.bucket_z))
+                    {
+                        spdlog::error("Error loading file!");
+                        return;
+                    }
+                    else
+                        spdlog::info("Loaded: {} point_clouds", session.point_clouds_container.point_clouds.size());
                 }
             }
+            ImGui::Text("3DTK dataset (18: the campus of the Jacobs University Bremen)");
+            ImGui::SameLine();
+            ImGuiHyperlink("http://kos.informatik.uni-osnabrueck.de/3Dscans/");
+
+            ImGui::NewLine();
+
+            if (ImGui::Button("Update initial poses from RESSO file"))
+            {
+                std::string input_file_name;
+                input_file_name = mandeye::fd::OpenFileDialogOneFile("Load RESSO file", {});
+                if (input_file_name.size() > 0)
+                {
+                    session.working_directory = fs::path(input_file_name).parent_path().string();
+
+                    if (!session.point_clouds_container.update_initial_poses_from_RESSO(
+                            session.working_directory.c_str(), input_file_name.c_str()))
+                    {
+                        spdlog::error("Error loading file!");
+                        return;
+                    }
+                    else
+                    {
+                        session.point_clouds_container.initial_poses_file_name = input_file_name;
+                        spdlog::info("Updated: {} point_clouds", session.point_clouds_container.point_clouds.size());
+                    }
+                }
+            }
+            ImGui::SameLine();
+            ImGui::Text(session.point_clouds_container.initial_poses_file_name.c_str());
+
+            if (ImGui::Button("Update poses from RESSO file"))
+            {
+                std::string input_file_name;
+                input_file_name = mandeye::fd::OpenFileDialogOneFile("Load RESSO file", {});
+
+                if (input_file_name.size() > 0)
+                {
+                    session.working_directory = fs::path(input_file_name).parent_path().string();
+
+                    if (!session.point_clouds_container.update_poses_from_RESSO(session.working_directory.c_str(), input_file_name.c_str()))
+                    {
+                        spdlog::error("Error loading file!");
+                        return;
+                    }
+                    else
+                    {
+                        spdlog::info("Updated: {} point_clouds", session.point_clouds_container.point_clouds.size());
+                        session.point_clouds_container.poses_file_name = input_file_name;
+                    }
+                }
+            }
+            ImGui::SameLine();
+
+            if (ImGui::Button("Update poses from RESSO file (inverse)"))
+            {
+                std::string input_file_name;
+                input_file_name = mandeye::fd::OpenFileDialogOneFile("Load RESSO file", {});
+
+                if (input_file_name.size() > 0)
+                {
+                    session.working_directory = fs::path(input_file_name).parent_path().string();
+
+                    if (!session.point_clouds_container.update_poses_from_RESSO_inverse(
+                            session.working_directory.c_str(), input_file_name.c_str()))
+                    {
+                        spdlog::error("Error loading file!");
+                        return;
+                    }
+                    else
+                    {
+                        spdlog::info("Updated: {} point_clouds", session.point_clouds_container.point_clouds.size());
+                        session.point_clouds_container.poses_file_name = input_file_name;
+                    }
+                }
+            }
+            ImGui::SameLine();
+            ImGui::Text(session.point_clouds_container.poses_file_name.c_str());
         }
-        ImGui::SameLine();
-        ImGui::Text(session.point_clouds_container.poses_file_name.c_str());
 
         ImGui::Separator();
 

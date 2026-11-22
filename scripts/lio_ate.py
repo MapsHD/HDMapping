@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Absolute trajectory error (ATE) of a TUM trajectory against a golden one.
 
-Poses are paired by identical timestamp and compared without any alignment:
-both trajectories come from lidar_odometry_step_1 on the same data and start
-in the same frame, so an alignment would only hide drift.
+Poses are paired in order and must have the same timestamps (within
+--max-dt-s). They are compared without any alignment: both trajectories come
+from lidar_odometry_step_1 on the same data and start in the same frame, so an
+alignment would only hide drift.
 
 Exit codes: 0 when the position RMSE is within the limit, 1 when it is not,
-2 when the two files do not have the same timestamps.
+2 when the two files do not have the same poses or timestamps.
 
 Usage:
     lio_ate.py <golden.tum> <candidate.tum> [--max-ate-m 0.01]
@@ -35,12 +36,20 @@ def main():
     parser.add_argument("golden", help="reference TUM trajectory")
     parser.add_argument("candidate", help="TUM trajectory to check")
     parser.add_argument("--max-ate-m", type=float, default=0.01, help="largest accepted position RMSE in metres (default 0.01)")
+    parser.add_argument(
+        "--max-dt-s", type=float, default=1e-5, help="largest accepted timestamp difference between paired poses (default 1e-5)"
+    )
     args = parser.parse_args()
 
     golden_times, golden = load(args.golden)
     candidate_times, candidate = load(args.candidate)
-    if golden_times != candidate_times:
-        print(f"Timestamps differ: golden has {len(golden_times)} poses, candidate {len(candidate_times)}")
+    if len(golden_times) != len(candidate_times):
+        print(f"Pose counts differ: golden has {len(golden_times)} poses, candidate {len(candidate_times)}")
+        return 2
+    # Timestamps are rounded from doubles, so platforms can differ in the last digits (~0.3 us at 1.8e9 s).
+    worst = max((abs(float(g) - float(c)) for g, c in zip(golden_times, candidate_times)), default=0.0)
+    if worst > args.max_dt_s:
+        print(f"Timestamps differ by up to {worst:.9f} s (limit {args.max_dt_s} s)")
         return 2
     if not golden:
         print("No poses to compare")

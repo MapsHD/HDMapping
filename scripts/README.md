@@ -38,7 +38,7 @@
   python3 scripts/lio_to_tum.py /path/to/lio_result_0 trajectory.tum
   ```
 
-* `lio_ate.py` — absolute trajectory error of a TUM trajectory against a golden one: poses paired by timestamp, position RMSE without alignment. Exits 0 when the RMSE is within `--max-ate-m` (default 0.01 m), 1 when it is not, 2 when the timestamps differ. Standard library only:
+* `lio_ate.py` — absolute trajectory error of a TUM trajectory against a golden one: poses paired in order with timestamps within `--max-dt-s` (default 10 µs), position RMSE without alignment. Exits 0 when the RMSE is within `--max-ate-m` (default 0.01 m), 1 when it is not, 2 when the poses or timestamps differ. Standard library only:
 
   ```
   python3 scripts/lio_ate.py golden.tum trajectory.tum --max-ate-m 0.01

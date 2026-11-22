@@ -1365,12 +1365,18 @@ void optimize_lidar_odometry(
         ir + 1, ir + 1, 1.0 / (lidar_odometry_motion_model_fix_origin_y_1_sigma_m * lidar_odometry_motion_model_fix_origin_y_1_sigma_m));
     tripletListP.emplace_back(
         ir + 2, ir + 2, 1.0 / (lidar_odometry_motion_model_fix_origin_z_1_sigma_m * lidar_odometry_motion_model_fix_origin_z_1_sigma_m));
-    const double sigma_fix_origin_om = lidar_odometry_motion_model_fix_origin_om_1_sigma_deg * DEG_TO_RAD;
-    const double sigma_fix_origin_fi = lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg * DEG_TO_RAD;
-    const double sigma_fix_origin_ka = lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg * DEG_TO_RAD;
-    tripletListP.emplace_back(ir + 3, ir + 3, 1.0 / (sigma_fix_origin_om * sigma_fix_origin_om));
-    tripletListP.emplace_back(ir + 4, ir + 4, 1.0 / (sigma_fix_origin_fi * sigma_fix_origin_fi));
-    tripletListP.emplace_back(ir + 5, ir + 5, 1.0 / (sigma_fix_origin_ka * sigma_fix_origin_ka));
+    tripletListP.emplace_back(
+        ir + 3,
+        ir + 3,
+        1.0 / (lidar_odometry_motion_model_fix_origin_om_1_sigma_deg * lidar_odometry_motion_model_fix_origin_om_1_sigma_deg));
+    tripletListP.emplace_back(
+        ir + 4,
+        ir + 4,
+        1.0 / (lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg * lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg));
+    tripletListP.emplace_back(
+        ir + 5,
+        ir + 5,
+        1.0 / (lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg * lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg));
 
     tripletListB.emplace_back(ir, 0, 0);
     tripletListB.emplace_back(ir + 1, 0, 0);
@@ -2257,6 +2263,7 @@ bool process_worker_step_update_rgd_after(
         {
             acc_distance = 0;
             std::scoped_lock lock(params.mutex_buckets_indoor, params.mutex_buckets_outdoor);
+            // the upstream decimate() below discards its result: the buffer is never decimated, so neither is this
             const Eigen::Vector3d viewport = worker_data.intermediate_trajectory[0].translation();
             ++params.buckets_indoor_revision;
             ++params.buckets_outdoor_revision;
@@ -2290,7 +2297,7 @@ bool process_worker_step_update_rgd_after(
         // decimate
         if (params.decimation > 0)
         {
-            points_global = decimate(points_global, params.decimation, params.decimation, params.decimation);
+            decimate(points_global, params.decimation, params.decimation, params.decimation);
         }
 
         if (params.ablation_study_use_hierarchical_rgd)

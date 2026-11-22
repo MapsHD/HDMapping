@@ -114,14 +114,14 @@ int main(int argc, char* argv[])
 
         //
         /*std::ofstream csv("source.txt");
-            
+
         for (size_t i = 0; i < source_global.size(); i++)
         {
             csv <<source_global[i].x() << ',' << source_global[i].y() << ',' << source_global[i].z() << '\n';
         }
 
         std::ofstream trg("target.txt");
-            
+
         for (size_t i = 0; i < target_global.size(); i++)
         {
             trg <<target_global[i].x() << ',' << target_global[i].y() << ',' << target_global[i].z() << '\n';
@@ -145,7 +145,7 @@ int main(int argc, char* argv[])
             IcpResidualStatistics residuals;
             TaitBryanPose icp_uncertainty =
                 icp.compute_icp_uncertainty(source_local_for_single_trajectory_node, target_global, m_global, 0.3, &residuals);
-            //icp.compute_icp_uncertainty_point_to_plane(source_local_for_single_trajectory_node, target_global, m_global, 0.3);
+            // icp.compute_icp_uncertainty_point_to_plane(source_local_for_single_trajectory_node, target_global, m_global, 0.3);
             std::cout << "sigma_px=" << icp_uncertainty.px << ", "
                       << "sigma_py=" << icp_uncertainty.py << ", "
                       << "sigma_pz=" << icp_uncertainty.pz << ", "
@@ -153,8 +153,7 @@ int main(int argc, char* argv[])
                       << "sigma_fi=" << icp_uncertainty.fi << ", "
                       << "sigma_ka=" << icp_uncertainty.ka << std::endl;
 
-
-             //TaitBryanPose icp_uncertainty_alternative_approach =
+            // TaitBryanPose icp_uncertainty_alternative_approach =
 
             icp_uncertainties.emplace_back(icp_uncertainty);
             icp_residuals.emplace_back(residuals);
@@ -180,9 +179,8 @@ int main(int argc, char* argv[])
         const TaitBryanPose& u = icp_uncertainties[i];
         const IcpResidualStatistics& r = icp_residuals[i];
         csv << node_timestamps[i].first << ',' << node_timestamps[i].second << ',' << node_positions[i].x() << ',' << node_positions[i].y()
-            << ',' << node_positions[i].z() << ',' << u.px << ',' << u.py << ',' << u.pz << ',' << u.om << ',' << u.fi << ',' << u.ka
-            << ',' << r.sum_squared_residuals << ',' << r.number_of_correspondences << ',' << r.number_of_observations << ','
-            << r.sigma0 << '\n';
+            << ',' << node_positions[i].z() << ',' << u.px << ',' << u.py << ',' << u.pz << ',' << u.om << ',' << u.fi << ',' << u.ka << ','
+            << r.sum_squared_residuals << ',' << r.number_of_correspondences << ',' << r.number_of_observations << ',' << r.sigma0 << '\n';
     }
 
     if (!csv)

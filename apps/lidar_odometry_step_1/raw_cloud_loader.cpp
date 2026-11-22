@@ -2,39 +2,37 @@
 
 #include <iostream>
 
-bool lazy_ensure(RawCloudLoader* L, std::vector<std::vector<Point3Di>>& ppf, size_t i)
+bool RawCloudLoader::ensure(std::vector<std::vector<Point3Di>>& ppf, size_t i)
 {
-    if (!L || L->loaded[i] || L->done[i] || L->n[i] == 0)
+    if (loaded[i] || done[i] || n[i] == 0)
         return true;
     const auto unchanged = [&]()
     {
-        std::error_code ec;
-        const auto size = fs::file_size(L->files[i], ec);
-        const auto time = fs::last_write_time(L->files[i], ec);
-        return !ec && size == L->file_size[i] && time == L->file_time[i];
+        const ChunkStamp now = source->stamp(i);
+        return now.valid && now.size == stamp[i].size && now.time == stamp[i].time;
     };
     if (!unchanged())
     {
-        std::cerr << "lazy_load_raw_clouds: '" << L->files[i] << "' changed or vanished since it was first read\n";
+        std::cerr << "lazy_load_raw_clouds: '" << source->chunkName(i) << "' changed or vanished since it was first read\n";
         return false;
     }
-    ppf[i] = L->load(i);
+    ppf[i] = source->loadPoints(i, filter);
     // checked again after the read, so a file replaced while it was being opened is refused too
-    if (!unchanged() || ppf[i].size() != L->n[i] || ppf[i].front().timestamp != L->t_first[i] || ppf[i].back().timestamp != L->t_last[i])
+    if (!unchanged() || ppf[i].size() != n[i] || ppf[i].front().timestamp != t_first[i] || ppf[i].back().timestamp != t_last[i])
     {
-        std::cerr << "lazy_load_raw_clouds: '" << L->files[i] << "' reads differently than when it was first read\n";
+        std::cerr << "lazy_load_raw_clouds: '" << source->chunkName(i) << "' reads differently than when it was first read\n";
         std::vector<Point3Di>().swap(ppf[i]);
         return false;
     }
-    L->loaded[i] = 1;
+    loaded[i] = 1;
     return true;
 }
 
-void lazy_release(RawCloudLoader* L, std::vector<std::vector<Point3Di>>& ppf, size_t i)
+void RawCloudLoader::release(std::vector<std::vector<Point3Di>>& ppf, size_t i)
 {
-    if (!L || !L->loaded[i])
+    if (!loaded[i])
         return;
     std::vector<Point3Di>().swap(ppf[i]);
-    L->loaded[i] = 0;
-    L->done[i] = 1;
+    loaded[i] = 0;
+    done[i] = 1;
 }

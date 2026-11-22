@@ -22,7 +22,9 @@ set(SOURCES
   lidar_odometry_utils_optimizers.cpp
   lidar_odometry.cpp lidar_odometry.h
   points_global_spill.h points_global_spill.cpp
+  laz_csv_source.h laz_csv_source.cpp
   raw_cloud_loader.h raw_cloud_loader.cpp
+  recording_source.h
   toml_io.h toml_io.cpp
 )
 

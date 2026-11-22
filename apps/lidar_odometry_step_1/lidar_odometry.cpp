@@ -1,5 +1,6 @@
 #include "lidar_odometry.h"
 #include "hdmapping_profiler.hpp"
+#include "laz_csv_source.h"
 #include "raw_cloud_loader.h"
 #include "tbb/tbb.h"
 #include <mutex>
@@ -112,18 +113,136 @@ static void report_lidar_gaps(
         std::cerr << "WARNING:   ... and " << lines.size() - kMaxLines << " more\n";
 }
 
-//! Time span and sample count of one IMU file's samples.
-static InputFileSpan imu_file_span(const std::string& file, const Imu& samples)
+// The body of load_data shared by every RecordingSource; the caller has set up the run report and the timing scope.
+static bool load_from_source(
+    const std::shared_ptr<RecordingSource>& source,
+    LidarOdometryParams& params,
+    std::vector<std::vector<Point3Di>>& pointsPerFile,
+    Imu& imu_data,
+    InputFileSpans& fileSpans)
 {
-    InputFileSpan span{ file };
-    for (const auto& sample : samples)
+    const fs::path working_directory = source->workingDirectory();
+    source->loadImu(imu_data, fileSpans.imu);
+
+    // Sort once after merging
+    std::sort(
+        imu_data.begin(),
+        imu_data.end(),
+        [](const auto& a, const auto& b)
+        {
+            return std::get<0>(a).first < std::get<0>(b).first;
+        });
+
+    // The IMU timestamps are already sorted; publishing their span needs no point-cloud reads or extra scan.
+    if (params.run_report && !imu_data.empty())
+        params.run_report->setRecordingSpan(std::get<0>(imu_data.front()).first, std::get<0>(imu_data.back()).first);
+
+    const size_t minSize = source->chunkCount();
+    std::cout << "Loading point clouds (" << minSize << " files)..\n";
+    std::cout << "total   - filter = kept\n-----------------------\n";
+
+    pointsPerFile.resize(minSize);
+    // the first file's points are dropped unless params.skip_first_file is off
+    const size_t firstUsedFile = params.skip_first_file ? 1 : 0;
+
+    // --- Working directories
+
+    fs::path wdp = working_directory / "preview";
+    params.working_directory_preview = wdp.string();
+    fs::path wdp_cache = working_directory / "cache";
+    params.working_directory_cache = wdp_cache.string();
+
+    std::vector<std::string> names(minSize);
+    for (size_t i = 0; i < minSize; ++i)
+        names[i] = source->chunkName(i);
+
+    PointFilter filter;
+    filter.omit_timestamp_zero = true;
+    filter.xy_inner = params.filter_threshold_xy_inner;
+    filter.xy_outer = params.filter_threshold_xy_outer;
+
+    params.raw_cloud_loader.reset();
+    if (params.lazy_load_raw_clouds)
     {
-        const double t = std::get<0>(sample).first;
-        span.first = span.count == 0 ? t : std::min(span.first, t);
-        span.last = span.count == 0 ? t : std::max(span.last, t);
-        span.count++;
+        params.raw_cloud_loader = std::make_shared<RawCloudLoader>();
+        auto& L = *params.raw_cloud_loader;
+        // a reload (the GUI opening another folder) must not keep the previous session's clouds
+        std::vector<std::vector<Point3Di>>(minSize).swap(pointsPerFile);
+        L.source = source;
+        L.filter = filter;
+        L.stamp.assign(minSize, ChunkStamp{});
+        L.t_first.assign(minSize, 0.0);
+        L.t_last.assign(minSize, 0.0);
+        L.n.assign(minSize, 0);
+        L.loaded.assign(minSize, 0);
+        L.done.assign(minSize, 0);
+        std::vector<std::vector<LidarGap>> gaps_in_file(minSize);
+        tbb::parallel_for(
+            std::min(firstUsedFile, minSize), // a skipped file's cloud is never used
+            minSize,
+            [&](size_t i)
+            {
+                L.stamp[i] = source->stamp(i);
+                auto data = source->loadPoints(i, filter);
+                L.n[i] = data.size();
+                if (!data.empty())
+                {
+                    L.t_first[i] = data.front().timestamp;
+                    L.t_last[i] = data.back().timestamp;
+                }
+                gaps_in_file[i] = find_lidar_gaps(data, kLidarGapWarningS);
+            });
+        report_lidar_gaps(names, firstUsedFile, gaps_in_file, L.t_first, L.t_last);
+        for (size_t i = 0; i < minSize; ++i)
+            fileSpans.laz.push_back({ names[i], L.t_first[i], L.t_last[i], L.n[i] });
+        if (params.save_calibration_validation && minSize > 0) // as the eager load: the first file, then dropped
+            write_calibration_validation(wdp, source->loadPoints(0, filter), params);
+        size_t totalPoints = 0;
+        for (auto k : L.n)
+            totalPoints += k;
+        std::cout << "TOTAL: " << totalPoints << " (lazy: ranges recorded, clouds loaded on demand)\n..loading finished.\n\n";
+        return true;
     }
-    return span;
+
+    // --- Parallel load of LAZ files
+    std::vector<std::vector<LidarGap>> gaps_in_file(minSize);
+    std::vector<double> t_first(minSize, 0.0);
+    std::vector<double> t_last(minSize, 0.0);
+    tbb::parallel_for(
+        size_t(0),
+        minSize,
+        [&](size_t i)
+        {
+            auto data = source->loadPoints(i, filter);
+
+            // Optional calibration validation (first file only)
+            if ((i == 0) && params.save_calibration_validation)
+                write_calibration_validation(wdp, data, params);
+
+            if (!data.empty())
+            {
+                t_first[i] = data.front().timestamp;
+                t_last[i] = data.back().timestamp;
+            }
+            gaps_in_file[i] = find_lidar_gaps(data, kLidarGapWarningS);
+
+            // Store results
+            pointsPerFile[i] = std::move(data);
+        });
+    report_lidar_gaps(names, firstUsedFile, gaps_in_file, t_first, t_last);
+    for (size_t i = 0; i < minSize; ++i)
+        fileSpans.laz.push_back({ names[i], t_first[i], t_last[i], pointsPerFile[i].size() });
+
+    if (params.skip_first_file && pointsPerFile.size() > 0)
+        pointsPerFile.front().clear();
+
+    // --- Summary
+    size_t totalPoints = 0;
+    for (const auto& pp : pointsPerFile)
+        totalPoints += pp.size();
+
+    std::cout << "TOTAL: " << totalPoints << "\n..loading finished.\n\n";
+    return true;
 }
 
 bool load_data(
@@ -151,385 +270,25 @@ bool load_data(
             input_file_names.empty() ? fs::path{} : fs::path(input_file_names.front()).parent_path(), params.points_global_spill_directory);
     RunReport::Scope timing(params.run_report.get(), RunReport::Stage::Loading);
     HDMAP_ZONE_SCOPE("load_data");
-    std::sort(input_file_names.begin(), input_file_names.end());
-    std::vector<std::string> csv_files, laz_files;
-    std::string sn_file;
-    std::string calibrationFile;
-
-    std::cout << "Loading data..\n--------------\n";
-
-    // --- Separate files by type
-    for (const auto& fileName : input_file_names)
-    {
-        std::string ext = fs::path(fileName).extension().string();
-        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-
-        if (ext == ".csv")
-            csv_files.push_back(fileName);
-        else if (ext == ".json")
-        {
-            std::string stem = fs::path(fileName).filename().stem().string(); // get filename without extension
-
-            // skip files not related to calibration
-            if (!stem.starts_with("status") && !stem.starts_with("cam0") && !stem.starts_with("cam1"))
-                if (calibrationFile.empty())
-                    calibrationFile = fileName;
-                else
-                    std::cout << "Unexpected JSON file found (" << fileName << "). Ignored..\n";
-        }
-        else if ((ext == ".laz") || (ext == ".las"))
-            laz_files.push_back(fileName);
-        else if (ext == ".mjc")
-        {
-            if (calibrationFile.empty())
-                calibrationFile = fileName;
-            else
-                std::cout << "Unexpected calibration file found (" << fileName << "). Ignored.." << std::endl;
-        }
-        else if ((ext == ".sn") && sn_file.empty())
-        {
-            sn_file = fileName;
-            std::cout << "Only using first SN file found\n";
-        }
-    }
-
-    auto get4index = [](const std::string& path) -> std::string
-    {
-        auto s = fs::path(path).stem().string();
-        return s.size() > 4 ? s.substr(s.size() - 4) : s;
-    };
-
-    for (size_t i = 0; i < laz_files.size(); i++)
-    {
-        std::string lfs = get4index(laz_files[i]);
-
-        bool found = false;
-        for (size_t j = 0; j < csv_files.size(); j++)
-        {
-            std::string cfs = get4index(csv_files[j]);
-            if (lfs.compare(cfs) == 0)
-            {
-                found = true;
-                break;
-            }
-        }
-
-        if (!found)
-        {
-            std::cout << "\n!!! there is no CSV file for: " << laz_files[i] << " !!! \n\n";
-        }
-    }
-
-    for (size_t i = 0; i < csv_files.size(); i++)
-    {
-        std::string lfs = get4index(csv_files[i]);
-
-        bool found = false;
-        for (size_t j = 0; j < laz_files.size(); j++)
-        {
-            std::string cfs = get4index(laz_files[j]);
-            if (lfs.compare(cfs) == 0)
-            {
-                found = true;
-                break;
-            }
-        }
-
-        if (!found)
-        {
-            std::cout << "\n!!! there is no LAZ file for: " << csv_files[i] << " !!! \n\n";
-        }
-    }
-
-    if (input_file_names.size() > 2)
-    {
-        std::string working_directory = fs::path(input_file_names.front()).parent_path().string();
-
-        if (laz_files.size() != csv_files.size())
-            std::cout << "!!! file number issue. continuing can lead to incomplete data!!!\n" << std::endl;
-
-        // check if folder exists!
-        if (!fs::exists(working_directory))
-        {
-            std::cerr << "Folder '" << working_directory << "' does not exist.\n";
-            return false;
-        }
-
-        // --- Calibration and IMU setup
-        const auto preloadedCalibration = MLvxCalib::GetCalibrationFromFile(calibrationFile);
-        const std::string imuSnToUse = MLvxCalib::GetImuSnToUse(calibrationFile);
-        const auto idToSn = MLvxCalib::GetIdToSnMapping(sn_file);
-
-        if (!preloadedCalibration.empty())
-        {
-            std::cout << "Loaded calibration for:\n";
-            for (const auto& [sn, _] : preloadedCalibration)
-                std::cout << " -> " << sn << "\n";
-
-            bool hasError = false;
-
-            for (const auto& [id, sn] : idToSn)
-            {
-                if (preloadedCalibration.find(sn) == preloadedCalibration.end())
-                {
-                    std::cerr << "WRONG CALIBRATION FILE! THE SERIAL NUMBER SHOULD BE " << sn << "!!!\n";
-                    hasError = true;
-                }
-            }
-
-            if (!hasError && preloadedCalibration.find(imuSnToUse) == preloadedCalibration.end())
-            {
-                std::cerr << "MISSING CALIBRATION FOR imuSnToUse: " << imuSnToUse << "!!!\n";
-                std::cerr << "Available serial numbers in calibration file are:\n";
-                for (const auto& [snKey, _] : preloadedCalibration)
-                    std::cerr << "  - " << snKey << "\n";
-
-                hasError = true;
-            }
-
-            if (hasError)
-            {
-                std::cerr << "Press ENTER to exit...\n";
-                std::cin.get();
-                std::exit(EXIT_FAILURE);
-            }
-        }
-        else
-        {
-            std::cout << "There is no calibration file in folder!" << std::endl;
-            std::cout << "IGNORE THIS MESSAGE IF YOU ONLY HAVE 1 LiDAR" << std::endl;
-
-            // example file for 2x LiDAR":
-            /*
-            {
-                "calibration" : {
-                    "47MDL9T0020193" : {
-                        "identity" : "true"
-                    },
-                    "47MDL9S0020300" :
-                        {
-                            "order" : "ROW",
-                            "inverted" : "TRUE",
-                            "data" : [
-                                0.999824, 0.00466397, -0.0181595, -0.00425984,
-                                -0.0181478, -0.00254457, -0.999832, -0.151599,
-                                -0.0047094, 0.999986, -0.00245948, -0.146408,
-                                0, 0, 0, 1
-                            ]
-                        }
-                },
-                                "imuToUse" : "47MDL9T0020193"
-            }*/
-        }
-
-        const int imuNumberToUse = MLvxCalib::GetImuIdToUse(idToSn, imuSnToUse);
-        // --- Load IMU data (still sequential, could parallelize later)
-        std::cout << "loading IMU data from 'imu****.csv' using ID " << imuNumberToUse << " from reference '" << sn_file << "' ..\n";
-
-        std::size_t minSize = std::min(laz_files.size(), csv_files.size());
-        // Each thread loads into its own local vector
-        std::vector<Imu> imuChunks(minSize);
-
-        tbb::parallel_for(
-            tbb::blocked_range<size_t>(0, minSize),
-            [&](const tbb::blocked_range<size_t>& range)
-            {
-                for (size_t i = range.begin(); i < range.end(); ++i)
-                {
-                    imuChunks[i] = load_imu(csv_files[i].c_str(), imuNumberToUse);
-                }
-            });
-
-        for (size_t i = 0; i < minSize; ++i)
-            fileSpans.imu.push_back(imu_file_span(csv_files[i], imuChunks[i]));
-
-        // Merge all chunks sequentially at the end
-        for (auto& chunk : imuChunks)
-            imu_data.insert(imu_data.end(), std::make_move_iterator(chunk.begin()), std::make_move_iterator(chunk.end()));
-
-        // Units with an external IMU (e.g. Murata) leave 'imu****.csv' header-only and log the IMU
-        // into a subfolder, in files not aligned with the LiDAR chunks
-        const fs::path murataImuDir = fs::path(working_directory) / "MURATA_IMU";
-        if (imu_data.empty() && fs::is_directory(murataImuDir))
-        {
-            std::vector<std::string> murataFiles;
-            for (const auto& entry : fs::directory_iterator(murataImuDir))
-            {
-                std::string ext = entry.path().extension().string();
-                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-                if (entry.is_regular_file() && ext == ".csv" && entry.file_size() > 0)
-                    murataFiles.push_back(entry.path().string());
-            }
-            std::sort(murataFiles.begin(), murataFiles.end());
-            std::cout << "no IMU data in 'imu****.csv', loading " << murataFiles.size() << " file(s) from '" << murataImuDir.string()
-                      << "' ..\n";
-
-            std::vector<Imu> murataChunks(murataFiles.size());
-            tbb::parallel_for(
-                size_t(0),
-                murataFiles.size(),
-                [&](size_t i)
-                {
-                    murataChunks[i] = load_imu(murataFiles[i], imuNumberToUse);
-                });
-            fileSpans.imu.clear();
-            for (size_t i = 0; i < murataFiles.size(); ++i)
-                fileSpans.imu.push_back(imu_file_span(murataFiles[i], murataChunks[i]));
-            for (auto& chunk : murataChunks)
-                imu_data.insert(imu_data.end(), std::make_move_iterator(chunk.begin()), std::make_move_iterator(chunk.end()));
-        }
-
-        // Sort once after merging
-        std::sort(
-            imu_data.begin(),
-            imu_data.end(),
-            [](const auto& a, const auto& b)
-            {
-                return std::get<0>(a).first < std::get<0>(b).first;
-            });
-
-        // The IMU timestamps are already sorted; publishing their span needs no point-cloud reads or extra scan.
-        if (params.run_report && !imu_data.empty())
-            params.run_report->setRecordingSpan(std::get<0>(imu_data.front()).first, std::get<0>(imu_data.back()).first);
-
-        // --- Precompute calibration once (major optimization)
-        const auto combinedCalibration = MLvxCalib::CombineIntoCalibration(idToSn, preloadedCalibration);
-
-        std::cout << "Loading point clouds (" << minSize << " files)..\n";
-        std::cout << "total   - filter = kept\n-----------------------\n";
-
-        if (debugMsg) // if true this will break parallelism
-        {
-            for (const auto& [id, calib] : combinedCalibration)
-                std::cout << " id : " << id << "\n" << calib.matrix() << "\n";
-        }
-
-        pointsPerFile.resize(minSize);
-        // the first file's points are dropped unless params.skip_first_file is off
-        const size_t firstUsedFile = params.skip_first_file ? 1 : 0;
-
-        // --- Working directories
-
-        fs::path wdp = fs::path(working_directory) / "preview";
-        params.working_directory_preview = wdp.string();
-        fs::path wdp_cache = fs::path(working_directory) / "cache";
-        params.working_directory_cache = wdp_cache.string();
-
-        params.raw_cloud_loader.reset();
-        if (params.lazy_load_raw_clouds)
-        {
-            params.raw_cloud_loader = std::make_shared<RawCloudLoader>();
-            auto& L = *params.raw_cloud_loader;
-            // a reload (the GUI opening another folder) must not keep the previous session's clouds
-            std::vector<std::vector<Point3Di>>(minSize).swap(pointsPerFile);
-            const double inner = params.filter_threshold_xy_inner, outer = params.filter_threshold_xy_outer;
-            L.files.assign(laz_files.begin(), laz_files.begin() + minSize);
-            L.file_size.assign(minSize, 0);
-            L.file_time.assign(minSize, fs::file_time_type{});
-            const std::vector<std::string> files = L.files;
-            L.load = [files, inner, outer, combinedCalibration](size_t i)
-            {
-                auto data = load_point_cloud(files[i].c_str(), true, inner, outer, combinedCalibration);
-                std::sort(
-                    data.begin(),
-                    data.end(),
-                    [](const Point3Di& a, const Point3Di& b)
-                    {
-                        return a.timestamp < b.timestamp;
-                    });
-                return data;
-            };
-            L.t_first.assign(minSize, 0.0);
-            L.t_last.assign(minSize, 0.0);
-            L.n.assign(minSize, 0);
-            L.loaded.assign(minSize, 0);
-            L.done.assign(minSize, 0);
-            std::vector<std::vector<LidarGap>> gaps_in_file(minSize);
-            tbb::parallel_for(
-                std::min(firstUsedFile, minSize), // a skipped file's cloud is never used
-                minSize,
-                [&](size_t i)
-                {
-                    std::error_code ec;
-                    L.file_size[i] = fs::file_size(L.files[i], ec);
-                    L.file_time[i] = fs::last_write_time(L.files[i], ec);
-                    auto data = L.load(i);
-                    L.n[i] = data.size();
-                    if (!data.empty())
-                    {
-                        L.t_first[i] = data.front().timestamp;
-                        L.t_last[i] = data.back().timestamp;
-                    }
-                    gaps_in_file[i] = find_lidar_gaps(data, kLidarGapWarningS);
-                });
-            report_lidar_gaps(L.files, firstUsedFile, gaps_in_file, L.t_first, L.t_last);
-            for (size_t i = 0; i < minSize; ++i)
-                fileSpans.laz.push_back({ L.files[i], L.t_first[i], L.t_last[i], L.n[i] });
-            if (params.save_calibration_validation && minSize > 0) // as the eager load: the first file, then dropped
-                write_calibration_validation(wdp, L.load(0), params);
-            size_t totalPoints = 0;
-            for (auto k : L.n)
-                totalPoints += k;
-            std::cout << "TOTAL: " << totalPoints << " (lazy: ranges recorded, clouds loaded on demand)\n..loading finished.\n\n";
-            return true;
-        }
-
-        // --- Parallel load of LAZ files
-        std::vector<std::vector<LidarGap>> gaps_in_file(minSize);
-        std::vector<double> t_first(minSize, 0.0);
-        std::vector<double> t_last(minSize, 0.0);
-        tbb::parallel_for(
-            size_t(0),
-            minSize,
-            [&](size_t i)
-            {
-                const std::string& fn = laz_files[i];
-
-                auto data = load_point_cloud(
-                    fn.c_str(), true, params.filter_threshold_xy_inner, params.filter_threshold_xy_outer, combinedCalibration);
-
-                std::sort(
-                    data.begin(),
-                    data.end(),
-                    [](const Point3Di& a, const Point3Di& b)
-                    {
-                        return a.timestamp < b.timestamp;
-                    });
-
-                // Optional calibration validation (first file only)
-                if ((i == 0) && params.save_calibration_validation)
-                    write_calibration_validation(wdp, data, params);
-
-                if (!data.empty())
-                {
-                    t_first[i] = data.front().timestamp;
-                    t_last[i] = data.back().timestamp;
-                }
-                gaps_in_file[i] = find_lidar_gaps(data, kLidarGapWarningS);
-
-                // Store results
-                pointsPerFile[i] = std::move(data);
-            });
-        report_lidar_gaps(laz_files, firstUsedFile, gaps_in_file, t_first, t_last);
-        for (size_t i = 0; i < minSize; ++i)
-            fileSpans.laz.push_back({ laz_files[i], t_first[i], t_last[i], pointsPerFile[i].size() });
-
-        if (params.skip_first_file && pointsPerFile.size() > 0)
-            pointsPerFile.front().clear();
-
-        // --- Summary
-        size_t totalPoints = 0;
-        for (const auto& pp : pointsPerFile)
-            totalPoints += pp.size();
-
-        std::cout << "TOTAL: " << totalPoints << "\n..loading finished.\n\n";
-        return true;
-    }
-    else
-    {
-        std::cout << "Not enough files to continue: " << input_file_names.size() << std::endl;
+    std::shared_ptr<RecordingSource> source = LazCsvSource::open(input_file_names, debugMsg);
+    if (!source)
         return false;
-    }
+    return load_from_source(source, params, pointsPerFile, imu_data, fileSpans);
+}
+
+bool load_data(
+    const std::shared_ptr<RecordingSource>& source,
+    LidarOdometryParams& params,
+    std::vector<std::vector<Point3Di>>& pointsPerFile,
+    Imu& imu_data,
+    InputFileSpans& fileSpans)
+{
+    fileSpans = {};
+    if (!params.run_report || params.run_report->live().status != "running")
+        params.run_report = std::make_shared<RunReport>(source->workingDirectory(), params.points_global_spill_directory);
+    RunReport::Scope timing(params.run_report.get(), RunReport::Stage::Loading);
+    HDMAP_ZONE_SCOPE("load_data");
+    return load_from_source(source, params, pointsPerFile, imu_data, fileSpans);
 }
 
 void calculate_trajectory(Trajectory& trajectory, Imu& imu_data, LidarOdometryParams& params, bool debugMsg)
@@ -716,7 +475,7 @@ bool compute_step_1(
     params.initial_points.reserve(params.threshold_initial_points);
 
     auto& ppf = pointsPerFile;
-    RawCloudLoader* loader = params.raw_cloud_loader.get();
+    const auto& loader = params.raw_cloud_loader; // null unless lazy_load_raw_clouds
     if (loader)
     {
         if (ppf.size() != loader->n.size())
@@ -733,7 +492,7 @@ bool compute_step_1(
     }
     for (size_t fi = 0; fi < pointsPerFile.size(); fi++)
     {
-        if (!lazy_ensure(loader, ppf, fi))
+        if (loader && !loader->ensure(ppf, fi))
             return false;
         const auto& pp = pointsPerFile[fi];
         // number_of_points += pp.size();
@@ -835,10 +594,10 @@ bool compute_step_1(
                 if (L.n[index] == 0)
                     continue;
                 if (L.t_last[index] < t0) // every later chunk starts later still: never read again
-                    lazy_release(loader, ppf, index);
+                    L.release(ppf, index);
                 else if (L.t_first[index] < t1) // may hold points in [t0, t1): load; the search below decides
                 {
-                    if (!lazy_ensure(loader, ppf, index))
+                    if (!L.ensure(ppf, index))
                         return false;
                 }
             }

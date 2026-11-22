@@ -372,9 +372,9 @@ void ManualPoseGraphLoopClosure::Gui(
 
                 const TaitBryanPose& current_pose = edges[index_active_edge].relative_pose_tb;
                 const TaitBryanPose& computed_pose = icp_uncertainty.relative_pose;
-                if (icp_uncertainty.edge == index_active_edge && current_pose.px == computed_pose.px && current_pose.py == computed_pose.py &&
-                    current_pose.pz == computed_pose.pz && current_pose.om == computed_pose.om && current_pose.fi == computed_pose.fi &&
-                    current_pose.ka == computed_pose.ka)
+                if (icp_uncertainty.edge == index_active_edge && current_pose.px == computed_pose.px &&
+                    current_pose.py == computed_pose.py && current_pose.pz == computed_pose.pz && current_pose.om == computed_pose.om &&
+                    current_pose.fi == computed_pose.fi && current_pose.ka == computed_pose.ka)
                 {
                     const auto show = [](const char* label, const TaitBryanPose& s, const IcpResidualStatistics& r)
                     {

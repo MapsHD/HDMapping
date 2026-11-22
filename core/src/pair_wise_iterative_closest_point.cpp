@@ -536,7 +536,7 @@ TaitBryanPose PairWiseICP::compute_icp_uncertainty(
                             {
                                 if (d_squared < min_dist_squared)
                                 {
-                                    //std::cout << "sqrt_d_squared: " << sqrt(d_squared) << std::endl;
+                                    // std::cout << "sqrt_d_squared: " << sqrt(d_squared) << std::endl;
                                     min_dist_squared = d_squared;
                                     nn_found = true;
                                     target_i_nn = target_i;

@@ -202,7 +202,25 @@ const std::string& McapFileReader::lidarLayoutWarning() const
 	return impl_->lidarLayoutWarning;
 }
 
-bool McapFileReader::read(const Callbacks& callbacks)
+std::optional<LogTimeRange> McapFileReader::logTimeSpan() const
+{
+	if(!impl_)
+		return std::nullopt;
+	if(const auto& statistics = impl_->reader.statistics(); statistics && statistics->messageCount > 0)
+		return LogTimeRange{statistics->messageStartTime, statistics->messageEndTime + 1};
+	const auto& chunkIndexes = impl_->reader.chunkIndexes();
+	if(chunkIndexes.empty())
+		return std::nullopt;
+	LogTimeRange span{std::numeric_limits<uint64_t>::max(), 0};
+	for(const auto& chunk : chunkIndexes)
+	{
+		span.start_ns = std::min<uint64_t>(span.start_ns, chunk.messageStartTime);
+		span.end_ns = std::max<uint64_t>(span.end_ns, chunk.messageEndTime + 1);
+	}
+	return span;
+}
+
+bool McapFileReader::read(const Callbacks& callbacks, const LogTimeRange& range)
 {
 	if(!isOpen())
 		return false;
@@ -218,6 +236,8 @@ bool McapFileReader::read(const Callbacks& callbacks)
 		return true;
 
 	mcap::ReadMessageOptions read_options;
+	read_options.startTime = range.start_ns;
+	read_options.endTime = range.end_ns;
 	read_options.readOrder = impl_->timeOrdered ? mcap::ReadMessageOptions::ReadOrder::LogTimeOrder
 											   : mcap::ReadMessageOptions::ReadOrder::FileOrder;
 	read_options.topicFilter = [&](std::string_view topic) {

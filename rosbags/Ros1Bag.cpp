@@ -434,8 +434,18 @@ bool Ros1BagReader::readIndex()
 					break;
 				message_counts[conn] += count;
 			}
+			IndexedChunk chunk;
+			const auto start = header.find("start_time");
+			const auto end = header.find("end_time");
+			if(fieldAs(header, "chunk_pos", chunk.pos) && start != header.end() && end != header.end())
+			{
+				chunk.start_ns = timeFromField(start->second);
+				chunk.end_ns = timeFromField(end->second);
+				chunks_.push_back(chunk);
+			}
 		}
 	}
+	std::sort(chunks_.begin(), chunks_.end(), [](const IndexedChunk& a, const IndexedChunk& b) { return a.pos < b.pos; });
 	for(const auto& [conn, count] : message_counts)
 	{
 		const auto it = connections_.find(conn);
@@ -499,10 +509,72 @@ bool Ros1BagReader::parseRecords(const uint8_t* data, size_t size, const Message
 	return true;
 }
 
+std::optional<LogTimeRange> Ros1BagReader::recordTimeSpan() const
+{
+	if(chunks_.empty())
+		return std::nullopt;
+	LogTimeRange span{std::numeric_limits<uint64_t>::max(), 0};
+	for(const auto& chunk : chunks_)
+	{
+		span.start_ns = std::min(span.start_ns, chunk.start_ns);
+		span.end_ns = std::max(span.end_ns, chunk.end_ns + 1);
+	}
+	return span;
+}
+
 bool Ros1BagReader::forEachMessage(const MessageFn& fn)
 {
 	if(!isOpen())
 		return false;
+	return scanAll(fn);
+}
+
+bool Ros1BagReader::forEachMessage(const MessageFn& fn, const LogTimeRange& range)
+{
+	if(!isOpen())
+		return false;
+	const MessageFn inRange = [&](const Ros1Connection& c, uint64_t time_ns, const uint8_t* data, size_t size)
+	{
+		return time_ns < range.start_ns || time_ns >= range.end_ns || fn(c, time_ns, data, size);
+	};
+	if(chunks_.empty())
+		return scanAll(inRange);
+
+	HeaderFields header;
+	std::vector<uint8_t> data, chunk;
+	bool stop = false;
+	for(const auto& indexed : chunks_)
+	{
+		if(indexed.end_ns < range.start_ns || indexed.start_ns >= range.end_ns)
+			continue;
+		file_.clear();
+		file_.seekg(static_cast<std::streamoff>(indexed.pos));
+		if(!readRecord(file_, header, data, error_))
+		{
+			if(error_.empty())
+				error_ = "cannot read the chunk at offset " + std::to_string(indexed.pos);
+			return false;
+		}
+		uint8_t op = 0;
+		uint32_t size = 0;
+		const auto compression = header.find("compression");
+		if(!fieldAs(header, "op", op) || op != kOpChunk || compression == header.end() || !fieldAs(header, "size", size))
+		{
+			error_ = "malformed chunk record at offset " + std::to_string(indexed.pos);
+			return false;
+		}
+		if(!decompress(compression->second, data, size, chunk, error_))
+			return false;
+		if(!parseRecords(chunk.data(), chunk.size(), inRange, stop))
+			return false;
+		if(stop)
+			break;
+	}
+	return true;
+}
+
+bool Ros1BagReader::scanAll(const MessageFn& fn)
+{
 	file_.clear();
 	file_.seekg(static_cast<std::streamoff>(kMagicSize));
 	HeaderFields header;
@@ -1008,7 +1080,12 @@ const std::string& Ros1BagFileReader::lidarLayoutWarning() const
 	return warning_;
 }
 
-bool Ros1BagFileReader::read(const Callbacks& callbacks)
+std::optional<LogTimeRange> Ros1BagFileReader::logTimeSpan() const
+{
+	return reader_.recordTimeSpan();
+}
+
+bool Ros1BagFileReader::read(const Callbacks& callbacks, const LogTimeRange& range)
 {
 	if(!open_)
 		return false;
@@ -1075,7 +1152,8 @@ bool Ros1BagFileReader::read(const Callbacks& callbacks)
 					callbacks.onSn(time_ns, sn);
 			}
 			return true;
-		});
+		},
+		range);
 	if(!ok)
 		error_ = reader_.error();
 	return ok;

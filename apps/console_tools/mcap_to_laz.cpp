@@ -7,6 +7,7 @@
 // load_point_cloud()/load_imu(); reading is handled by rosbags/McapReader and
 // writing by rosbags/MandeyeSessionWriter, which keeps this tool free of
 // core/TBB/glm/toml++/vqf.
+#include "ImuTransform.h"
 #include "MandeyeSessionWriter.h"
 #include "McapReader.h"
 #if defined(HDMAPPING_IMPORT_ROS1_BAG)
@@ -40,40 +41,6 @@ namespace
     constexpr const char* kInputExtension = ".mcap";
     constexpr const char* kInputDescription = "a ros2msg/CDR MCAP bag, e.g. one written by laz_to_mcap";
 #endif
-
-    // Standard gravity, the g HDMapping's IMU csv is scaled in.
-    constexpr double kStandardGravity = 9.80665;
-
-    // What the importer does to every IMU sample before it reaches the csv:
-    // rotate it into the lidar frame (the frame HDMapping assumes the IMU is in)
-    // and bring acceleration to g.
-    struct ImuTransform
-    {
-        double qx = 0.0, qy = 0.0, qz = 0.0, qw = 1.0; // IMU frame -> lidar frame
-        double acc_scale = 1.0; // 1 for a bag already in g, 1/9.80665 for m/s^2
-    };
-
-    void rotate(const ImuTransform& q, float& x, float& y, float& z)
-    {
-        // v' = v + 2w (u x v) + 2 u x (u x v), u = (qx, qy, qz)
-        const double vx = x, vy = y, vz = z;
-        const double cx = q.qy * vz - q.qz * vy, cy = q.qz * vx - q.qx * vz, cz = q.qx * vy - q.qy * vx;
-        x = static_cast<float>(vx + 2.0 * (q.qw * cx + q.qy * cz - q.qz * cy));
-        y = static_cast<float>(vy + 2.0 * (q.qw * cy + q.qz * cx - q.qx * cz));
-        z = static_cast<float>(vz + 2.0 * (q.qw * cz + q.qx * cy - q.qy * cx));
-    }
-
-    void apply_imu_transform(const ImuTransform& t, std::vector<rosbags::McapImuSample>& samples)
-    {
-        for (auto& s : samples)
-        {
-            rotate(t, s.gyro_x, s.gyro_y, s.gyro_z);
-            rotate(t, s.acc_x, s.acc_y, s.acc_z);
-            s.acc_x = static_cast<float>(s.acc_x * t.acc_scale);
-            s.acc_y = static_cast<float>(s.acc_y * t.acc_scale);
-            s.acc_z = static_cast<float>(s.acc_z * t.acc_scale);
-        }
-    }
 
     // Absolute time grid, matching MessageSplitter in laz_to_mcap.cpp: a timestamp t
     // belongs to bin floor(t / chunk_seconds). Because the grid is absolute rather
@@ -332,7 +299,7 @@ int main(const int argc, const char** argv)
     rosbags::McapReaderOptions options;
     double chunk_seconds = 10.0;
     bool list_only = false;
-    ImuTransform imu_transform;
+    rosbags::ImuTransform imu_transform;
 
     for (int i = 1; i < argc; ++i)
     {
@@ -411,7 +378,7 @@ int main(const int argc, const char** argv)
             if (unit == "g")
                 imu_transform.acc_scale = 1.0;
             else if (unit == "ms2")
-                imu_transform.acc_scale = 1.0 / kStandardGravity;
+                imu_transform.acc_scale = 1.0 / rosbags::kStandardGravity;
             else
             {
                 spdlog::error("Unknown --imu-acc-unit '{}' (expected g|ms2)", unit);
@@ -534,7 +501,7 @@ int main(const int argc, const char** argv)
         spdlog::info("Bag serial number: {}", serial_number);
     if (!topics.imu.empty())
         imu_progress.finish(imu.size());
-    apply_imu_transform(imu_transform, imu);
+    rosbags::applyImuTransform(imu_transform, imu);
     spdlog::info("Read {} IMU sample(s)", imu.size());
 
     rosbags::MandeyeSessionWriter writer(session_dir, /*with_rgb=*/false, /*with_ring=*/true);

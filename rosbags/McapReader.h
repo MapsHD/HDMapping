@@ -4,7 +4,9 @@
 #include <cstdint>
 #include <filesystem>
 #include <functional>
+#include <limits>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -45,6 +47,14 @@ struct ResolvedTopics
 	std::string imu;
 	std::string sn;
     LidarSchema lidar_schema = LidarSchema::Unknown;
+};
+
+// Half-open range [start_ns, end_ns) of message log times: the MCAP log time, or
+// the record time of a ROS1 bag. The default covers every message.
+struct LogTimeRange
+{
+	uint64_t start_ns = 0;
+	uint64_t end_ns = std::numeric_limits<uint64_t>::max();
 };
 
 // One channel as found in the file, for --list output and diagnostics.
@@ -111,9 +121,15 @@ public:
 		std::function<void(uint64_t log_time_ns, const std::string&)> onSn;
 	};
 
-	// Streams the whole file through `callbacks`. Returns false on a read error
-	// (see error()); a file with no matching messages is not an error.
-	bool read(const Callbacks& callbacks);
+	// Streams the messages whose log time lies in `range` (by default the whole
+	// file) through `callbacks`. Uses the chunk index to skip the rest when the file
+	// has one. Returns false on a read error (see error()); a file with no matching
+	// messages is not an error.
+	bool read(const Callbacks& callbacks, const LogTimeRange& range = {});
+
+	// Log times of the file's first and last message, from the statistics record or
+	// the chunk index; nullopt when the file has neither.
+	std::optional<LogTimeRange> logTimeSpan() const;
 
 private:
 	struct Impl;

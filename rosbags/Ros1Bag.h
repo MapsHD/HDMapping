@@ -55,15 +55,31 @@ public:
 	// Returns false on a read or decompression error (see error()).
 	using MessageFn = std::function<bool(const Ros1Connection&, uint64_t time_ns, const uint8_t* data, size_t size)>;
 	bool forEachMessage(const MessageFn& fn);
+	// As above, for the messages whose record time lies in `range`. An indexed bag
+	// reads only the chunks that overlap it; an unindexed one is scanned whole.
+	bool forEachMessage(const MessageFn& fn, const LogTimeRange& range);
+
+	// Record times covered by the chunks in the index section; nullopt for an
+	// unindexed bag.
+	std::optional<LogTimeRange> recordTimeSpan() const;
 
 private:
+	struct IndexedChunk
+	{
+		uint64_t pos{};
+		uint64_t start_ns{};
+		uint64_t end_ns{}; // inclusive, as in the chunk info record
+	};
+
 	bool readIndex();
 	bool parseRecords(const uint8_t* data, size_t size, const MessageFn& fn, bool& stop);
+	bool scanAll(const MessageFn& fn);
 
 	std::ifstream file_;
 	std::string error_;
 	uint64_t index_pos_{};
 	std::map<uint32_t, Ros1Connection> connections_;
+	std::vector<IndexedChunk> chunks_; // from the index section, ordered by file position
 };
 
 class Ros1BagWriter
@@ -193,9 +209,13 @@ public:
 	bool timeOrdered() const;
 	const std::string& lidarLayoutWarning() const;
 
-	// Streams the whole bag through `callbacks`; `log_time_ns` is the bag record
-	// time. Returns false on a read error (see error()).
-	bool read(const Callbacks& callbacks);
+	// Streams the messages whose record time lies in `range` (by default the whole
+	// bag) through `callbacks`; `log_time_ns` is the bag record time. Returns false
+	// on a read error (see error()).
+	bool read(const Callbacks& callbacks, const LogTimeRange& range = {});
+
+	// Record times covered by the bag's chunks; nullopt for an unindexed bag.
+	std::optional<LogTimeRange> logTimeSpan() const;
 
 private:
 	Ros1BagReader reader_;

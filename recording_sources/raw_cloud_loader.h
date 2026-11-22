@@ -1,8 +1,9 @@
 #pragma once
 
 #include "lidar_odometry_utils.h"
+#include "recording_source.h"
 
-#include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -16,17 +17,16 @@
 //! same order. The loader lives in LidarOdometryParams::raw_cloud_loader, so each pipeline owns its own.
 struct RawCloudLoader
 {
-    std::function<std::vector<Point3Di>(size_t)> load;
-    std::vector<std::string> files;
-    std::vector<std::uintmax_t> file_size;
-    std::vector<fs::file_time_type> file_time;
+    std::shared_ptr<const RecordingSource> source;
+    PointFilter filter;
+    std::vector<ChunkStamp> stamp; //!< each chunk's state when first read
     std::vector<double> t_first, t_last;
     std::vector<size_t> n;
     std::vector<char> loaded, done;
+
+    //! Load chunk i into ppf[i] if step 1 needs it and it is not in memory. Lazy loading reads every chunk twice (the
+    //! range pass in load_data, then here), so a chunk that changed in between is refused rather than silently processed.
+    bool ensure(std::vector<std::vector<Point3Di>>& ppf, size_t i);
+    //! Free ppf[i] for good: step 1 has passed its last point.
+    void release(std::vector<std::vector<Point3Di>>& ppf, size_t i);
 };
-
-//! Load file i if step 1 needs it and it is not in memory. Lazy loading reads every file twice (the range pass in
-//! load_data, then here), so a file that changed in between is refused rather than silently processed.
-bool lazy_ensure(RawCloudLoader* L, std::vector<std::vector<Point3Di>>& ppf, size_t i);
-
-void lazy_release(RawCloudLoader* L, std::vector<std::vector<Point3Di>>& ppf, size_t i);

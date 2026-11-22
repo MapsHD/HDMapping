@@ -13,7 +13,8 @@ set(SOURCES
   ../lidar_odometry_step_1/lidar_odometry_utils.cpp
   ../lidar_odometry_step_1/lidar_odometry_utils_optimizers.cpp
   ../lidar_odometry_step_1/points_global_spill.cpp
-  ../lidar_odometry_step_1/raw_cloud_loader.cpp
+  ${REPOSITORY_DIRECTORY}/recording_sources/laz_csv_source.cpp
+  ${REPOSITORY_DIRECTORY}/recording_sources/raw_cloud_loader.cpp
     "../../core/src/utils.cpp"
 )
 
@@ -29,6 +30,8 @@ add_executable(
 target_include_directories(
   mandeye_raw_data_viewer_legacy
   PRIVATE include
+  ${REPOSITORY_DIRECTORY}/apps/lidar_odometry_step_1
+  ${REPOSITORY_DIRECTORY}/recording_sources
   ${REPOSITORY_DIRECTORY}/core/include
   ${REPOSITORY_DIRECTORY}/core_hd_mapping/include
   ${THIRDPARTY_DIRECTORY}

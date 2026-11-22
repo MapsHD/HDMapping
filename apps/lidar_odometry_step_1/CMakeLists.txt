@@ -22,7 +22,9 @@ set(SOURCES
   lidar_odometry_utils_optimizers.cpp
   lidar_odometry.cpp lidar_odometry.h
   points_global_spill.h points_global_spill.cpp
-  raw_cloud_loader.h raw_cloud_loader.cpp
+  ${REPOSITORY_DIRECTORY}/recording_sources/laz_csv_source.h ${REPOSITORY_DIRECTORY}/recording_sources/laz_csv_source.cpp
+  ${REPOSITORY_DIRECTORY}/recording_sources/raw_cloud_loader.h ${REPOSITORY_DIRECTORY}/recording_sources/raw_cloud_loader.cpp
+  ${REPOSITORY_DIRECTORY}/recording_sources/recording_source.h
   toml_io.h toml_io.cpp
 )
 
@@ -44,6 +46,8 @@ target_apply_hdmapping_profiler(lidar_odometry_step_1)
 target_include_directories(
   lidar_odometry_step_1
   PRIVATE include
+          ${CMAKE_CURRENT_SOURCE_DIR}
+          ${REPOSITORY_DIRECTORY}/recording_sources
           ${REPOSITORY_DIRECTORY}/core/include
           ${REPOSITORY_DIRECTORY}/core_hd_mapping/include
           ${THIRDPARTY_DIRECTORY}
@@ -99,6 +103,8 @@ target_apply_hdmapping_profiler(drag_folder_with_mandeye_data_and_drop_here-prec
 target_include_directories(
   drag_folder_with_mandeye_data_and_drop_here-precision_forestry
   PRIVATE include
+          ${CMAKE_CURRENT_SOURCE_DIR}
+          ${REPOSITORY_DIRECTORY}/recording_sources
           ${REPOSITORY_DIRECTORY}/core/include
           ${REPOSITORY_DIRECTORY}/core_hd_mapping/include
           ${THIRDPARTY_DIRECTORY}

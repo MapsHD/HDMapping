@@ -4,6 +4,7 @@
 #include <sstream>
 
 #include "lidar_odometry_utils.h"
+#include "recording_source.h"
 #include "run_report.h"
 #include "toml_io.h"
 #include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
@@ -14,17 +15,6 @@
 #include <Core/session.h>
 
 using Trajectory = std::map<double, std::tuple<Eigen::Matrix4d, double, RawIMUData>>;
-using Imu = std::vector<std::tuple<std::pair<double, double>, Eigen::Vector3f, Eigen::Vector3f>>;
-
-//! Time span of one input file as load_data read it.
-struct InputFileSpan
-{
-    std::string file;
-    double first = 0.0; //!< first sample's LiDAR-clock time [s]; 0 when count is 0
-    double last = 0.0; //!< last sample's LiDAR-clock time [s]
-    size_t count = 0; //!< points or IMU samples read
-};
-
 //! Per-file spans load_data reports when asked, e.g. for a Gantt chart of the session.
 struct InputFileSpans
 {
@@ -49,6 +39,14 @@ bool load_data(
     std::vector<std::vector<Point3Di>>& pointsPerFile,
     Imu& imu_data,
     bool debugMsg,
+    InputFileSpans& fileSpans);
+//! Loads any recording; the file-list overloads above open the folder as a LazCsvSource and continue here.
+//! @param fileSpans receives the spans; reset first
+bool load_data(
+    const std::shared_ptr<RecordingSource>& source,
+    LidarOdometryParams& params,
+    std::vector<std::vector<Point3Di>>& pointsPerFile,
+    Imu& imu_data,
     InputFileSpans& fileSpans);
 void calculate_trajectory(Trajectory& trajectory, Imu& imu_data, LidarOdometryParams& params, bool debugMsg);
 // pointsPerFile is read, and with lazy_load_raw_clouds loaded and freed file by file

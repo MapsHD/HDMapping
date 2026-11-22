@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 4.0.0)
 
-project(hd-mapping VERSION 0.107.0)
+project(hd-mapping VERSION 0.107.1)
 
 # Common settings
 set(CMAKE_CXX_STANDARD 20)

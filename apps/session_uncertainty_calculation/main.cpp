@@ -129,12 +129,12 @@ int main(int argc, char* argv[])
             PairWiseICP icp;
             TaitBryanPose icp_uncertainty =
                 icp.compute_icp_uncertainty(source_local_for_single_trajectory_node, target_global, m_global, 0.1);
-            std::cout << "px=" << icp_uncertainty.px << ", "
-                      << "py=" << icp_uncertainty.py << ", "
-                      << "pz=" << icp_uncertainty.pz << ", "
-                      << "om=" << icp_uncertainty.om << ", "
-                      << "fi=" << icp_uncertainty.fi << ", "
-                      << "ka=" << icp_uncertainty.ka << std::endl;
+            std::cout << "sigma_px=" << icp_uncertainty.px << ", "
+                      << "sigma_py=" << icp_uncertainty.py << ", "
+                      << "sigma_pz=" << icp_uncertainty.pz << ", "
+                      << "sigma_om=" << icp_uncertainty.om << ", "
+                      << "sigma_fi=" << icp_uncertainty.fi << ", "
+                      << "sigma_ka=" << icp_uncertainty.ka << std::endl;
 
             icp_uncertainties.emplace_back(icp_uncertainty);
             node_timestamps.emplace_back(n.timestamps);

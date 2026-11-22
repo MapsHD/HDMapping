@@ -3181,8 +3181,8 @@ void display()
 
             if (ImGui::MenuItem("Save all point clouds as single LAZ", nullptr, nullptr, loaded_sessions && !sessions.empty()))
             {
-                const std::string output_file_name =
-                    mandeye::fd::SaveFileDialog("Save all point clouds as single LAZ", mandeye::fd::LAS_LAZ_filter, ".laz", "all_sessions.laz");
+                const std::string output_file_name = mandeye::fd::SaveFileDialog(
+                    "Save all point clouds as single LAZ", mandeye::fd::LAS_LAZ_filter, ".laz", "all_sessions.laz");
                 if (!output_file_name.empty())
                 {
                     if (save_all_sessions_to_las(sessions, output_file_name))
@@ -3701,8 +3701,6 @@ void display()
             }
 
             ImGui::Separator();
-
-            
 
             ImGui::EndMenu();
         }

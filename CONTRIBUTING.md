@@ -6,9 +6,10 @@ alike. This file adds the rule that protects the processing results.
 ## The LIO trajectory must not change
 
 HDMapping's lidar-inertial odometry (`lidar_odometry_step_1`) is state of the art. A PR must not change the trajectory
-it computes. CI checks this on every PR, on Linux, Windows and macOS: it runs step 1 with default parameters on the
-long-corridor recording of the [HUMANOID-LIO-DATASET](https://zenodo.org/records/21318128) and fails when the ATE
-against `tests/golden/long-corridor.tum` is above 1 cm.
+it computes. CI checks this on every PR, on Linux, Windows and macOS: it runs step 1 with default parameters on
+`calibration-room/trial-1` of the [HUMANOID-LIO-DATASET](https://zenodo.org/records/21318128) (380 s, about 300 m, so
+it crosses the 200 m sliding-window reset) and fails when the ATE against
+`tests/golden/calibration-room-trial-1.tum` is above 1 cm.
 
 This covers every change, not only changes to the odometry code:
 
@@ -32,8 +33,8 @@ A change that is meant to improve the trajectory is welcome, but it goes in its 
 2. **The theory.** Why the change is correct and why it improves the result: the math, the model, or a reference.
    A change that only makes the numbers better on one recording is not enough.
 
-Only when both hold up is the golden trajectory updated, in the same PR, with the new `tests/golden/long-corridor.tum`
-taken from that PR's Linux CI artifact (`lio-long-corridor-Linux`).
+Only when both hold up is the golden trajectory updated, in the same PR, with the new
+`tests/golden/calibration-room-trial-1.tum` taken from that PR's Linux CI artifact (`lio-calibration-room-trial-1-Linux`).
 
 **The decision to update the golden trajectory belongs to Janusz Będkowski and Michał Pełka.** `CODEOWNERS` makes
 their approval required for any change under `tests/golden/`, to the CI check and to its tolerance.

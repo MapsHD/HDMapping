@@ -83,7 +83,7 @@ def main():
     if not rows:
         print(f"No poses found in '{args.folder}'", file=sys.stderr)
         return 1
-    with open(args.output, "w") as out:
+    with open(args.output, "w", newline="\n") as out:  # same bytes on every platform
         for ns, m in rows:
             qx, qy, qz, qw = quaternion(m)
             out.write(

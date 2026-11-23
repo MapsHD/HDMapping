@@ -8,8 +8,12 @@ alike. This file adds the rule that protects the processing results.
 HDMapping's lidar-inertial odometry (`lidar_odometry_step_1`) is state of the art. A PR must not change the trajectory
 it computes. CI checks this on every PR, on Linux, Windows and macOS: it runs step 1 with default parameters on
 `calibration-room/trial-1` of the [HUMANOID-LIO-DATASET](https://zenodo.org/records/21318128) (380 s, about 300 m, so
-it crosses the 200 m sliding-window reset) and fails when the ATE against
-`tests/golden/calibration-room-trial-1.tum` is above 1 cm.
+it crosses the 200 m sliding-window reset) and fails when the ATE against that platform's golden trajectory,
+`tests/golden/calibration-room-trial-1-<Linux|Windows|macOS>.tum`, is above 1 cm.
+
+There is one golden trajectory per platform. Each platform repeats its own result exactly, but the compilers and
+standard libraries differ in rounding and in how they order equal elements, so the platforms differ from each other by
+about 1-1.5 cm on this recording.
 
 This covers every change, not only changes to the odometry code:
 
@@ -33,10 +37,11 @@ A change that is meant to improve the trajectory is welcome, but it goes in its 
 2. **The theory.** Why the change is correct and why it improves the result: the math, the model, or a reference.
    A change that only makes the numbers better on one recording is not enough.
 
-Only when both hold up is the golden trajectory updated, in the same PR, with the new
-`tests/golden/calibration-room-trial-1.tum` taken from that PR's Linux CI artifact (`lio-calibration-room-trial-1-Linux`).
+Only when both hold up are the golden trajectories updated, in the same PR: each
+`tests/golden/calibration-room-trial-1-<platform>.tum` is taken from that PR's CI artifact for the platform
+(`lio-calibration-room-trial-1-Linux`, `-Windows`, `-macOS`).
 
-**The decision to update the golden trajectory belongs to Janusz Będkowski and Michał Pełka.** `CODEOWNERS` makes
+**The decision to update the golden trajectories belongs to Janusz Będkowski and Michał Pełka.** `CODEOWNERS` makes
 their approval required for any change under `tests/golden/`, to the CI check and to its tolerance.
 
 ## PR checklist

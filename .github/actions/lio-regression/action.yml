@@ -2,8 +2,9 @@ name: LIO trajectory regression
 description: >
   Runs lidar_odometry_step_1 with default parameters on calibration-room/trial-1 of the
   HUMANOID-LIO-DATASET (Zenodo 10.5281/zenodo.21318128; 380 s, ~300 m, so it crosses the 200 m
-  sliding-window reset) and fails when the trajectory's ATE against
-  tests/golden/calibration-room-trial-1.tum is above 1 cm. Uploads the trajectory as an artifact either way.
+  sliding-window reset) and fails when the trajectory's ATE against this platform's golden trajectory,
+  tests/golden/calibration-room-trial-1-<runner.os>.tum, is above 1 cm. Uploads the trajectory as an
+  artifact either way.
 
 inputs:
   build-dir:
@@ -70,7 +71,7 @@ runs:
         mkdir -p "${{ runner.temp }}/lio-artifact"
         cp "$result"/HDMapping_results_*.json "$result"/HDMapping_params_*.toml "$result"/session_ini_poses.mri "${{ runner.temp }}/lio-artifact/"
         python "${{ github.workspace }}/scripts/lio_to_tum.py" "$result" "${{ runner.temp }}/lio-artifact/calibration-room-trial-1.tum"
-        python "${{ github.workspace }}/scripts/lio_ate.py" "${{ github.workspace }}/tests/golden/calibration-room-trial-1.tum" \
+        python "${{ github.workspace }}/scripts/lio_ate.py" "${{ github.workspace }}/tests/golden/calibration-room-trial-1-${{ runner.os }}.tum" \
           "${{ runner.temp }}/lio-artifact/calibration-room-trial-1.tum" --max-ate-m "${{ inputs.max-ate-m }}"
 
     - name: Upload trajectory

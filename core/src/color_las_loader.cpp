@@ -7,37 +7,43 @@
 std::vector<mandeye::Point> mandeye::load(const std::string& lazFile)
 {
     std::vector<Point> points;
-    laszip_POINTER laszip_reader;
+    laszip_POINTER laszip_reader = nullptr;
     if (laszip_create(&laszip_reader))
     {
         spdlog::error("DLL ERROR: creating laszip reader");
-        std::abort();
+        return points;
     }
 
     laszip_BOOL is_compressed = 0;
     if (laszip_open_reader(laszip_reader, lazFile.c_str(), &is_compressed))
     {
         spdlog::error("DLL ERROR: opening laszip reader for '{}'", lazFile);
-        std::abort();
+        laszip_destroy(laszip_reader);
+        return points;
     }
-    std::cout << "compressed : " << is_compressed << std::endl;
-    laszip_header* header;
+    spdlog::info("LAS file '{}' is {}", lazFile, is_compressed ? "compressed" : "uncompressed");
+    laszip_header* header = nullptr;
 
     if (laszip_get_header_pointer(laszip_reader, &header))
     {
         spdlog::error("DLL ERROR: getting header pointer from laszip reader");
-        std::abort();
+        laszip_close_reader(laszip_reader);
+        laszip_destroy(laszip_reader);
+        return points;
     }
 
     laszip_I64 npoints = (header->number_of_point_records ? header->number_of_point_records : header->extended_number_of_point_records);
 
     spdlog::info("file '{}' contains {} points", lazFile, npoints);
 
-    laszip_point* point;
+    laszip_point* point = nullptr;
 
     if (laszip_get_point_pointer(laszip_reader, &point))
     {
         spdlog::error("DLL ERROR: getting point pointer from laszip reader");
+        laszip_close_reader(laszip_reader);
+        laszip_destroy(laszip_reader);
+        return points;
     }
 
     laszip_I64 p_count = 0;
@@ -47,6 +53,8 @@ std::vector<mandeye::Point> mandeye::load(const std::string& lazFile)
         if (laszip_read_point(laszip_reader))
         {
             spdlog::error("DLL ERROR: reading point {}", p_count);
+            points.clear();
+            break;
         }
 
         Point p;
@@ -59,6 +67,15 @@ std::vector<mandeye::Point> mandeye::load(const std::string& lazFile)
         points.emplace_back(p);
 
         p_count++;
+    }
+
+    if (laszip_close_reader(laszip_reader))
+    {
+        spdlog::error("DLL ERROR: closing laszip reader for '{}'", lazFile);
+    }
+    if (laszip_destroy(laszip_reader))
+    {
+        spdlog::error("DLL ERROR: destroying laszip reader");
     }
 
     return points;

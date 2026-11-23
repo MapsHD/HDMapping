@@ -3179,6 +3179,24 @@ void display()
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
                 ImGui::SetTooltip("Save the current poses of one session as a TUM trajectory (t[s] x y z qx qy qz qw)");
 
+            if (ImGui::MenuItem("Save all point clouds as single LAZ", nullptr, nullptr, loaded_sessions && !sessions.empty()))
+            {
+                const std::string output_file_name = mandeye::fd::SaveFileDialog(
+                    "Save all point clouds as single LAZ", mandeye::fd::LAS_LAZ_filter, ".laz", "all_sessions.laz");
+                if (!output_file_name.empty())
+                {
+                    if (save_all_sessions_to_las(sessions, output_file_name))
+                        std::cout << "Saved: " << output_file_name << std::endl;
+                    else
+                        pfd::message("Export failed", "Could not write '" + output_file_name + "'", pfd::choice::ok, pfd::icon::error);
+                }
+            }
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                ImGui::SetTooltip(
+                    "Merge the visible scans of all visible sessions, with their current poses, into one las/laz file.\n"
+                    "point_source_ID = session index. Points are written as loaded: with 'Downsample during load' on,\n"
+                    "the file is downsampled too.");
+
             ImGui::Separator();
             if (ImGui::BeginMenu("Save all marked trajectories", sessions.size() > 0))
             {
@@ -3681,6 +3699,8 @@ void display()
 
                 ImGui::EndMenu();
             }
+
+            ImGui::Separator();
 
             ImGui::EndMenu();
         }

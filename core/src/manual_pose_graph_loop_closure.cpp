@@ -337,6 +337,70 @@ void ManualPoseGraphLoopClosure::Gui(
                 ImGui::SameLine();
                 if (ImGui::Button("ICP (0.1)"))
                     run_icp(point_clouds_container, index_active_edge, 0.1, 30, num_edge_extended_before, num_edge_extended_after);
+                char icp_uncertainty_label[128];
+                std::snprintf(
+                    icp_uncertainty_label,
+                    sizeof(icp_uncertainty_label),
+                    "Calculate ICP uncertainty for search radius %.3f m###icp_uncertainty",
+                    search_radious);
+                if (ImGui::Button(icp_uncertainty_label))
+                {
+                    icp_uncertainty.edge = index_active_edge;
+                    icp_uncertainty.relative_pose = edges[index_active_edge].relative_pose_tb;
+                    icp_uncertainty.point_to_point = compute_icp_uncertainty(
+                        point_clouds_container,
+                        index_active_edge,
+                        search_radious,
+                        num_edge_extended_before,
+                        num_edge_extended_after,
+                        false,
+                        &icp_uncertainty.point_to_point_residuals);
+                    icp_uncertainty.point_to_plane = compute_icp_uncertainty(
+                        point_clouds_container,
+                        index_active_edge,
+                        search_radious,
+                        num_edge_extended_before,
+                        num_edge_extended_after,
+                        true,
+                        &icp_uncertainty.point_to_plane_residuals);
+                }
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(
+                        "Standard deviations of the active edge's relative pose from the ICP normal matrix at the current pose,\n"
+                        "with Search_radius. Formal values: neighbouring LiDAR points are correlated, so they are optimistic.\n"
+                        "Use them to compare edges, not as absolute accuracy. inf = geometry does not constrain the pose.");
+
+                const TaitBryanPose& current_pose = edges[index_active_edge].relative_pose_tb;
+                const TaitBryanPose& computed_pose = icp_uncertainty.relative_pose;
+                if (icp_uncertainty.edge == index_active_edge && current_pose.px == computed_pose.px &&
+                    current_pose.py == computed_pose.py && current_pose.pz == computed_pose.pz && current_pose.om == computed_pose.om &&
+                    current_pose.fi == computed_pose.fi && current_pose.ka == computed_pose.ka)
+                {
+                    const auto show = [](const char* label, const TaitBryanPose& s, const IcpResidualStatistics& r)
+                    {
+                        ImGui::Text(
+                            "%s sigma [m]: sigma_px %.4f sigma_py %.4f sigma_pz %.4f  [deg]: sigma_om %.4f sigma_fi %.4f sigma_ka %.4f",
+                            label,
+                            s.px,
+                            s.py,
+                            s.pz,
+                            rad2deg(s.om),
+                            rad2deg(s.fi),
+                            rad2deg(s.ka));
+                        ImGui::Text(
+                            "    sum of squared residuals %.6f [m^2], correspondences %d, observations %d, sigma0(RMS) %.4f [m]",
+                            r.sum_squared_residuals,
+                            r.number_of_correspondences,
+                            r.number_of_observations,
+                            r.sigma0);
+                        if (ImGui::IsItemHovered())
+                            ImGui::SetTooltip(
+                                "sigma0 = sqrt(sum of squared residuals / (observations - 6)): RMS residual per observation.\n"
+                                "It scales all pose sigmas: covariance = sigma0^2 * (J^T J)^-1.");
+                    };
+                    show("point-to-point", icp_uncertainty.point_to_point, icp_uncertainty.point_to_point_residuals);
+                    show("point-to-plane", icp_uncertainty.point_to_plane, icp_uncertainty.point_to_plane_residuals);
+                }
 
                 if (ImGui::Button("Save source (local)"))
                 {

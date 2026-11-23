@@ -39,6 +39,18 @@ public:
         bool progress_drawn = false; //!< the progress bar has been shown at least once
     };
     IcpAllEdgesRun icp_all_edges_run;
+    //! Last "Calculate ICP uncertainty" result: the edge and the relative pose it was computed for, so it is shown only
+    //! while both are unchanged.
+    struct IcpUncertainty
+    {
+        int edge = -1;
+        TaitBryanPose relative_pose;
+        TaitBryanPose point_to_point;
+        TaitBryanPose point_to_plane;
+        IcpResidualStatistics point_to_point_residuals;
+        IcpResidualStatistics point_to_plane_residuals;
+    };
+    IcpUncertainty icp_uncertainty;
     //! "Keep initial trajectory curvature": compute_pose_graph_slam() uses the initial poses as the motion model, else the current ones.
     bool keep_initial_trajectory_curvature = true;
 

@@ -534,3 +534,65 @@ inline bool save_all_to_las(const Session& session, std::string output_las_name,
 
     return writer.close();
 }
+
+//! Writes the visible scans of all visible sessions, in global coordinates (pose * point + session offset), to one
+//! las/laz file. point_source_ID holds the session index, so the merged cloud can be split per session again.
+inline bool save_all_sessions_to_las(const std::vector<Session>& sessions, const std::string& output_las_name)
+{
+    // The first visible session's offset is the file offset; other sessions are shifted to it.
+    const auto first_visible = std::find_if(
+        sessions.begin(),
+        sessions.end(),
+        [](const Session& s)
+        {
+            return s.visible;
+        });
+    if (first_visible == sessions.end())
+    {
+        std::cerr << "no visible session to save" << std::endl;
+        return false;
+    }
+    const Eigen::Vector3d file_offset = first_visible->point_clouds_container.offset;
+
+    if (sessions.size() > 65535)
+    {
+        std::cerr << "warning: more than 65535 sessions, point_source_ID capped at 65535\n";
+    }
+
+    LazWriter writer;
+    if (!writer.open(output_las_name, file_offset.x(), file_offset.y(), file_offset.z()))
+    {
+        std::cerr << "problem with saving file: " << output_las_name << std::endl;
+        return false;
+    }
+
+    for (size_t session_idx = 0; session_idx < sessions.size(); ++session_idx)
+    {
+        const Session& session = sessions[session_idx];
+        if (!session.visible)
+            continue;
+
+        const Eigen::Vector3d shift = session.point_clouds_container.offset - file_offset;
+        const unsigned short psid = static_cast<unsigned short>(std::min<size_t>(session_idx, 65535));
+
+        for (const auto& p : session.point_clouds_container.point_clouds)
+        {
+            if (!p.visible)
+                continue;
+
+            for (size_t i = 0; i < p.points_local.size(); ++i)
+            {
+                const Eigen::Vector3d vp = p.m_pose * p.points_local[i] + shift;
+                const unsigned short inten = (i < p.intensities.size()) ? p.intensities[i] : 0;
+                const double ts = (i < p.timestamps.size()) ? p.timestamps[i] : 0.0;
+
+                if (!writer.writePoint(vp, inten, ts, file_offset.x(), file_offset.y(), file_offset.z(), psid))
+                {
+                    return false;
+                }
+            }
+        }
+    }
+
+    return writer.close();
+}

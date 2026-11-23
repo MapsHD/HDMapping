@@ -9,7 +9,7 @@ HDMapping's lidar-inertial odometry (`lidar_odometry_step_1`) is state of the ar
 it computes. CI checks this on every PR, on Linux, Windows and macOS: it runs step 1 with default parameters on
 `calibration-room/trial-1` of the [HUMANOID-LIO-DATASET](https://zenodo.org/records/21318128) (380 s, about 300 m, so
 it crosses the 200 m sliding-window reset) and fails when the ATE against that platform's golden trajectory,
-`tests/golden/calibration-room-trial-1-<Linux|Windows|macOS>.tum`, is above 1 cm.
+`tests/golden/calibration-room-trial-1-<Linux|Windows|macOS>.tum`, is above 1 mm.
 
 There is one golden trajectory per platform. Each platform repeats its own result exactly, but the compilers and
 standard libraries differ in rounding and in how they order equal elements, so the platforms differ from each other by

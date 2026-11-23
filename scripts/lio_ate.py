@@ -10,7 +10,7 @@ Exit codes: 0 when the position RMSE is within the limit, 1 when it is not,
 2 when the two files do not have the same poses or timestamps.
 
 Usage:
-    lio_ate.py <golden.tum> <candidate.tum> [--max-ate-m 0.01]
+    lio_ate.py <golden.tum> <candidate.tum> [--max-ate-m 0.001]
 """
 
 import argparse
@@ -35,7 +35,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("golden", help="reference TUM trajectory")
     parser.add_argument("candidate", help="TUM trajectory to check")
-    parser.add_argument("--max-ate-m", type=float, default=0.01, help="largest accepted position RMSE in metres (default 0.01)")
+    parser.add_argument("--max-ate-m", type=float, default=0.001, help="largest accepted position RMSE in metres (default 0.001)")
     parser.add_argument(
         "--max-dt-s", type=float, default=1e-5, help="largest accepted timestamp difference between paired poses (default 1e-5)"
     )

@@ -48,6 +48,10 @@ add_library(imgui_raylib STATIC
     ${IMGUI_RAYLIB_DIR}/imgui_demo.cpp
 )
 target_include_directories(imgui_raylib PUBLIC ${IMGUI_RAYLIB_DIR})
+# 32-bit indices: rlImGui ignores ImDrawCmd::VtxOffset, so with 16-bit indices a
+# draw list over 65535 vertices (e.g. ImPlot lines of a long IMU log) wraps
+# around and renders garbage. Same setting as the legacy `imgui` target.
+target_compile_definitions(imgui_raylib PUBLIC ImDrawIdx=unsigned\ int)
 # NOTE: deliberately NOT defining IMGUI_DISABLE_OBSOLETE_FUNCTIONS (unlike
 # mandeye-colors) -- core's WITH_GUI=1 sources (manual_pose_graph_loop_closure.cpp
 # etc, shared unchanged with the legacy GLUT app) call a few of ImGui's

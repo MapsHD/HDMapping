@@ -450,6 +450,27 @@ namespace
         if (points_with_ring == 0 && total_points > 0)
             spdlog::info("No point has a ring (the session has no 'ring' attribute, or every ring is 0)");
 
+        // Units with an external IMU (e.g. Murata) leave 'imu****.csv' header-only and log the IMU
+        // into a MURATA_IMU subfolder, in files not aligned with the LiDAR chunks (same fallback
+        // as lidar_odometry_step_1).
+        const fs::path murata_imu_dir = fs::path(dir_path) / "MURATA_IMU";
+        if (all_imu.empty() && fs::is_directory(murata_imu_dir))
+        {
+            std::vector<std::string> murata_files;
+            for (const auto& entry : fs::directory_iterator(murata_imu_dir))
+            {
+                if (entry.is_regular_file() && to_lower(entry.path().extension().string()) == ".csv" && entry.file_size() > 0)
+                    murata_files.push_back(entry.path().string());
+            }
+            std::sort(murata_files.begin(), murata_files.end());
+            spdlog::info("No IMU data in 'imu****.csv', loading {} file(s) from {}", murata_files.size(), murata_imu_dir.string());
+            for (const auto& file : murata_files)
+            {
+                auto imu_data = load_imu(file, calib.imu_id_to_use);
+                all_imu.insert(all_imu.end(), std::make_move_iterator(imu_data.begin()), std::make_move_iterator(imu_data.end()));
+            }
+        }
+
         if (!all_imu.empty())
         {
             sort_imu_by_timestamp(all_imu);

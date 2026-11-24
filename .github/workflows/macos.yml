@@ -47,6 +47,11 @@ jobs:
         # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
         run: ctest -C ${{env.BUILD_TYPE}} --output-on-failure
 
+      - name: LIO trajectory regression
+        uses: ./.github/actions/lio-regression
+        with:
+          build-dir: ${{github.workspace}}/build
+
       - name: List built binaries
         run: |
           echo "Built binaries:"

@@ -31,3 +31,15 @@
   ```
   python3 scripts/resample_imu.py /path/to/continousScanning_0013 --rate 200
   ```
+
+* `lio_to_tum.py` — converts a `lidar_odometry_step_1` result folder (`lio_result_N`) to a TUM trajectory (`timestamp tx ty tz qx qy qz qw`). Uses `session_ini_poses.mri`, the poses step 1 wrote, because steps 2 and 3 overwrite `session_poses.mrp`. Standard library only:
+
+  ```
+  python3 scripts/lio_to_tum.py /path/to/lio_result_0 trajectory.tum
+  ```
+
+* `lio_ate.py` — absolute trajectory error of a TUM trajectory against a golden one: poses paired in order with timestamps within `--max-dt-s` (default 10 µs), position RMSE without alignment. Exits 0 when the RMSE is within `--max-ate-m` (default 0.001 m), 1 when it is not, 2 when the poses or timestamps differ. Standard library only:
+
+  ```
+  python3 scripts/lio_ate.py golden.tum trajectory.tum --max-ate-m 0.001
+  ```

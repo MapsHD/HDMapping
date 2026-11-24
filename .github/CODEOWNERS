@@ -1,0 +1,6 @@
+# Changes to the golden LIO trajectory, the check that compares against it and its tolerance
+# need approval from one of these owners. See CONTRIBUTING.md.
+/tests/golden/ @michalpelka @januszbedkowski
+/.github/actions/lio-regression/ @michalpelka @januszbedkowski
+/scripts/lio_ate.py @michalpelka @januszbedkowski
+/scripts/lio_to_tum.py @michalpelka @januszbedkowski

@@ -1,0 +1,83 @@
+name: LIO trajectory regression
+description: >
+  Runs lidar_odometry_step_1 with default parameters on calibration-room/trial-1 of the
+  HUMANOID-LIO-DATASET (Zenodo 10.5281/zenodo.21318128; 380 s, ~300 m, so it crosses the 200 m
+  sliding-window reset) and fails when the trajectory's ATE against this platform's golden trajectory,
+  tests/golden/calibration-room-trial-1-<runner.os>.tum, is above 1 mm. Uploads the trajectory as an
+  artifact either way.
+
+inputs:
+  build-dir:
+    description: CMake build directory containing bin/ (or bin/<config>/ for multi-config generators)
+    required: true
+  max-ate-m:
+    description: Largest accepted position RMSE against the golden trajectory, in metres
+    default: "0.001"
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Restore calibration-room dataset
+      id: dataset-cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ runner.temp }}/lio-dataset/calibration-room.7z
+        key: humanoid-lio-calibration-room-f965681f362701e48b4631e95e54bd10
+
+    - name: Download calibration-room dataset
+      if: steps.dataset-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        mkdir -p "${{ runner.temp }}/lio-dataset"
+        curl -fsSL --retry 5 --retry-delay 10 -o "${{ runner.temp }}/lio-dataset/calibration-room.7z" \
+          "https://zenodo.org/api/records/21318128/files/calibration-room.7z/content"
+
+    - name: Verify and extract dataset
+      shell: bash
+      run: |
+        archive="${{ runner.temp }}/lio-dataset/calibration-room.7z"
+        python - "$archive" <<'EOF'
+        import hashlib, sys
+        h = hashlib.md5()
+        with open(sys.argv[1], "rb") as f:
+            for block in iter(lambda: f.read(1 << 20), b""):
+                h.update(block)
+        print(h.hexdigest())
+        sys.exit(h.hexdigest() != "f965681f362701e48b4631e95e54bd10")
+        EOF
+        rm -rf "${{ runner.temp }}/lio-run" && mkdir -p "${{ runner.temp }}/lio-run"
+        cd "${{ runner.temp }}/lio-run" && cmake -E tar xf "$archive"
+        rm -rf calibration-room/trial-2 calibration-room/TLS-ground-truth
+        ls calibration-room/trial-1/hdmapping-raw | head
+        df -h .
+
+    - name: Run lidar_odometry_step_1
+      shell: bash
+      run: |
+        bin=$(find "${{ inputs.build-dir }}/bin" -type f \( -name lidar_odometry_step_1 -o -name lidar_odometry_step_1.exe \) | head -1)
+        echo "binary: $bin"
+        start=$(date +%s)
+        "$bin" "${{ runner.temp }}/lio-run/calibration-room/trial-1/hdmapping-raw"
+        echo "step 1 took $(( $(date +%s) - start )) s"
+
+    - name: Compare with golden trajectory
+      shell: bash
+      run: |
+        result="${{ runner.temp }}/lio-run/calibration-room/trial-1/hdmapping-raw/lio_result_0"
+        mkdir -p "${{ runner.temp }}/lio-artifact"
+        cp "$result"/HDMapping_results_*.json "$result"/HDMapping_params_*.toml "$result"/session_ini_poses.mri "${{ runner.temp }}/lio-artifact/"
+        python "${{ github.workspace }}/scripts/lio_to_tum.py" "$result" "${{ runner.temp }}/lio-artifact/calibration-room-trial-1.tum"
+        python "${{ github.workspace }}/scripts/lio_ate.py" "${{ github.workspace }}/tests/golden/calibration-room-trial-1-${{ runner.os }}.tum" \
+          "${{ runner.temp }}/lio-artifact/calibration-room-trial-1.tum" --max-ate-m "${{ inputs.max-ate-m }}"
+
+    - name: Upload trajectory
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: lio-calibration-room-trial-1-${{ runner.os }}
+        path: ${{ runner.temp }}/lio-artifact/
+        if-no-files-found: warn

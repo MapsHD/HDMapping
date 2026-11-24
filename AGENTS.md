@@ -40,6 +40,10 @@ macOS, the Debian package and the Python bindings. It fails on any clang-format 
 - Keep diffs reviewable. Agent-written code is fine, but a large diff that mixes fixes, refactors, tests and UX will
   be sent back to be split.
 - Performance work must not change results. Give before/after timings.
+- A PR must not change the LIO trajectory. CI compares step 1 on a real recording with `tests/golden/calibration-room-trial-1-<platform>.tum`
+  (ATE limit 1 mm). This includes bug fixes, default parameters and making dead code take effect. Don't edit the
+  golden trajectory, the check or its tolerance to make CI pass. An intended improvement follows
+  [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Existing workflows
 

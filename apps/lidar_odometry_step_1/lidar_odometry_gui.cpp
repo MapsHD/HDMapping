@@ -31,6 +31,7 @@
 
 #include "toml_io.h"
 #include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <ctime>
@@ -2077,6 +2078,48 @@ static void quit_abandoned_run()
     std::_Exit(0);
 }
 
+//! UTF-8 form of a path, for ImGui labels and toml++ (which widens UTF-8 on Windows).
+static std::string path_utf8(const fs::path& path)
+{
+    const std::u8string utf8 = path.u8string();
+    return std::string(utf8.begin(), utf8.end());
+}
+
+//! Folder with the user's own parameter presets: %APPDATA%\hdmapping on Windows, $XDG_CONFIG_HOME/hdmapping or
+//! ~/.config/hdmapping elsewhere. Empty if neither variable is set.
+static fs::path user_presets_directory()
+{
+#ifdef _WIN32
+    if (const wchar_t* app_data = _wgetenv(L"APPDATA"); app_data && *app_data)
+        return fs::path(app_data) / "hdmapping";
+#else
+    if (const char* xdg_config = std::getenv("XDG_CONFIG_HOME"); xdg_config && *xdg_config)
+        return fs::path(xdg_config) / "hdmapping";
+    if (const char* home = std::getenv("HOME"); home && *home)
+        return fs::path(home) / ".config" / "hdmapping";
+#endif
+    return {};
+}
+
+//! The .toml files in @p directory, sorted by name. Empty if the folder is missing or unreadable.
+static std::vector<fs::path> list_user_presets(const fs::path& directory)
+{
+    std::vector<fs::path> presets;
+    try
+    {
+        if (directory.empty() || !fs::is_directory(directory))
+            return presets;
+        for (const auto& entry : fs::directory_iterator(directory))
+            if (entry.is_regular_file() && entry.path().extension() == ".toml")
+                presets.push_back(entry.path());
+    } catch (const fs::filesystem_error& error)
+    {
+        std::cerr << "User presets: " << error.what() << std::endl;
+    }
+    std::sort(presets.begin(), presets.end());
+    return presets;
+}
+
 void display()
 {
     if (pipelinePending)
@@ -2451,6 +2494,54 @@ void display()
                         "--stationary-imu): each window's rotation and translation are predicted from the previous window instead of "
                         "from the IMU.");
 
+                ImGui::Separator();
+                // User presets: parameter .toml files in the user's config folder, re-read each time the menu opens.
+                static fs::path user_presets_dir;
+                static std::vector<fs::path> user_presets;
+                static fs::path last_user_preset; // checked while lastPar == -1
+                if (ImGui::IsWindowAppearing())
+                {
+                    user_presets_dir = user_presets_directory();
+                    user_presets = list_user_presets(user_presets_dir);
+                }
+                for (const auto& preset : user_presets)
+                {
+                    const std::string preset_path = path_utf8(preset);
+                    if (ImGui::MenuItem(path_utf8(preset.stem()).c_str(), nullptr, lastPar == -1 && preset == last_user_preset))
+                    {
+                        try
+                        {
+                            TomlIO toml_io;
+                            if (toml_io.LoadParametersFromTomlFile(preset_path, params))
+                            {
+                                lastPar = -1;
+                                last_user_preset = preset;
+                                std::cout << "Parameters loaded from user preset: " << preset_path << std::endl;
+                            }
+                            else
+                                std::cerr << "Failed to load user preset: " << preset_path << std::endl;
+                        } catch (const std::exception& e)
+                        {
+                            std::cerr << "Error loading user preset " << preset_path << ": " << e.what() << std::endl;
+                        }
+                    }
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("%s", preset_path.c_str());
+                }
+                if (user_presets.empty())
+                {
+                    ImGui::MenuItem("No user presets", nullptr, false, false);
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                    {
+                        if (user_presets_dir.empty())
+                            ImGui::SetTooltip("User config folder is unknown (no APPDATA / HOME)");
+                        else
+                            ImGui::SetTooltip(
+                                "Save parameters (Parameters > Save parameters) as .toml files in\n%s\nto list them here",
+                                path_utf8(user_presets_dir).c_str());
+                    }
+                }
+
                 ImGui::EndMenu();
             }
             if (ImGui::IsItemHovered())
@@ -2533,7 +2624,21 @@ void display()
 
                 if (ImGui::MenuItem("Save parameters"))
                 {
+                    // Open the dialog in the user presets folder, so saved files show up in the Presets menu. The other
+                    // dialogs keep opening where they did before.
+                    const std::string previous_location_hint = mandeye::fd::GetLastLocationHint();
+                    if (const fs::path presets_dir = user_presets_directory(); !presets_dir.empty())
+                    {
+                        std::error_code error;
+                        fs::create_directories(presets_dir, error);
+                        if (error)
+                            std::cerr << "Cannot create user presets folder " << path_utf8(presets_dir) << ": " << error.message()
+                                      << std::endl;
+                        else
+                            mandeye::fd::SetLastLocationHint(path_utf8(presets_dir));
+                    }
                     auto output_file_name = mandeye::fd::SaveFileDialog("Save parameters file", mandeye::fd::Toml_filter, ".toml");
+                    mandeye::fd::SetLastLocationHint(previous_location_hint);
                     std::cout << "Parameters file to save: '" << output_file_name << "'" << std::endl;
 
                     if (!output_file_name.empty())

@@ -2164,6 +2164,7 @@ static void exportColmap(AppState& s)
     s.status = "COLMAP: " + std::to_string(nImg) + " images, " + std::to_string(nPts) + " points (+ply) -> " + sparse.string();
 }
 
+#ifdef CALIB_ENABLE_ROS_EXPORT
 //! Gather everything the ROS exporter needs from current viewer state.
 static void buildRosInput(AppState& s, RosExportInput& in)
 {
@@ -2225,6 +2226,7 @@ static void exportRos(AppState& s)
             s.rosBusy = false;
         });
 }
+#endif
 
 static void drawScene(AppState& s)
 {
@@ -3460,6 +3462,7 @@ int main(int argc, char* argv[])
                     b,
                     IM_COL32(0, 255, 0, 255),
                     /*rounding=*/0.f,
+                    /*flags=*/0,
                     /*thickness=*/2.f);
             }
 

@@ -95,6 +95,11 @@ namespace mandeye::fd
         spdlog::info("File dialogs will open in: '{}'", locationHint);
         internal::lastLocationHint = locationHint;
     }
+
+    std::string GetLastLocationHint()
+    {
+        return internal::lastLocationHint;
+    }
     void OutOfMemMessage()
     {
         spdlog::error(

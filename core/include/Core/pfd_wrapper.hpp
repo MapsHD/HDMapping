@@ -62,6 +62,8 @@ namespace mandeye::fd
         const std::string& defaultFileName = "");
     std::string SelectFolder(const std::string& title);
     void SetLastLocationHint(const std::string& locationHint);
+    //! Folder the next file dialog opens in.
+    std::string GetLastLocationHint();
 
     void OutOfMemMessage();
 } // namespace mandeye::fd

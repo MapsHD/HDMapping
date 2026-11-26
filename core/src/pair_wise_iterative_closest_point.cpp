@@ -9,6 +9,7 @@
 
 #include <cmath>
 #include <limits>
+#include <random>
 
 #include <python-scripts/point-to-feature-metrics/point_to_plane_tait_bryan_wc_jacobian.h>
 #include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian_simplified.h>
@@ -20,7 +21,8 @@ bool PairWiseICP::compute(
     int number_of_iterations,
     Eigen::Affine3d& m_pose_result)
 {
-    std::cout << "PairWiseICP::compute" << std::endl;
+    if (verbose)
+        std::cout << "PairWiseICP::compute" << std::endl;
     bool multithread = true;
 
     // The target and the search radius don't change between iterations, so its bucket index is built once.
@@ -79,7 +81,8 @@ bool PairWiseICP::compute(
 
     for (int iter = 0; iter < number_of_iterations; iter++)
     {
-        std::cout << "iteration: " << iter + 1 << " of: " << number_of_iterations << std::endl;
+        if (verbose)
+            std::cout << "iteration: " << iter + 1 << " of: " << number_of_iterations << std::endl;
         Eigen::MatrixXd AtPA(6, 6);
         AtPA.setZero();
         Eigen::MatrixXd AtPB(6, 1);
@@ -252,11 +255,13 @@ bool PairWiseICP::compute(
         std::vector<double> h_x;
         for (int k = 0; k < x.outerSize(); ++k)
         {
-            std::cout << "result pose updates" << std::endl;
+            if (verbose)
+                std::cout << "result pose updates" << std::endl;
             for (Eigen::SparseMatrix<double>::InnerIterator it(x, k); it; ++it)
             {
                 h_x.push_back(it.value());
-                std::cout << it.row() << " " << it.col() << " " << it.value() << std::endl;
+                if (verbose)
+                    std::cout << it.row() << " " << it.col() << " " << it.value() << std::endl;
             }
         }
 
@@ -273,7 +278,8 @@ bool PairWiseICP::compute(
             pose.ka += h_x[counter++];
 
             m_pose_result = affine_matrix_from_pose_tait_bryan(pose);
-            std::cout << "PairWiseICP::compute SUCCESS" << std::endl;
+            if (verbose)
+                std::cout << "PairWiseICP::compute SUCCESS" << std::endl;
             // return true;
         }
         else
@@ -363,26 +369,25 @@ namespace
         std::unordered_map<uint64_t, std::pair<uint32_t, uint32_t>> buckets;
     };
 
-    //! Standard deviations of the pose parameters (px, py, pz in metres; om, fi, ka in radians) from the normal matrix
-    //! AtPA = J^T J (unit weights). Covariance = sigma0^2 * AtPA^-1, where the variance factor
-    //! sigma0^2 = sum of squared residuals / (number_of_observations - 6). Returns infinity for every parameter
-    //! when the problem is degenerate (e.g. a corridor or a plane leaves a direction unconstrained).
+    //! Writes the residual statistics (sigma0 = sqrt(sum of squared residuals / (number_of_observations - 6))) and
+    //! resets the covariance to NaN.
     void fill_residual_statistics(
-        IcpResidualStatistics* statistics, double sum_squared_residuals, int number_of_correspondences, int number_of_observations)
+        IcpResidualStatistics& residual_statistics, double sum_squared_residuals, int number_of_correspondences, int number_of_observations)
     {
-        if (statistics == nullptr)
-        {
-            return;
-        }
-        statistics->sum_squared_residuals = sum_squared_residuals;
-        statistics->number_of_correspondences = number_of_correspondences;
-        statistics->number_of_observations = number_of_observations;
-        statistics->sigma0 = number_of_observations > 6 ? std::sqrt(sum_squared_residuals / (number_of_observations - 6))
-                                                        : std::numeric_limits<double>::quiet_NaN();
+        residual_statistics.sum_squared_residuals = sum_squared_residuals;
+        residual_statistics.number_of_correspondences = number_of_correspondences;
+        residual_statistics.number_of_observations = number_of_observations;
+        residual_statistics.sigma0 = number_of_observations > 6 ? std::sqrt(sum_squared_residuals / (number_of_observations - 6))
+                                                                : std::numeric_limits<double>::quiet_NaN();
+        // Set by compute_icp_uncertainty_from_hessian().
+        residual_statistics.covariance.setConstant(std::numeric_limits<double>::quiet_NaN());
     }
 
     TaitBryanPose compute_icp_uncertainty_from_hessian(
-        const Eigen::Matrix<double, 6, 6>& AtPA, int number_of_observations, double sum_squared_residuals)
+        const Eigen::Matrix<double, 6, 6>& AtPA,
+        int number_of_observations,
+        double sum_squared_residuals,
+        IcpResidualStatistics& statistics)
     {
         TaitBryanPose sigma = infinite_uncertainty();
 
@@ -409,6 +414,7 @@ namespace
         const double sigma0_squared = sum_squared_residuals / redundancy;
         const Eigen::Matrix<double, 6, 6>& V = eigen_solver.eigenvectors();
         const Eigen::Matrix<double, 6, 6> covariance = sigma0_squared * V * eigenvalues.cwiseInverse().asDiagonal() * V.transpose();
+        statistics.covariance = covariance;
 
         sigma.px = std::sqrt(covariance(0, 0));
         sigma.py = std::sqrt(covariance(1, 1));
@@ -420,14 +426,14 @@ namespace
     }
 } // namespace
 
-TaitBryanPose PairWiseICP::compute_icp_uncertainty(
+std::pair<TaitBryanPose, IcpResidualStatistics> PairWiseICP::compute_icp_uncertainty(
     const std::vector<Eigen::Vector3d>& source,
     const std::vector<Eigen::Vector3d>& target,
     const Eigen::Affine3d& m_pose_result,
-    double search_radious,
-    IcpResidualStatistics* statistics)
+    double search_radious)
 {
     bool multithread = true;
+    IcpResidualStatistics icp_residual_statistics;
     TaitBryanPose icp_uncertainty;
     icp_uncertainty.px = 0;
     icp_uncertainty.py = 0;
@@ -612,50 +618,29 @@ TaitBryanPose PairWiseICP::compute_icp_uncertainty(
         counter_nn += sum.counter_nn;
     }
     // Each point-to-point correspondence gives 3 observations (x, y, z).
-    fill_residual_statistics(statistics, sum_squared_residuals, counter_nn, 3 * counter_nn);
+    fill_residual_statistics(icp_residual_statistics, sum_squared_residuals, counter_nn, 3 * counter_nn);
 
     if (counter_nn < 100)
     {
         std::cout << "not suficient number of observations" << std::endl;
         std::cout << "PairWiseICP::compute FAILED (Relative pose is not changed/solved/optimized --> please consider removing this edge)"
                   << std::endl;
-        return icp_uncertainty;
+        return { icp_uncertainty, icp_residual_statistics };
     }
 
-    /*
-    Added compute_icp_uncertainty_from_hessian to pair_wise_iterative_closest_point.cpp.
-
-    How it works:
-
-    Covariance: it computes covariance = σ₀² · (AᵀPA)⁻¹ and returns the square root of each diagonal entry as a TaitBryanPose. px/py/pz are
-    in metres and om/fi/ka in radians. Scale factor: σ₀² = sum of squared residuals / (3·n − 6). Each match gives 3 observations and the
-    pose has 6 unknowns. Matrix inverse: it inverts through an eigen decomposition, which shows when the geometry leaves a direction
-    unconstrained (a plane, a corridor). If the smallest eigenvalue is below 1e-12 of the largest, it prints a warning and returns infinity
-    for every parameter. Other changes:
-
-    Extra parameter: the Hessian only gives the shape of the uncertainty, not its size, so the function needs the residuals too. The call is
-    now compute_icp_uncertainty_from_hessian(AtPA, counter_nn, sum_squared_residuals). Residual sum: NormalEquations gets a
-    sum_squared_residuals field. Each match adds its min_dist_squared, and the block sums are added up alongside AtPA. Includes: added
-    <cmath> and <limits>. Things to check:
-
-    Wasted work: hessian_fun still calls point_to_point_source_to_target_tait_bryan_wc_AtPB_simplified for every point and never uses the
-    result. You can delete that call. Over-confident result: neighbouring LiDAR points are correlated, so this formal covariance tends to
-    make the uncertainty look smaller than it really is. It's fine for comparing edges with each other, but don't read it as an absolute
-    error.
-    */
     // Each point-to-point correspondence gives 3 observations (x, y, z).
-    icp_uncertainty = compute_icp_uncertainty_from_hessian(AtPA, 3 * counter_nn, sum_squared_residuals);
+    icp_uncertainty = compute_icp_uncertainty_from_hessian(AtPA, 3 * counter_nn, sum_squared_residuals, icp_residual_statistics);
 
-    return icp_uncertainty;
+    return { icp_uncertainty, icp_residual_statistics };
 }
 
-TaitBryanPose PairWiseICP::compute_icp_uncertainty_point_to_plane(
+std::pair<TaitBryanPose, IcpResidualStatistics> PairWiseICP::compute_icp_uncertainty_point_to_plane(
     const std::vector<Eigen::Vector3d>& source,
     const std::vector<Eigen::Vector3d>& target,
     const Eigen::Affine3d& m_pose_result,
-    double search_radious,
-    IcpResidualStatistics* statistics)
+    double search_radious)
 {
+    IcpResidualStatistics residual_statistics;
     // A target neighbourhood is used as a plane only if it has enough points and is flat: smallest eigenvalue of
     // its covariance at most this fraction of the middle one.
     constexpr int min_neighbours = 5;
@@ -768,15 +753,111 @@ TaitBryanPose PairWiseICP::compute_icp_uncertainty_point_to_plane(
         counter += sum.counter;
     }
     // Each point-to-plane correspondence gives 1 observation (distance along the normal).
-    fill_residual_statistics(statistics, sum_squared_residuals, counter, counter);
+    fill_residual_statistics(residual_statistics, sum_squared_residuals, counter, counter);
 
     if (counter < min_correspondences)
     {
         std::cout << "PairWiseICP::compute_icp_uncertainty_point_to_plane: not enough planar correspondences (" << counter << ")"
                   << std::endl;
-        return infinite_uncertainty();
+        return { infinite_uncertainty(), residual_statistics };
     }
 
     // Each point-to-plane correspondence gives 1 observation (distance along the normal).
-    return compute_icp_uncertainty_from_hessian(AtPA, counter, sum_squared_residuals);
+    const TaitBryanPose sigma = compute_icp_uncertainty_from_hessian(AtPA, counter, sum_squared_residuals, residual_statistics);
+    return { sigma, residual_statistics };
+}
+
+IcpSpread PairWiseICP::compute_icp_montecarlo(
+    const std::vector<Eigen::Vector3d>& source,
+    const std::vector<Eigen::Vector3d>& target,
+    const Eigen::Affine3d& m_pose,
+    double search_radious,
+    int number_of_iterations,
+    int number_of_runs,
+    double start_offset_m,
+    double start_offset_rad,
+    const std::function<void(int run)>& on_run_done)
+{
+    using Vector6d = Eigen::Matrix<double, 6, 1>;
+    using Matrix6d = Eigen::Matrix<double, 6, 6>;
+
+    const auto to_vector = [](const TaitBryanPose& p)
+    {
+        return (Vector6d() << p.px, p.py, p.pz, p.om, p.fi, p.ka).finished();
+    };
+    const Vector6d reference = to_vector(pose_tait_bryan_from_affine_matrix(m_pose));
+
+    // std::mt19937's output is fixed by the standard (unlike std::uniform_real_distribution's), so every platform
+    // draws the same offsets.
+    std::mt19937 generator(0);
+    const auto uniform = [&generator](double half_width)
+    {
+        return half_width * (2.0 * static_cast<double>(generator()) / static_cast<double>(std::mt19937::max()) - 1.0);
+    };
+
+    std::vector<Vector6d> start_offsets;
+    std::vector<Vector6d> result_offsets;
+    for (int run = 0; run < number_of_runs; run++)
+    {
+        Vector6d start_offset;
+        for (int i = 0; i < 6; i++)
+        {
+            start_offset(i) = uniform(i < 3 ? start_offset_m : start_offset_rad);
+        }
+        start_offsets.push_back(start_offset);
+
+        const Vector6d start = reference + start_offset;
+        const TaitBryanPose start_pose{ start(0), start(1), start(2), start(3), start(4), start(5) };
+        Eigen::Affine3d m_pose_run = affine_matrix_from_pose_tait_bryan(start_pose);
+        if (compute(source, target, search_radious, number_of_iterations, m_pose_run))
+        {
+            Vector6d offset = to_vector(pose_tait_bryan_from_affine_matrix(m_pose_run)) - reference;
+            for (int i = 3; i < 6; i++)
+            {
+                offset(i) = std::remainder(offset(i), 2.0 * M_PI); // angle difference in [-pi, pi]
+            }
+            result_offsets.push_back(offset);
+        }
+        if (on_run_done)
+            on_run_done(run + 1);
+    }
+
+    const auto mean_of = [](const std::vector<Vector6d>& samples)
+    {
+        Vector6d sum = Vector6d::Zero();
+        for (const auto& s : samples)
+        {
+            sum += s;
+        }
+        return Vector6d(sum / static_cast<double>(samples.size()));
+    };
+    const auto covariance_of = [&mean_of](const std::vector<Vector6d>& samples)
+    {
+        const Vector6d mean = mean_of(samples);
+        Matrix6d sum = Matrix6d::Zero();
+        for (const auto& s : samples)
+        {
+            sum += (s - mean) * (s - mean).transpose();
+        }
+        return Matrix6d(sum / static_cast<double>(samples.size() - 1));
+    };
+
+    IcpSpread spread;
+    spread.number_of_runs = number_of_runs;
+    spread.number_of_converged_runs = static_cast<int>(result_offsets.size());
+    if (start_offsets.size() >= 2)
+    {
+        spread.start_sigma = covariance_of(start_offsets).diagonal().cwiseSqrt();
+    }
+    if (!result_offsets.empty())
+    {
+        spread.mean_offset = mean_of(result_offsets);
+    }
+    if (result_offsets.size() >= 2)
+    {
+        spread.covariance = covariance_of(result_offsets);
+    }
+    if (verbose)
+        std::cout << "ICP Monte Carlo: " << spread.number_of_converged_runs << " of " << number_of_runs << " runs converged" << std::endl;
+    return spread;
 }

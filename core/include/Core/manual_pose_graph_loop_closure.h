@@ -39,18 +39,48 @@ public:
         bool progress_drawn = false; //!< the progress bar has been shown at least once
     };
     IcpAllEdgesRun icp_all_edges_run;
-    //! Last "Calculate ICP uncertainty" result: the edge and the relative pose it was computed for, so it is shown only
-    //! while both are unchanged.
+    //! Methods of the "Calculate ICP uncertainty" dropdown.
+    enum class IcpUncertaintyMethod : int
+    {
+        PointToPoint = 0, //!< sigma0^2 * (J^T J)^-1 from point-to-point residuals
+        PointToPlane = 1, //!< sigma0^2 * (J^T J)^-1 from point-to-plane residuals
+        MonteCarlo = 2, //!< spread of ICP runs from randomly perturbed start poses
+    };
+    //! "Calculate ICP uncertainty": its settings and last result. The result is shown only while the method, the edge
+    //! and the relative pose it was computed for are unchanged.
     struct IcpUncertainty
     {
+        IcpUncertaintyMethod method = IcpUncertaintyMethod::PointToPlane;
+        int number_of_runs = 20; //!< Monte Carlo
+        double start_offset_m = 0.05; //!< Monte Carlo
+        double start_offset_deg = 0.5; //!< Monte Carlo
+        //! Size of the drawn translation ellipsoid, in standard deviations.
+        double ellipsoid_sigma = 10.0;
+
+        IcpUncertaintyMethod computed_method = IcpUncertaintyMethod::PointToPlane;
         int edge = -1;
         TaitBryanPose relative_pose;
-        TaitBryanPose point_to_point;
-        TaitBryanPose point_to_plane;
-        IcpResidualStatistics point_to_point_residuals;
-        IcpResidualStatistics point_to_plane_residuals;
+        IcpResidualStatistics residuals; //!< point-to-point, point-to-plane
+        IcpSpread spread; //!< Monte Carlo
     };
     IcpUncertainty icp_uncertainty;
+    //! True when edge is the active edge and its relative pose still equals relative_pose.
+    bool is_active_edge_at(int edge, const TaitBryanPose& relative_pose) const
+    {
+        if (edge != index_active_edge || edge < 0 || edge >= static_cast<int>(edges.size()))
+        {
+            return false;
+        }
+        const TaitBryanPose& a = edges[edge].relative_pose_tb;
+        const TaitBryanPose& b = relative_pose;
+        return a.px == b.px && a.py == b.py && a.pz == b.pz && a.om == b.om && a.fi == b.fi && a.ka == b.ka;
+    }
+    //! True when icp_uncertainty was computed with the selected method for the active edge at its current relative pose.
+    bool icp_uncertainty_is_current() const
+    {
+        return icp_uncertainty.computed_method == icp_uncertainty.method &&
+            is_active_edge_at(icp_uncertainty.edge, icp_uncertainty.relative_pose);
+    }
     //! "Keep initial trajectory curvature": compute_pose_graph_slam() uses the initial poses as the motion model, else the current ones.
     bool keep_initial_trajectory_curvature = true;
 

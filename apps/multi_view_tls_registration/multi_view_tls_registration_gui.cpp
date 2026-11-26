@@ -270,6 +270,7 @@ void observationPickingRender(const ObservationPicking& observation_picking);
 void renderLoopClosure(
     PointClouds& point_clouds_container, int index_loop_closure_source, int index_loop_closure_target, int before, int after);
 void renderLoopClosureLabels(PointClouds& point_clouds_container);
+void drawEllipsoid(const Eigen::Matrix3d& transform, const Eigen::Vector3d& center, Color color);
 void renderGroundControlPoints(const GroundControlPoints& ground_control_points, const PointClouds& point_clouds_container);
 void renderGroundControlPointsLabels(const GroundControlPoints& ground_control_points, const PointClouds& point_clouds_container);
 void renderGNSS(const GNSS& gnss, const PointClouds& point_clouds_container);
@@ -4312,6 +4313,34 @@ void renderLoopClosure(
         Vector3 pMidUp = Vector3{ static_cast<float>(midUp.x()), static_cast<float>(midUp.y()), static_cast<float>(midUp.z()) };
         DrawCylinderEx(pMid, pMidUp, tubeRadius, tubeRadius, 8, c);
     }
+
+    // px, py, pz ellipsoid of the active edge's ICP uncertainty (Monte Carlo: magenta, at the mean result; else yellow,
+    // at the current pose) around the index_to scan origin. The covariance is in the index_from scan's frame and is
+    // rotated here to world.
+    const auto& loop_closure = session.pose_graph_loop_closure;
+    if (loop_closure.icp_uncertainty_is_current())
+    {
+        const auto& uncertainty = loop_closure.icp_uncertainty;
+        const bool monte_carlo = uncertainty.method == ManualPoseGraphLoopClosure::IcpUncertaintyMethod::MonteCarlo;
+        const Eigen::Matrix<double, 6, 6>& covariance_6 = monte_carlo ? uncertainty.spread.covariance : uncertainty.residuals.covariance;
+        if (covariance_6.allFinite())
+        {
+            const auto& edge = loop_closure.edges[uncertainty.edge];
+            const Eigen::Affine3d& m_from = pointClouds[edge.index_from].m_pose;
+            const TaitBryanPose& pose = edge.relative_pose_tb;
+            Eigen::Vector3d center_local(pose.px, pose.py, pose.pz);
+            if (monte_carlo)
+            {
+                center_local += uncertainty.spread.mean_offset.head<3>();
+            }
+            const Eigen::Matrix3d covariance = m_from.linear() * covariance_6.topLeftCorner<3, 3>() * m_from.linear().transpose();
+            // Eigen decomposition rather than Cholesky: a direction can have zero variance.
+            const Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(covariance);
+            const Eigen::Matrix3d transform = uncertainty.ellipsoid_sigma * eigen_solver.eigenvectors() *
+                eigen_solver.eigenvalues().cwiseMax(0.0).cwiseSqrt().asDiagonal();
+            drawEllipsoid(transform, m_from * center_local, monte_carlo ? MAGENTA : YELLOW);
+        }
+    }
 }
 
 // Was GroundControlPoints::draw_ellipse() (core/src/ground_control_points.cpp)
@@ -4323,8 +4352,13 @@ void renderLoopClosure(
 void drawUncertaintyEllipse(const Eigen::Matrix3d& covar, const Eigen::Vector3d& mean, Color color)
 {
     Eigen::LLT<Eigen::Matrix<double, 3, 3>> cholSolver(covar);
-    Eigen::Matrix3d transform = cholSolver.matrixL();
+    drawEllipsoid(cholSolver.matrixL(), mean, color);
+}
 
+//! Wireframe of the unit sphere mapped by x -> transform * x + center.
+void drawEllipsoid(const Eigen::Matrix3d& transform, const Eigen::Vector3d& center, Color color)
+{
+    const Eigen::Vector3d& mean = center;
     const double pi = 3.141592;
     const double di = 0.02;
     const double dj = 0.04;

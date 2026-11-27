@@ -136,8 +136,7 @@ void ScanRenderer::rebuild(size_t index, const PointCloud& pc)
     // Every point in points_local is uploaded -- no stride/skip here, so
     // loading a session always renders it at full point density.
     // Session::load's own voxel-bucket decimation, controlled by the
-    // Settings panel's "Downsample during load" checkbox, is unrelated and
-    // untouched -- it's shared unchanged with the legacy GLUT app.
+    // Settings panel's "Downsample during load" checkbox, is unrelated.
     const bool hasIntensity = pc.intensities.size() == pc.points_local.size();
     float minIntensity = std::numeric_limits<float>::max();
     float maxIntensity = -std::numeric_limits<float>::max();

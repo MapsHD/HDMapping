@@ -22,8 +22,6 @@ add_executable(
   mandeye_raw_data_viewer ${SOURCES}
 )
 
-# raylib-based (ported off GLUT; the GLUT build is kept as apps/mandeye_raw_data_viewer_legacy):
-# <Core/raylib_utils.hpp> (core_raylib_utils) replaces <Core/utils.hpp> with the same names.
 target_include_directories(
   mandeye_raw_data_viewer
   PRIVATE include

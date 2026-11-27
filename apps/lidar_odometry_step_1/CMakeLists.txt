@@ -38,9 +38,6 @@ add_executable(
 target_compile_definitions(lidar_odometry_step_1 PRIVATE WITH_GUI=1)
 target_apply_hdmapping_profiler(lidar_odometry_step_1)
 
-# lidar_odometry_gui.cpp is raylib-based (ported off GLUT; the GLUT build is kept as
-# apps/lidar_odometry_step_1_legacy): <Core/raylib_utils.hpp> (core_raylib_utils) replaces
-# <Core/utils.hpp> with the same names, so only the GL calls changed.
 target_include_directories(
   lidar_odometry_step_1
   PRIVATE include

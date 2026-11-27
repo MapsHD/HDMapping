@@ -11,8 +11,7 @@ platforms, see "Platforms and portability" below.
 - `shared/include/HDMapping/`: header-only utilities (`Assert.h` with `HDMAPPING_ASSERT`, `PoseInterpolation.h`,
   `SessionPaths.h`).
 - `apps/`: the tools. Main workflow: `mandeye_raw_data_viewer`, `lidar_odometry_step_1`, `multi_view_tls_registration`
-  (step 2), `multi_session_registration` (step 3). The `*_legacy` apps are the GLUT versions kept next to the raylib
-  ports. New rendering work goes into the raylib code.
+  (step 2), `multi_session_registration` (step 3). New rendering work goes into the raylib code.
 - `3rdparty/`: git submodules built from source. `3rdpartyBinary/`: prebuilt OpenCV and PROJ. Both are wired up in
   `cmake/dependencies.cmake`.
 - `scripts/`: developer tooling, documented in `scripts/README.md`.

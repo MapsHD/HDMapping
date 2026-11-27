@@ -112,5 +112,4 @@ cleanup. Failed or cancelled runs write a diagnostic report when an output
 directory is available; an unwritable destination cannot retain its own failure
 report. Fatal process termination cannot guarantee finalization.
 
-This change covers the raylib Step 1 workflow. Shared processing sources also
-build for the older GLUT entry points, whose legacy UI is not redesigned here.
+This change covers the raylib Step 1 workflow.

@@ -3,11 +3,6 @@ include_guard()
 # raylib + Dear ImGui + rlImGui, for the raylib-based step2 viewer
 # (apps/multi_view_tls_registration_raylib). Mirrors the integration pattern
 # established in the sibling mandeye-colors project.
-#
-# NOTE: cmake/imgui.cmake already defines a target named `imgui`, statically
-# linked with the GLUT/OpenGL2 backend baked in for the legacy GLUT apps.
-# That target cannot be reused here (rlImGui needs a plain ImGui core with no
-# backend baked in), so this file builds a separate `imgui_raylib` target.
 
 include(FetchContent)
 
@@ -50,11 +45,10 @@ add_library(imgui_raylib STATIC
 target_include_directories(imgui_raylib PUBLIC ${IMGUI_RAYLIB_DIR})
 # 32-bit indices: rlImGui ignores ImDrawCmd::VtxOffset, so with 16-bit indices a
 # draw list over 65535 vertices (e.g. ImPlot lines of a long IMU log) wraps
-# around and renders garbage. Same setting as the legacy `imgui` target.
+# around and renders garbage.
 target_compile_definitions(imgui_raylib PUBLIC ImDrawIdx=unsigned\ int)
 # NOTE: deliberately NOT defining IMGUI_DISABLE_OBSOLETE_FUNCTIONS (unlike
-# mandeye-colors) -- core's WITH_GUI=1 sources (manual_pose_graph_loop_closure.cpp
-# etc, shared unchanged with the legacy GLUT app) call a few of ImGui's
+# mandeye-colors) -- core's WITH_GUI=1 sources call a few of ImGui's
 # "obsolete" functions (e.g. SetWindowFontScale), which that flag compiles
 # out entirely (declaration included), breaking the link against core.a.
 

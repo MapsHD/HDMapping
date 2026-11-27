@@ -388,6 +388,27 @@ bool load_data(
                 return std::get<0>(a).first < std::get<0>(b).first;
             });
 
+        if (params.imu_offset_qw != 1.0 || params.imu_offset_qx != 0.0 || params.imu_offset_qy != 0.0 || params.imu_offset_qz != 0.0)
+        {
+            const Eigen::Quaterniond imu_offset(params.imu_offset_qw, params.imu_offset_qx, params.imu_offset_qy, params.imu_offset_qz);
+            if (imu_offset.norm() < 1e-9)
+            {
+                std::cerr << "imu_offset quaternion (w x y z) is zero, it must describe a rotation\n";
+                return false;
+            }
+            rotate_imu(imu_data, imu_offset);
+            std::cout << "IMU readings rotated by offset quaternion (w x y z): " << params.imu_offset_qw << " " << params.imu_offset_qx
+                      << " " << params.imu_offset_qy << " " << params.imu_offset_qz << "\n";
+        }
+
+        if (params.imu_target_rate_hz > 0.0)
+        {
+            const size_t samples_before = imu_data.size();
+            imu_data = average_imu_to_rate(imu_data, params.imu_target_rate_hz);
+            std::cout << "IMU averaged to " << params.imu_target_rate_hz << " Hz: " << samples_before << " -> " << imu_data.size()
+                      << " samples\n";
+        }
+
         // The IMU timestamps are already sorted; publishing their span needs no point-cloud reads or extra scan.
         if (params.run_report && !imu_data.empty())
             params.run_report->setRecordingSpan(std::get<0>(imu_data.front()).first, std::get<0>(imu_data.back()).first);
@@ -868,7 +889,7 @@ bool compute_step_1(
         }
 
         // correct points timestamps
-        if (wd.intermediate_trajectory_timestamps.size() > 2)
+        if (params.use_uniform_point_timestamps && wd.intermediate_trajectory_timestamps.size() > 2)
         {
             double ts_begin = wd.intermediate_trajectory_timestamps[0].first;
             double ts_step = (wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1].first -

@@ -498,6 +498,54 @@ std::vector<std::tuple<std::pair<double, double>, Eigen::Vector3f, Eigen::Vector
     return all_data;
 }
 
+std::vector<std::tuple<std::pair<double, double>, Eigen::Vector3f, Eigen::Vector3f>> average_imu_to_rate(
+    const std::vector<std::tuple<std::pair<double, double>, Eigen::Vector3f, Eigen::Vector3f>>& imu, double target_rate_hz)
+{
+    if (target_rate_hz <= 0.0 || imu.empty())
+        return imu;
+
+    const double t0 = std::get<0>(imu.front()).first;
+    const auto bin_of = [&](size_t i)
+    {
+        return static_cast<int64_t>(std::floor((std::get<0>(imu[i]).first - t0) * target_rate_hz));
+    };
+
+    std::vector<std::tuple<std::pair<double, double>, Eigen::Vector3f, Eigen::Vector3f>> averaged;
+    averaged.reserve(imu.size());
+    for (size_t begin = 0; begin < imu.size();)
+    {
+        const int64_t bin = bin_of(begin);
+        size_t end = begin + 1;
+        while (end < imu.size() && bin_of(end) == bin)
+            end++;
+
+        Eigen::Vector3d gyr_sum = Eigen::Vector3d::Zero();
+        Eigen::Vector3d acc_sum = Eigen::Vector3d::Zero();
+        for (size_t i = begin; i < end; i++)
+        {
+            gyr_sum += std::get<1>(imu[i]).cast<double>();
+            acc_sum += std::get<2>(imu[i]).cast<double>();
+        }
+        // stamped with the last sample: step 1 applies each reading over the interval that ends at its timestamp, so
+        // the bin's mean time would put the orientation half a bin ahead (2.4 ms at 207 Hz)
+        const double n = static_cast<double>(end - begin);
+        averaged.emplace_back(std::get<0>(imu[end - 1]), (gyr_sum / n).cast<float>(), (acc_sum / n).cast<float>());
+        begin = end;
+    }
+    return averaged;
+}
+
+void rotate_imu(
+    std::vector<std::tuple<std::pair<double, double>, Eigen::Vector3f, Eigen::Vector3f>>& imu, const Eigen::Quaterniond& imu_to_lidar)
+{
+    const Eigen::Matrix3d rotation = imu_to_lidar.normalized().toRotationMatrix();
+    for (auto& [timestamps, gyr, acc] : imu)
+    {
+        gyr = (rotation * gyr.cast<double>()).cast<float>();
+        acc = (rotation * acc.cast<double>()).cast<float>();
+    }
+}
+
 namespace
 {
     // Byte offset of the uint16 LAS extra-bytes attribute `name` within a point's

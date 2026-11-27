@@ -869,6 +869,27 @@ void settings_gui()
                 params.threshold_nr_poses = 1;
             }
 
+            ImGui::SetNextItemWidth(ImGuiNumberWidth);
+            ImGui::InputDouble("IMU target rate [Hz]", &params.imu_target_rate_hz, 0.0, 0.0, "%.1f");
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip(
+                    "> 0: average the IMU samples to this rate during load (one trajectory node per sample),\n"
+                    "e.g. 207 for the 1451 Hz Murata IMU; -1: use every sample. Applies on Load data.");
+
+            double imu_offset[4] = { params.imu_offset_qw, params.imu_offset_qx, params.imu_offset_qy, params.imu_offset_qz };
+            ImGui::SetNextItemWidth(ImGuiNumberWidth * 2);
+            if (ImGui::InputScalarN("IMU offset quaternion (w x y z)", ImGuiDataType_Double, imu_offset, 4, nullptr, nullptr, "%.4f"))
+            {
+                params.imu_offset_qw = imu_offset[0];
+                params.imu_offset_qx = imu_offset[1];
+                params.imu_offset_qy = imu_offset[2];
+                params.imu_offset_qz = imu_offset[3];
+            }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip(
+                    "rotation from the IMU frame to the lidar frame applied to the IMU readings during load,\n"
+                    "e.g. 0.7071 0 0 0.7071 for an IMU turned +90 deg about z; 1 0 0 0: unchanged. Applies on Load data.");
+
             ImGui::NewLine();
         }
 
@@ -1029,6 +1050,11 @@ void settings_gui()
                 ImGui::SetTooltip(
                     "Predict each window's rotation and translation from the previous one (constant velocity) instead of from "
                     "the IMU. For recordings without a usable IMU, e.g. a synthetic stationary one.");
+            ImGui::Checkbox("Uniform point timestamps", &params.use_uniform_point_timestamps);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip(
+                    "On: overwrite each window's point timestamps with evenly spaced times between its first and last node.\n"
+                    "Off: keep the lidar's own timestamps, better when its point rate is uneven (e.g. Hesai no-return sectors).");
             ImGui::Checkbox("Use IMU preintegration", &params.use_imu_preintegration);
             if (params.use_imu_preintegration)
             {
@@ -2178,6 +2204,9 @@ void display()
     ImGuiIO& io = ImGui::GetIO();
     rlViewport(0, 0, GetRenderWidth(), GetRenderHeight());
 
+    // every frame, so the colour from the defaults, a preset or a loaded TOML shows from the start, not only after
+    // the View menu's picker has been opened
+    bg_color = params.clear_color;
     ClearBackground(ColorFromNormalized(Vector4{ bg_color.x * bg_color.w, bg_color.y * bg_color.w, bg_color.z * bg_color.w, bg_color.w }));
     rlEnableDepthTest();
 
@@ -2714,8 +2743,6 @@ void display()
                 ImGui::Text("Colors:");
 
                 ImGui::ColorEdit3("Background", (float*)&params.clear_color, ImGuiColorEditFlags_NoInputs);
-
-                bg_color = params.clear_color;
 
                 ImGui::Separator();
 

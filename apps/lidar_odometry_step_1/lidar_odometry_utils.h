@@ -87,6 +87,16 @@ struct LidarOdometryParams
     double threshould_output_filter = 0.5; // for export --> all points xyz.norm() < threshould_output_filter will be removed
     int min_counter_concatenated_trajectory_nodes = 10; // for export
 
+    // IMU: > 0 averages the IMU samples to this rate [Hz] during load (one trajectory node per sample), e.g. 207 for
+    // the 1451 Hz Murata IMU; <= 0 uses every sample
+    double imu_target_rate_hz = -1.0;
+    // IMU: rotation from the IMU frame to the lidar frame applied to the IMU readings during load (v_lidar = q * v_imu),
+    // e.g. w = z = 0.7071 for an IMU turned +90 deg about z; identity (w = 1) leaves them unchanged
+    double imu_offset_qw = 1.0;
+    double imu_offset_qx = 0.0;
+    double imu_offset_qy = 0.0;
+    double imu_offset_qz = 0.0;
+
     // AHRS type selection: false = Fusion (Madgwick, default), true = VQF
     bool use_vqf = false;
 
@@ -135,6 +145,9 @@ struct LidarOdometryParams
     // No usable IMU: predict each window's rotation and translation from the
     // previous window (constant velocity) instead of from the IMU orientation.
     bool lidar_only_odometry = false;
+    // true: overwrite each window's point timestamps with evenly spaced times between its first and last node, in point
+    // order; false: keep the lidar's own timestamps (better when its point rate is uneven, e.g. Hesai no-return sectors)
+    bool use_uniform_point_timestamps = true;
     int nr_iter = 100;
     NDT::GridParameters in_out_params_indoor;
     NDT::GridParameters in_out_params_outdoor;
@@ -347,6 +360,21 @@ void update_rgd_spherical_coordinates(
 //! @param imuToUse - id number of IMU to use, the same index as in pointcloud return by @ref load_point_cloud
 //! @return vector of tuples (std::pair<timestamp, timestampUnix>, angular_velocity, linear_acceleration)
 std::vector<std::tuple<std::pair<double, double>, Eigen::Vector3f, Eigen::Vector3f>> load_imu(const std::string& imu_file, int imuToUse);
+
+//! Averages IMU samples over consecutive time bins of 1 / target_rate_hz seconds, counted from the first sample.
+//! Each non-empty bin becomes one sample with the mean angular velocity and acceleration, stamped with the timestamps
+//! (both clocks) of the bin's last sample, as step 1 applies a reading over the interval that ends at its timestamp.
+//! @param imu - samples sorted by timestamp, as returned by @ref load_imu
+//! @param target_rate_hz - output rate [Hz]; <= 0 returns @p imu unchanged
+//! @return averaged samples, sorted by timestamp
+std::vector<std::tuple<std::pair<double, double>, Eigen::Vector3f, Eigen::Vector3f>> average_imu_to_rate(
+    const std::vector<std::tuple<std::pair<double, double>, Eigen::Vector3f, Eigen::Vector3f>>& imu, double target_rate_hz);
+
+//! Rotates every IMU reading (angular velocity and acceleration) into another frame: v_lidar = imu_to_lidar * v_imu.
+//! @param imu - samples, rotated in place; timestamps are unchanged
+//! @param imu_to_lidar - rotation from the IMU frame to the lidar frame; normalized before use, must not be zero
+void rotate_imu(
+    std::vector<std::tuple<std::pair<double, double>, Eigen::Vector3f, Eigen::Vector3f>>& imu, const Eigen::Quaterniond& imu_to_lidar);
 
 //! This function load point cloud from LAS/LAZ file.
 //! Optionally it can apply extrinsic calibration to each point.

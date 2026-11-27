@@ -43,3 +43,9 @@
   ```
   python3 scripts/lio_ate.py golden.tum trajectory.tum --max-ate-m 0.001
   ```
+
+* `plot_session_uncertainty.py` — plots the CSV written by `session_uncertainty_calculation` (any `--method`): a top view of the trajectory coloured by the position sigma with the x-y covariance ellipses, and the pose sigmas over time with sigma0 and correspondences (or converged Monte Carlo runs). Shows the figures, or saves them with `--output`. Needs `numpy` and `matplotlib`:
+
+  ```
+  python3 scripts/plot_session_uncertainty.py uncertainty.csv --output uncertainty.png
+  ```

@@ -1316,14 +1316,13 @@ bool PoseGraphLoopClosure::run_icp(
     return false;
 }
 
-TaitBryanPose PoseGraphLoopClosure::compute_icp_uncertainty(
+std::pair<TaitBryanPose, IcpResidualStatistics> PoseGraphLoopClosure::compute_icp_uncertainty(
     const PointClouds& point_clouds_container,
     int index_active_edge,
     double search_radius,
     int num_edge_extended_before,
     int num_edge_extended_after,
-    bool point_to_plane,
-    IcpResidualStatistics* statistics)
+    bool point_to_plane)
 {
     const auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
     std::vector<Eigen::Vector3d> source;
@@ -1331,8 +1330,35 @@ TaitBryanPose PoseGraphLoopClosure::compute_icp_uncertainty(
     edge_source_target(point_clouds_container, edges[index_active_edge], num_edge_extended_before, num_edge_extended_after, source, target);
 
     PairWiseICP icp;
-    return point_to_plane ? icp.compute_icp_uncertainty_point_to_plane(source, target, m_pose, search_radius, statistics)
-                          : icp.compute_icp_uncertainty(source, target, m_pose, search_radius, statistics);
+    return point_to_plane ? icp.compute_icp_uncertainty_point_to_plane(source, target, m_pose, search_radius)
+                          : icp.compute_icp_uncertainty(source, target, m_pose, search_radius);
+}
+
+IcpSpread PoseGraphLoopClosure::compute_icp_montecarlo(
+    const PointClouds& point_clouds_container,
+    int index_active_edge,
+    double search_radius,
+    int number_of_iterations,
+    int num_edge_extended_before,
+    int num_edge_extended_after,
+    int number_of_runs,
+    double start_offset_m,
+    double start_offset_rad) const
+{
+    std::vector<Eigen::Vector3d> source;
+    std::vector<Eigen::Vector3d> target;
+    edge_source_target(point_clouds_container, edges[index_active_edge], num_edge_extended_before, num_edge_extended_after, source, target);
+
+    PairWiseICP icp;
+    return icp.compute_icp_montecarlo(
+        source,
+        target,
+        affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb),
+        search_radius,
+        number_of_iterations,
+        number_of_runs,
+        start_offset_m,
+        start_offset_rad);
 }
 
 std::vector<float> PoseGraphLoopClosure::icp_search_radii(float start_radius)

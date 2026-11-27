@@ -79,16 +79,27 @@ public:
     //! Standard deviations of one edge's relative pose (px, py, pz in metres; om, fi, ka in radians) from the ICP
     //! normal matrix at the current relative pose, on the same clouds as run_icp().
     //! @param point_to_plane false: point-to-point residuals (as run_icp() minimises); true: point-to-plane residuals
-    //! @param statistics if given, receives the residual statistics (sum of squared residuals, sigma0, ...)
-    //! @return infinity for every parameter when the geometry does not constrain the pose
-    TaitBryanPose compute_icp_uncertainty(
+    //! @return the standard deviations (infinity for every parameter when the geometry does not constrain the pose) and
+    //! the residual statistics with the covariance
+    std::pair<TaitBryanPose, IcpResidualStatistics> compute_icp_uncertainty(
         const PointClouds& point_clouds_container,
         int index_active_edge,
         double search_radius,
         int num_edge_extended_before,
         int num_edge_extended_after,
-        bool point_to_plane,
-        IcpResidualStatistics* statistics = nullptr);
+        bool point_to_plane);
+    //! Monte Carlo ICP ("ICP spread") of one edge's relative pose: PairWiseICP::compute_icp_montecarlo() on the same
+    //! clouds as run_icp(). The edge is left unchanged.
+    IcpSpread compute_icp_montecarlo(
+        const PointClouds& point_clouds_container,
+        int index_active_edge,
+        double search_radius,
+        int number_of_iterations,
+        int num_edge_extended_before,
+        int num_edge_extended_after,
+        int number_of_runs,
+        double start_offset_m,
+        double start_offset_rad) const;
     //! Search radii for coarse-to-fine ICP: `start_radius`, then those of the per-edge ICP buttons' steps (2.0, 1.0,
     //! 0.5, 0.25, 0.1 m) below it.
     static std::vector<float> icp_search_radii(float start_radius);

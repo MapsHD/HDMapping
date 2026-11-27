@@ -4,6 +4,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <HDMapping/BuildInfo.h>
 #include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
 #include <HDMapping/SessionPaths.h>
 
@@ -394,6 +395,7 @@ bool Session::save(
     j["ground_truth"] = is_ground_truth;
     j["exporting_software_version"] = HDMAPPING_CONFIGURE_PROJECT_VERSION;
     jj["Session Settings"] = j;
+    jj["build_info"] = buildInfoJson();
 
     nlohmann::json jloop_closure_edges;
     if (!is_subsession)

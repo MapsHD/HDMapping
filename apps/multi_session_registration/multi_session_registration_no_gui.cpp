@@ -18,6 +18,7 @@
 
 #include <portable-file-dialogs.h>
 
+#include <HDMapping/BuildInfo.h>
 #include <HDMapping/HDMAPPING_ConfigureInfo.hpp>
 #include <HDMapping/SessionPaths.h>
 
@@ -362,6 +363,7 @@ bool save_project_settings(const std::string& file_name, const ProjectSettings& 
         jloop_closure_edges.push_back(jloop_closure_edge);
     }
     jj["loop_closure_edges"] = jloop_closure_edges;
+    jj["build_info"] = buildInfoJson();
 
     std::ofstream fs(file_name);
     if (!fs.good())
